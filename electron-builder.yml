@@ -1,0 +1,22 @@
+appId: dev.desktop-assistant.app
+productName: Desktop Assistant
+directories:
+  output: release
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+asar: true
+npmRebuild: false
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+win:
+  target: nsis
+nsis:
+  oneClick: false
+  perMachine: false

@@ -1,0 +1,16 @@
+node_modules/
+out/
+dist/
+release/
+test-results/
+playwright-report/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+graphify-out/cache/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+graphify-out/graph.html

@@ -166,7 +166,8 @@ export function appsPlugin(apps: () => ApprovedApp[]): Plugin {
           // No arguments and no shell: only the exact approved path is opened.
           const error = await shell.openPath(app.path)
           if (error) throw new Error(`Windows could not open ${app.name}: ${error}`)
-          return `Opened ${app.name}.`
+          // Say what can happen next: small models otherwise stop here and tell the user to do the rest.
+          return `Opened ${app.name}; it is now the window in front. To type into it, call ui_type with the text (no item needed); to see it, call screen_look.`
         }
       })
     ]

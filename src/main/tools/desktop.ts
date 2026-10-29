@@ -49,6 +49,7 @@ export class DesktopHelper {
     if (this.proc && this.proc.exitCode === null) return this.proc
     const proc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', this.script()], {
       windowsHide: true,
+      env: { ...process.env, LUMI_PID: String(process.pid) }, // so the helper never treats Lumi's own windows as the target
       stdio: ['pipe', 'pipe', 'pipe']
     })
     this.proc = proc

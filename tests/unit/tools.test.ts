@@ -150,3 +150,19 @@ describe('conversation with tools', () => {
     expect(conv.snapshot().status).toBe('idle')
   })
 })
+
+describe('parseWrittenToolCall', () => {
+  it('turns a tool call written as text into a real call, only for tools that exist', async () => {
+    const { parseWrittenToolCall } = await import('../../src/main/ai/conversation')
+    const names = ['apps_open', 'web_open']
+    expect(parseWrittenToolCall('apps_open {"name": "Notepad"}', names)).toEqual({ id: '', name: 'apps_open', arguments: '{"name": "Notepad"}' })
+    expect(parseWrittenToolCall('<tool_call>\n{"name": "web_open", "arguments": {"site": "youtube"}}\n</tool_call>', names)).toEqual({
+      id: '',
+      name: 'web_open',
+      arguments: '{"site":"youtube"}'
+    })
+    expect(parseWrittenToolCall('rm_rf {"path": "C:/"}', names)).toBeNull() // not a tool Lumi has
+    expect(parseWrittenToolCall('I opened apps_open {"name": "x"} for you', names)).toBeNull() // prose stays prose
+    expect(parseWrittenToolCall('apps_open {broken', names)).toBeNull()
+  })
+})

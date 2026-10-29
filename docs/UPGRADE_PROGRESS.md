@@ -111,3 +111,16 @@ Context7 is configured but needs authentication (`/mcp` in Claude Code) before i
 | Uninstall | removes the app; keeps `%APPDATA%\Desktop Assistant` (settings, chats, 2.7 GB of models); reinstall works |
 | Live built-in AI, Whisper, Notepad control | see Phases 6 and 2–3 |
 | Not tested | real microphone in a real room; cloud providers (no keys); a clean second PC; code signing (no certificate) |
+
+## 0.2.1: testing the installed app found three bugs (fixed)
+Tested the real installed `Lumi.exe` (launched with `--force-renderer-accessibility`, driven through Lumi's own UI
+Automation helper like a person: typing in the chat box, clicking "Allow once").
+1. **Tool calls written as text.** Qwen3 sometimes wrote `apps_open {"name": "Notepad"}` as a reply instead of calling the
+   tool, so nothing happened. Fixed twice over: Qwen's recommended non-thinking sampling (temp 0.7, top-p 0.8, top-k 20)
+   instead of llama.cpp's defaults, and a parser that turns a written call for a real tool into a call (still approved).
+2. **Typing landed in Lumi.** Clicking "Allow once" focuses Lumi's chat, so typing "where the focus is" went into Lumi.
+   The helper now treats the topmost window that isn't Lumi's as the target and brings it back before typing or keys.
+3. **Non-English text was mangled** on its way to the helper (PowerShell read stdin as the OEM code page). Now UTF-8.
+- **Verified in the installed app (built-in engine, Ollama stopped):** "What is 17 times 3?" → "17 times 3 is 51." (~6 s);
+  "Open Notepad and type this text into it: Hello from Lumi" with real approvals → 3/3 runs, Notepad's document checked
+  independently each time (9–11 s). Unit 144 pass, E2E 50/50.

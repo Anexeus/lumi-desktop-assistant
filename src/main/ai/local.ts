@@ -174,7 +174,9 @@ export class LocalServer {
     const args =
       this.kind === 'llm'
         ? // Thinking off (Qwen3's template switch): multi-step desktop tasks were ~5× slower with reasoning, for little gain.
-          [...common, '-c', '8192', '--chat-template-kwargs', '{"enable_thinking":false}', ...(device ? ['--device', device.id] : ['--device', 'none'])]
+          // Sampling is Qwen's recommendation for non-thinking mode; llama.cpp's defaults (temp 0.8) made tool calls flaky.
+          [...common, '-c', '8192', '--chat-template-kwargs', '{"enable_thinking":false}', '--temp', '0.7', '--top-p', '0.8', '--top-k', '20', '--min-p', '0',
+            ...(device ? ['--device', device.id] : ['--device', 'none'])]
         : [...common, '--inference-path', '/v1/audio/transcriptions', '-l', 'en', '-t', String(Math.min(8, availableParallelism())), '--prompt', VOCABULARY]
     this.set({ state: 'starting', device: device?.name ?? 'CPU', message: 'Loading the model…' })
     const proc = spawn(exe, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, LLAMA_API_KEY: this.key } })

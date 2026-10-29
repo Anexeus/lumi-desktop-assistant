@@ -11,6 +11,10 @@ public static class LumiNative {
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern int GetWindowTextLength(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h, uint cmd);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr v);
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
@@ -47,6 +51,32 @@ function TopWindows {
     Where-Object { $_.Current.Name -and $_.Current.NativeWindowHandle -ne 0 }
 }
 
+# Lumi's own windows (chat, island, character) are never the target: clicking "Allow once" focuses Lumi, so
+# "the active window" means the topmost visible window that isn't Lumi's.
+$LumiPid = [int]$env:LUMI_PID
+function TargetHandle {
+  $h = [LumiNative]::GetForegroundWindow()
+  for ($i = 0; $h -ne [IntPtr]::Zero -and $i -lt 500; $i++) {
+    $owner = [uint32]0
+    [void][LumiNative]::GetWindowThreadProcessId($h, [ref]$owner)
+    if ($owner -ne $LumiPid -and [LumiNative]::IsWindowVisible($h) -and [LumiNative]::GetWindowTextLength($h) -gt 0) { return $h }
+    $h = [LumiNative]::GetWindow($h, 2) # next window down in z-order
+  }
+  [LumiNative]::GetForegroundWindow()
+}
+
+# Brings the target to the front if Lumi has the keyboard (so typing never lands in Lumi's own chat box).
+function EnsureTarget {
+  $fg = [LumiNative]::GetForegroundWindow(); $owner = [uint32]0
+  [void][LumiNative]::GetWindowThreadProcessId($fg, [ref]$owner)
+  if ($owner -ne $LumiPid) { return }
+  $h = TargetHandle
+  if ([LumiNative]::IsIconic($h)) { [void][LumiNative]::ShowWindow($h, 9) }
+  Keys 'alt'
+  [void][LumiNative]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 250
+}
+
 function FindWindow($req) {
   if ($req.handle) { return $UIA::FromHandle([IntPtr][int64]$req.handle) }
   if ($req.title) {
@@ -56,7 +86,7 @@ function FindWindow($req) {
     if (-not $w) { throw "No open window matches '$t'." }
     return $w
   }
-  $UIA::FromHandle([LumiNative]::GetForegroundWindow())
+  $UIA::FromHandle((TargetHandle))
 }
 
 $Interactive = @($CT::Button, $CT::Edit, $CT::MenuItem, $CT::TabItem, $CT::CheckBox, $CT::RadioButton, $CT::ComboBox, $CT::ListItem,
@@ -174,7 +204,7 @@ function Act($req) {
       'toggle' { $e.GetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern).Toggle(); return 'toggled' }
       'expand' { $e.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand(); return 'expanded' }
       'select' { $e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); return 'selected' }
-      'focus' { $e.SetFocus(); return 'focused' }
+      'focus' { $e.SetFocus(); EnsureTarget; return 'focused' }
       default {
         try { $e.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); return 'invoked' } catch {}
         try { $e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); return 'selected' } catch {}
@@ -233,8 +263,8 @@ function Handle($req) {
       return @{ done = $req.action }
     }
     'act' { return @{ done = (Act $req) } }
-    'type' { foreach ($c in ([string]$req.text).ToCharArray()) { [LumiNative]::TypeChar($c) }; if ($req.enter) { Keys 'enter' }; return @{ done = 'typed' } }
-    'keys' { Keys ([string]$req.keys); return @{ done = 'pressed' } }
+    'type' { EnsureTarget; foreach ($c in ([string]$req.text).ToCharArray()) { [LumiNative]::TypeChar($c) }; if ($req.enter) { Keys 'enter' }; return @{ done = 'typed' } }
+    'keys' { EnsureTarget; Keys ([string]$req.keys); return @{ done = 'pressed' } }
     'click' { Click ([int]$req.x) ([int]$req.y) ([bool]$req.right) ([bool]$req.double); return @{ done = 'clicked' } }
     'scroll' {
       if ($req.x -ne $null) { [void][LumiNative]::SetCursorPos([int]$req.x, [int]$req.y) }
@@ -246,6 +276,9 @@ function Handle($req) {
   }
 }
 
+# Requests are UTF-8 JSON. Without this, PowerShell decodes stdin with the OEM code page and mangles anything
+# non-English (window titles with "—", accented text Lumi types, emoji).
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $stdin = [Console]::In
 while (($line = $stdin.ReadLine()) -ne $null) {

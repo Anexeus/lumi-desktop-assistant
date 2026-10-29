@@ -146,7 +146,7 @@ describe('conversation with tools', () => {
       onCharacter: () => {}
     })
     await conv.send('loop forever')
-    expect(rounds).toBe(6)
+    expect(rounds).toBe(11) // MAX_TOOL_ROUNDS (10) tool rounds, then one final answer
     expect(conv.snapshot().status).toBe('idle')
   })
 })

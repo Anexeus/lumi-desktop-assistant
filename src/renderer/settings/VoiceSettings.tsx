@@ -1,11 +1,12 @@
+import { LocalModels } from './AiSettings'
 import { pickVoice } from '../character/speech'
 import { useEffect, useRef, useState } from 'react'
-import type { VoiceSettings as Voice } from '@shared/ipc'
+import type { AppState, VoiceSettings as Voice } from '@shared/ipc'
 import { fixWavSizes } from '../ui/wav'
 
 const SAMPLE = 'Hi! This is how I sound. Do you like it?'
 
-export function VoiceSettings({ voice }: { voice: Voice }): React.JSX.Element {
+export function VoiceSettings({ voice, local }: { voice: Voice; local?: AppState['local'] }): React.JSX.Element {
   const [windowsVoices, setWindowsVoices] = useState<string[]>([])
   const [mics, setMics] = useState<MediaDeviceInfo[]>([])
   const [status, setStatus] = useState<{ error: boolean; text: string } | null>(null)
@@ -88,7 +89,7 @@ export function VoiceSettings({ voice }: { voice: Voice }): React.JSX.Element {
       <label className="field">
         <span>Speak replies</span>
         <select value={voice.output} onChange={(e) => save({ output: e.target.value as Voice['output'] })}>
-          <option value="local">With the AI voice on this PC (Ollama)</option>
+          <option value="local">With the AI service’s voice (e.g. Ollama)</option>
           <option value="system">With a Windows voice</option>
           <option value="off">Don’t speak</option>
         </select>
@@ -140,11 +141,34 @@ export function VoiceSettings({ voice }: { voice: Voice }): React.JSX.Element {
 
       <label className="row">
         <span>
-          Voice input (push to talk)
-          <small>Click the mic in chat or the island, speak, click again. The mic is only open while you talk.</small>
+          Voice input
+          <small>
+            Push to talk with the mic button, or tap the island for hands-free voice mode (tap again to stop). The mic is only open while one of
+            those is on, and Windows shows its mic icon.
+          </small>
         </span>
         <input type="checkbox" checked={voice.input} onChange={(e) => save({ input: e.target.checked })} />
       </label>
+      {voice.input && (
+        <label className="row">
+          <span>
+            Only respond when I say the name
+            <small>In hands-free mode, ignore speech that doesn’t include the assistant’s name (a simple wake word).</small>
+          </span>
+          <input type="checkbox" checked={voice.wake} onChange={(e) => save({ wake: e.target.checked })} />
+        </label>
+      )}
+
+      {voice.input && (
+        <label className="field">
+          <span>Understand speech with</span>
+          <select value={voice.stt} onChange={(e) => save({ stt: e.target.value as Voice['stt'] })}>
+            <option value="builtin">Lumi’s Whisper, on this PC (private)</option>
+            <option value="server">The AI service’s speech model ({voice.model})</option>
+          </select>
+        </label>
+      )}
+      {voice.input && voice.stt === 'builtin' && local && <LocalModels kind="stt" local={local} />}
 
       {voice.input && (
         <label className="field">

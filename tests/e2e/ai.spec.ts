@@ -85,7 +85,12 @@ test.beforeAll(async () => {
 
   userData = mkdtempSync(join(tmpdir(), 'desktop-assistant-ai-'))
   // A pre-SQLite settings file: the app imports it into its database on first start.
-  writeFileSync(join(userData, 'settings.json'), JSON.stringify({ ai: { baseUrl, model: 'fake-model' }, islandVisible: true }))
+  writeFileSync(join(userData, 'settings.json'), JSON.stringify({
+      ai: { baseUrl, model: 'fake-model' },
+      islandVisible: true,
+      // These tests cover the AI server's speech endpoints (new installs default to the Windows voice + built-in whisper).
+      voice: { output: 'local', input: true, stt: 'server', model: 'fake-audio', voice: '', speed: 1, micId: '' }
+    }))
   await launch()
 })
 
@@ -211,7 +216,7 @@ test('the island sits at the top centre, expands, answers and shares the convers
 
 test('Stop cancels a streaming reply and keeps what arrived', async () => {
   const chat = await openPanel('chat')
-  await chat.evaluate((url) => window.assistant.ai.setSettings({ baseUrl: url, model: 'slow-model' }), baseUrl)
+  await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url, model: 'slow-model' }), baseUrl)
   await chat.getByRole('textbox', { name: 'Message' }).fill('tell me a long story')
   await chat.keyboard.press('Enter')
   await expect(chat.locator('.bubble.assistant').last()).toContainText('word1')
@@ -232,7 +237,7 @@ test('settings tests the connection and lists models', async () => {
 
 test('API keys are encrypted at rest, sent as a bearer token, and dropped when the service changes', async () => {
   const chat = await openPanel('chat')
-  await chat.evaluate((url) => window.assistant.ai.setSettings({ baseUrl: url, model: 'fake-model' }), baseUrl)
+  await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url, model: 'fake-model' }), baseUrl)
   const state = await chat.evaluate(() => window.assistant.ai.setApiKey('sk-test-123456'))
   expect(state.ai.hasApiKey).toBe(true)
   expect(JSON.stringify(state)).not.toContain('sk-test-123456') // never handed back to a renderer
@@ -242,11 +247,11 @@ test('API keys are encrypted at rest, sent as a bearer token, and dropped when t
   await expect.poll(() => requests.at(-1)?.auth).toBe('Bearer sk-test-123456')
 
   // Same service, different path: the key stays. Different host: it is deleted.
-  const samePath = await chat.evaluate((url) => window.assistant.ai.setSettings({ baseUrl: url.replace('/v1', '/v1/'), model: 'fake-model' }), baseUrl)
+  const samePath = await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url.replace('/v1', '/v1/'), model: 'fake-model' }), baseUrl)
   expect(samePath.ai.hasApiKey).toBe(true)
-  const other = await chat.evaluate(() => window.assistant.ai.setSettings({ baseUrl: 'http://localhost:9/v1', model: 'x' }))
+  const other = await chat.evaluate(() => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: 'http://localhost:9/v1', model: 'x' }))
   expect(other.ai.hasApiKey).toBe(false)
-  await chat.evaluate((url) => window.assistant.ai.setSettings({ baseUrl: url, model: 'fake-model' }), baseUrl)
+  await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url, model: 'fake-model' }), baseUrl)
 })
 
 test('unsafe settings and empty messages are rejected', async () => {
@@ -254,8 +259,8 @@ test('unsafe settings and empty messages are rejected', async () => {
   const outcomes = await chat.evaluate(async () => {
     const tryIt = (p: Promise<unknown>): Promise<string> => p.then(() => 'accepted', () => 'rejected')
     return [
-      await tryIt(window.assistant.ai.setSettings({ baseUrl: 'file:///C:/Windows/win.ini', model: 'x' })),
-      await tryIt(window.assistant.ai.setSettings({ baseUrl: 'http://user:pass@example.com/v1', model: 'x' })),
+      await tryIt(window.assistant.ai.setSettings({ provider: 'custom', baseUrl: 'file:///C:/Windows/win.ini', model: 'x' })),
+      await tryIt(window.assistant.ai.setSettings({ provider: 'custom', baseUrl: 'http://user:pass@example.com/v1', model: 'x' })),
       await tryIt(window.assistant.chat.send('   '))
     ]
   })

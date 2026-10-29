@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, type MenuItemConstructorOptions } from 'electron'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { z } from 'zod'
@@ -8,7 +9,8 @@ import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent, type Ch
 import { Events, Invoke, Send, type AppState, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
 import { runCommand, saveMemory } from './ai/commands'
 import { Conversation } from './ai/conversation'
-import { listModels, ProviderError, streamChat, type StreamEvent } from './ai/provider'
+import { downloadModel, LocalServer } from './ai/local'
+import { describeImage, listModels, ProviderError, streamChat, type ProviderConfig, type StreamEvent } from './ai/provider'
 import { HOOK_PORT, hooksInstalled, installHooks, startHookServer, uninstallHooks, type HookEvent } from './claude/hooks'
 import { ClaudeTasks, findClaude } from './claude/tasks'
 import { PermissionBroker } from './tools/broker'
@@ -18,9 +20,14 @@ import { githubPlugin } from './tools/github'
 import { McpManager, parseCommandLine } from './tools/mcp'
 import { createRegistry, runToolCall } from './tools/registry'
 import { webPlugin } from './tools/web'
+import { DesktopHelper, desktopPlugin } from './tools/desktop'
+import { projectsPlugin } from './tools/projects'
 import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
+import { startLog } from './log'
 import { findCharacter } from '@shared/characters'
+import { findLocalModel, LOCAL_MODELS } from '@shared/localModels'
+import { findProvider } from '@shared/providers'
 import { importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
 import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
@@ -31,6 +38,7 @@ import { loadWindowState, saveWindowState } from './window-state'
 import { glassSupported, WindowManager } from './windows'
 
 const SHORTCUT = 'Control+Alt+Shift+A'
+const STOP_SHORTCUT = 'Control+Alt+Shift+X'
 const ISLAND_SHORTCUT = 'Alt+Shift+Space' // Ctrl+Alt+Space is often taken; Alt+Space is the Windows window menu
 const API_KEY = 'ai.apiKey'
 const GITHUB_TOKEN = 'github.token'
@@ -50,6 +58,8 @@ app.enableSandbox()
 registerAppScheme()
 
 if (!app.requestSingleInstanceLock()) {
+  // Without this line, a second launch (e.g. `npm run dev` while the installed Lumi runs) seems to do nothing.
+  console.error('Lumi is already running (look for its tray icon). That copy was brought to the front; quit it from the tray to start this one.')
   app.quit()
 } else {
   app.on('window-all-closed', () => {
@@ -59,6 +69,7 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function start(): Promise<void> {
+  startLog(join(app.getPath('userData'), 'logs'))
   app.setAppUserModelId('dev.desktop-assistant.app')
   Menu.setApplicationMenu(null)
   // Push-to-talk: the microphone, audio only, for the chat and island windows while voice input is on.
@@ -75,11 +86,53 @@ async function start(): Promise<void> {
   const saved = loadWindowState(store)
   const settings = loadSettings(store)
   saveSettings(store, settings) // persists generated defaults (e.g. the hook token) on first run
+  // One encrypted key per provider. A key saved before providers existed belongs to the service in use then.
+  const keyFor = (provider: string): string => `ai.key.${provider}`
+  if (hasSecret(API_KEY)) {
+    await setSecret(keyFor(settings.ai.provider), (await getSecret(API_KEY)) ?? null)
+    await setSecret(API_KEY, null)
+  }
   const aiStatus = (): AppState['ai'] => ({
     ...settings.ai,
-    hasApiKey: hasSecret(API_KEY),
-    local: isLocalUrl(settings.ai.baseUrl)
+    hasApiKey: hasSecret(keyFor(settings.ai.provider)),
+    local: findProvider(settings.ai.provider).local || (settings.ai.provider === 'custom' && isLocalUrl(settings.ai.baseUrl))
   })
+
+  // Lumi's built-in engines: bundled servers, models downloaded on first use.
+  const runtimesDir = app.isPackaged ? join(process.resourcesPath, 'runtimes') : join(app.getAppPath(), 'resources', 'runtimes')
+  const modelsDir = join(app.getPath('userData'), 'models', 'local')
+  const modelPath = (id: string): string => join(modelsDir, findLocalModel(id)!.file)
+  const installedModels = (): string[] => LOCAL_MODELS.filter((m) => existsSync(join(modelsDir, m.file))).map((m) => m.id)
+  let download: AppState['local']['download'] = null
+  let downloadError: string | null = null
+  let downloadAbort: AbortController | undefined
+  const localState = (): AppState['local'] => ({
+    runtime: existsSync(join(runtimesDir, 'llama', 'llama-server.exe')) && existsSync(join(runtimesDir, 'whisper', 'whisper-server.exe')),
+    llm: settings.local.llm,
+    stt: settings.local.stt,
+    installed: installedModels(),
+    download,
+    downloadError,
+    servers: { llm: llmServer.status, stt: sttServer.status }
+  })
+  const pushLocal = (): void => void (state && setState({ local: localState() }))
+  const llmServer = new LocalServer('llm', () => join(runtimesDir, 'llama', 'llama-server.exe'), pushLocal)
+  const sttServer = new LocalServer('stt', () => join(runtimesDir, 'whisper', 'whisper-server.exe'), pushLocal)
+  /** Starts a built-in server, turning a missing model or a start failure into a message the chat can show. */
+  async function localUrl(server: LocalServer, id: string, what: string): Promise<string> {
+    if (!installedModels().includes(id)) throw new ProviderError('model', `Download ${what} first: Settings → AI → Lumi built-in.`)
+    try {
+      return await server.ensure(modelPath(id))
+    } catch (error) {
+      throw new ProviderError('unreachable', error instanceof Error ? error.message : String(error))
+    }
+  }
+  async function aiConfig(): Promise<ProviderConfig> {
+    if (settings.ai.provider === 'builtin') {
+      return { baseUrl: await localUrl(llmServer, settings.local.llm, 'the chat model'), model: settings.local.llm, apiKey: llmServer.key }
+    }
+    return { baseUrl: settings.ai.baseUrl, model: settings.ai.model, apiKey: await getSecret(keyFor(settings.ai.provider)) }
+  }
   const custom = await readCustomModel()
   const modelInfo = (meta: VrmMeta, revision: number): AppState['model'] => ({
     id: 'custom',
@@ -110,12 +163,16 @@ async function start(): Promise<void> {
     ai: aiStatus(),
     historyEnabled: settings.historyEnabled,
     voice: settings.voice,
-    tools: { plugins: [], folders: settings.tools.folders, apps: settings.tools.apps, notifications: settings.tools.notifications },
+    tools: { plugins: [], folders: settings.tools.folders, apps: settings.tools.apps, notifications: settings.tools.notifications, screenshots: settings.tools.screenshots },
     approvals: [],
     integrations: { githubToken: hasSecret(GITHUB_TOKEN), mcp: [] },
     claude: { path: null, hooksInstalled: false, hookServer: false, tasks: [], events: [] },
-    graphics: settings.graphics
+    graphics: settings.graphics,
+    controlling: false,
+    stopShortcut: STOP_SHORTCUT,
+    local: { runtime: false, llm: '', stt: '', installed: [], download: null, downloadError: null, servers: { llm: { state: 'stopped', device: null, message: '' }, stt: { state: 'stopped', device: null, message: '' } } }
   }
+  state.local = localState()
 
   const persist = (): void => saveWindowState(store, { character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
 
@@ -132,6 +189,7 @@ async function start(): Promise<void> {
     setAlwaysOnTop: (value) => setState({ alwaysOnTop: value }),
     openChat: () => windows.openPanel('chat'),
     openSettings: () => windows.openPanel('settings'),
+    stop: () => emergencyStop(),
     quit: () => app.quit()
   }
   const tray = createTray(actions)
@@ -263,6 +321,16 @@ async function start(): Promise<void> {
     ]
   }
 
+  const resourcesDir = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
+  const desktop = new DesktopHelper(() => join(resourcesDir, 'scripts', 'desktop.ps1'))
+  /** Emergency stop: the reply, pending approvals and any desktop action in flight all end now. */
+  function emergencyStop(): void {
+    conversation.cancel()
+    broker.reset()
+    desktop.stop()
+    setState({ controlling: false, approvals: [] })
+    notify(settings.assistantName, 'Stopped. Nothing else will happen until you ask again.')
+  }
   const builtins = [
     claudePlugin,
     filesPlugin(() => settings.tools.folders),
@@ -273,7 +341,19 @@ async function start(): Promise<void> {
     ),
     notifyPlugin(() => settings.tools.notifications),
     webPlugin((title, body) => notify(title, body)),
-    githubPlugin(() => getSecret(GITHUB_TOKEN))
+    githubPlugin(() => getSecret(GITHUB_TOKEN)),
+    desktopPlugin(desktop, (controlling) => setState({ controlling }), {
+      // A screenshot leaves the PC only with the user's switch on and a cloud model that can see images.
+      unavailable: () =>
+        !settings.tools.screenshots
+          ? 'Screenshots to cloud AI are off (Settings → Tools). Use screen_look instead.'
+          : !findProvider(settings.ai.provider).vision
+            ? `${findProvider(settings.ai.provider).name} can't see images. Choose Gemini, OpenAI or Claude in Settings → AI for this.`
+            : null,
+      where: () => findProvider(settings.ai.provider).name,
+      describe: async (png, question) => describeImage(await aiConfig(), png, question)
+    }),
+    projectsPlugin(() => settings.tools.folders)
   ]
   const registry = createRegistry(() => [...builtins, ...mcp.plugins()], () => settings.tools.disabled)
   const integrationsState = (): AppState['integrations'] => ({ githubToken: hasSecret(GITHUB_TOKEN), mcp: mcp.info() })
@@ -287,7 +367,8 @@ async function start(): Promise<void> {
     plugins: registry.info(),
     folders: settings.tools.folders,
     apps: settings.tools.apps,
-    notifications: settings.tools.notifications
+    notifications: settings.tools.notifications,
+    screenshots: settings.tools.screenshots
   })
   const saveTools = (patch: Partial<typeof settings.tools>): AppState => {
     settings.tools = { ...settings.tools, ...patch }
@@ -307,7 +388,7 @@ async function start(): Promise<void> {
   const ollamaUp = (): Promise<boolean> => fetch('http://127.0.0.1:11434/api/version', { signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false)
   let ollamaStarting: Promise<boolean> | undefined
   async function startOllama(): Promise<boolean> {
-    if (!/^http:\/\/(127\.0\.0\.1|localhost):11434\b/.test(settings.ai.baseUrl) || !existsSync(OLLAMA_EXE)) return false
+    if (settings.ai.provider !== 'ollama' || !/^http:\/\/(127\.0\.0\.1|localhost):11434\b/.test(settings.ai.baseUrl) || !existsSync(OLLAMA_EXE)) return false
     ollamaStarting ??= (async () => {
       if (await ollamaUp()) return true
       spawn(OLLAMA_EXE, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref()
@@ -329,7 +410,7 @@ async function start(): Promise<void> {
   }
   async function* chatStream(messages: Parameters<typeof streamChat>[1], signal: AbortSignal): AsyncGenerator<StreamEvent> {
     const run = async function* (): AsyncGenerator<StreamEvent> {
-      yield* streamChat({ ...settings.ai, apiKey: await getSecret(API_KEY) }, messages, { signal, tools: registry.specs() })
+      yield* streamChat(await aiConfig(), messages, { signal, tools: registry.specs() })
     }
     try {
       yield* run()
@@ -436,15 +517,65 @@ async function start(): Promise<void> {
   })
   handle(Invoke.chatClear, () => newChat())
   handle(Invoke.aiSetSettings, async (next) => {
-    // A key belongs to one service: never send it to a different host after the address changes.
-    if (new URL(next.baseUrl).origin !== new URL(settings.ai.baseUrl).origin) await setSecret(API_KEY, null)
+    // A "custom" key belongs to one address: never send it to a different host after the address changes.
+    const origin = (u: string): string => (u ? new URL(u).origin : '')
+    if (next.provider === 'custom' && settings.ai.provider === 'custom' && origin(next.baseUrl) !== origin(settings.ai.baseUrl)) await setSecret(keyFor('custom'), null)
+    if (next.provider !== 'builtin') llmServer.stop() // frees the GPU memory
     settings.ai = next
     saveSettings(store, settings)
     return setState({ ai: aiStatus() })
   })
   handle(Invoke.aiSetApiKey, async ({ key }) => {
-    await setSecret(API_KEY, key)
+    await setSecret(keyFor(settings.ai.provider), key)
     return setState({ ai: aiStatus() })
+  })
+  handle(Invoke.localDownload, async ({ id }) => {
+    if (download) throw new Error('Rejected local:download: another download is running')
+    const model = findLocalModel(id)!
+    downloadAbort = new AbortController()
+    download = { id, received: 0, total: model.size }
+    downloadError = null
+    let shown = 0
+    void downloadModel(model, modelsDir, (received) => {
+      download = { id, received, total: model.size }
+      if (Date.now() - shown > 250) {
+        shown = Date.now()
+        pushLocal()
+      }
+    }, downloadAbort.signal)
+      .then(() => {
+        // The first model of its kind becomes the one in use.
+        if (!installedModels().includes(settings.local[model.kind]) || settings.local[model.kind] === id) {
+          settings.local = { ...settings.local, [model.kind]: id }
+          saveSettings(store, settings)
+        }
+      })
+      .catch((error: unknown) => void (downloadError = error instanceof Error ? error.message : String(error)))
+      .finally(() => {
+        download = null
+        downloadAbort = undefined
+        pushLocal()
+      })
+    return setState({ local: localState() })
+  })
+  handle(Invoke.emergencyStop, () => emergencyStop())
+  handle(Invoke.localCancel, () => {
+    downloadAbort?.abort()
+    return state
+  })
+  handle(Invoke.localRemove, async ({ id }) => {
+    const model = findLocalModel(id)!
+    ;(model.kind === 'llm' ? llmServer : sttServer).stop()
+    await rm(modelPath(id), { force: true })
+    await rm(`${modelPath(id)}.part`, { force: true })
+    return setState({ local: localState() })
+  })
+  handle(Invoke.localSelect, ({ kind, id }) => {
+    if (findLocalModel(id)?.kind !== kind) throw new Error('Rejected local:select: wrong model kind')
+    settings.local = { ...settings.local, [kind]: id }
+    saveSettings(store, settings)
+    ;(kind === 'llm' ? llmServer : sttServer).stop() // the next request starts it with the new model
+    return setState({ local: localState() })
   })
   handle(Invoke.approvalRespond, ({ id, decision }) => broker.respond(id, decision))
   handle(Invoke.toolsAddFolder, async (_p, e) => {
@@ -473,6 +604,7 @@ async function start(): Promise<void> {
     saveTools({ disabled: enabled ? settings.tools.disabled.filter((d) => d !== id) : [...new Set([...settings.tools.disabled, id])] })
   )
   handle(Invoke.toolsSetNotifications, ({ value }) => saveTools({ notifications: value }))
+  handle(Invoke.toolsSetScreenshots, ({ value }) => saveTools({ screenshots: value }))
   handle(Invoke.claudeStart, ({ prompt, project, mode }) => {
     const folder = approvedProject(project)
     if (!folder) throw new Error('Rejected claude:start: not an approved folder')
@@ -552,12 +684,16 @@ async function start(): Promise<void> {
     saveSettings(store, settings)
     return setState({ voice })
   })
-  const voiceConfig = async () => ({ baseUrl: settings.ai.baseUrl, model: settings.voice.model, apiKey: await getSecret(API_KEY) })
+  const voiceConfig = async () => ({ baseUrl: settings.ai.baseUrl, model: settings.voice.model, apiKey: await getSecret(keyFor(settings.ai.provider)) })
   handle(Invoke.voiceTranscribe, async ({ wav }, e) => {
     const allowed = settings.voice.input && (windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)
     if (!allowed) throw new Error('Rejected voice:transcribe: voice input is off or not allowed from this window')
     try {
-      return { ok: true as const, text: await withOllama(async () => transcribe(await voiceConfig(), wav)) }
+      const text =
+        settings.voice.stt === 'builtin'
+          ? await transcribe({ baseUrl: await localUrl(sttServer, settings.local.stt, 'the speech model'), model: 'whisper' }, wav)
+          : await withOllama(async () => transcribe(await voiceConfig(), wav))
+      return { ok: true as const, text }
     } catch (error) {
       return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not understand the recording.' }
     }
@@ -565,6 +701,7 @@ async function start(): Promise<void> {
   handle(Invoke.voiceSynthesize, async ({ text }, e) => {
     // The character speaks replies; Settings plays the "Test voice" sample.
     if (!fromCharacter(e.sender) && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected voice:synthesize: not allowed from this window')
+    if (settings.ai.provider === 'builtin') return { ok: false as const, message: 'Lumi’s built-in AI has no voice of its own; using the Windows voice.' }
     try {
       const audio = await withOllama(async () => synthesize({ ...(await voiceConfig()), voice: settings.voice.voice, speed: settings.voice.speed }, text))
       return { ok: true as const, audio }
@@ -579,10 +716,15 @@ async function start(): Promise<void> {
     notifyData()
   })
   handle(Invoke.aiListModels, async ({ baseUrl }): Promise<ListModelsResult> => {
-    const url = baseUrl ?? settings.ai.baseUrl
-    const sameService = new URL(url).origin === new URL(settings.ai.baseUrl).origin
     try {
-      const models = await listModels({ baseUrl: url, model: settings.ai.model, apiKey: sameService ? await getSecret(API_KEY) : undefined })
+      // Built-in: "testing the connection" means starting the engine with the chosen model.
+      if (settings.ai.provider === 'builtin' && !baseUrl) {
+        await aiConfig()
+        return { ok: true, models: [findLocalModel(settings.local.llm)!.name] }
+      }
+      const url = baseUrl ?? settings.ai.baseUrl
+      const sameService = !!settings.ai.baseUrl && new URL(url).origin === new URL(settings.ai.baseUrl).origin
+      const models = await listModels({ baseUrl: url, model: settings.ai.model, apiKey: sameService ? await getSecret(keyFor(settings.ai.provider)) : undefined })
       return { ok: true, models }
     } catch (error) {
       return { ok: false, message: error instanceof ProviderError ? error.message : 'Could not list models.' }
@@ -608,6 +750,7 @@ async function start(): Promise<void> {
   on(Send.dragMove, (p, e) => fromCharacter(e.sender) && windows.dragMove(p.screenX, p.screenY))
   on(Send.dragEnd, (_p, e) => fromCharacter(e.sender) && windows.dragEnd())
   on(Send.resize, (p, e) => fromCharacter(e.sender) && windows.resizeCharacter(p.width, p.height))
+  on(Send.scale, (p, e) => fromCharacter(e.sender) && windows.scaleCharacter(p.factor))
   on(Send.resizeEnd, (_p, e) => fromCharacter(e.sender) && windows.settleCharacter())
   on(Send.showMenu, (_p, e) => {
     if (!fromCharacter(e.sender)) return
@@ -645,6 +788,7 @@ async function start(): Promise<void> {
   setState({ tools: toolsState() })
   void mcp.sync()
   void startOllama() // warm up at launch so the first message doesn't wait for it
+  if (settings.ai.provider === 'builtin' && installedModels().includes(settings.local.llm)) void aiConfig().catch(() => {}) // likewise
   const hookPort = (testMode && Number(process.env['DESKTOP_ASSISTANT_HOOK_PORT'])) || HOOK_PORT
   void startHookServer(() => settings.claude.hookToken, onHookEvent, hookPort).then((server) => {
     hookServerUp = !!server
@@ -654,6 +798,7 @@ async function start(): Promise<void> {
 
   const registered = globalShortcut.register(SHORTCUT, actions.toggleCharacter)
   if (!registered) console.warn(`Global shortcut ${SHORTCUT} is taken by another application`)
+  if (!globalShortcut.register(STOP_SHORTCUT, emergencyStop)) console.warn(`Global shortcut ${STOP_SHORTCUT} is taken by another application`)
   const islandRegistered = globalShortcut.register(ISLAND_SHORTCUT, () => {
     if (!state.islandVisible) setState({ islandVisible: true })
     windows.setIslandExpanded(!windows.isIslandExpanded())
@@ -672,13 +817,20 @@ async function start(): Promise<void> {
     })
   }
 
-  app.on('second-instance', () => setState({ characterVisible: true }))
+  app.on('second-instance', () => {
+    setState({ characterVisible: true })
+    windows.openPanel('chat')
+  })
   app.on('before-quit', () => {
     conversation.cancel()
     persist()
     windows.markQuitting()
   })
   app.on('will-quit', () => {
+    desktop.stop()
+    downloadAbort?.abort()
+    llmServer.stop()
+    sttServer.stop()
     claudeTasks.cancelAll()
     void mcp.closeAll()
     globalShortcut.unregisterAll()

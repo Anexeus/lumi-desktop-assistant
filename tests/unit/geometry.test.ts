@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, placeBeside } from '../../src/main/geometry'
+import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, placeBeside, scaleBounds } from '../../src/main/geometry'
 
 const primary = { x: 0, y: 0, width: 1920, height: 1040 }
 const secondary = { x: 1920, y: 0, width: 2560, height: 1400 }
@@ -54,5 +54,25 @@ describe('placeBeside', () => {
     const r = placeBeside(anchor, size, primary)
     expect(r.x).toBeGreaterThanOrEqual(anchor.x + anchor.width)
     expect(r.y).toBeGreaterThanOrEqual(primary.y)
+  })
+})
+
+describe('scaleBounds', () => {
+  const b = { x: 1000, y: 300, width: 320, height: 420 }
+  it('grows and shrinks proportionally around the feet', () => {
+    const big = scaleBounds(b, 1.5)
+    expect([big.width, big.height]).toEqual([480, 630])
+    expect(big.x + big.width / 2).toBe(b.x + b.width / 2)
+    expect(big.y + big.height).toBe(b.y + b.height)
+    const small = scaleBounds(b, 0.8)
+    expect([small.width, small.height]).toEqual([256, 336])
+  })
+  it('stops at the limits without changing the proportions', () => {
+    const max = scaleBounds(b, 100)
+    expect(max.width).toBe(900) // width reaches its limit first for this shape
+    expect(max.width / max.height).toBeCloseTo(320 / 420, 2)
+    const min = scaleBounds(b, 0.01)
+    expect(min.width).toBe(160)
+    expect(min.width / min.height).toBeCloseTo(320 / 420, 2)
   })
 })

@@ -87,6 +87,18 @@ hints are not trusted for the confirmation decision unless the user marks the se
   folders the user explicitly approved, and show that warning when a folder is added.
 - The hook ingress binds `127.0.0.1` only, requires a per-install token, rate-limits requests, and validates payloads.
 
+## Desktop control, project scripts, local engines
+
+- Desktop control (UI Automation, typing, clicks) runs in a fixed bundled script; requests are JSON data, never code.
+  Every action asks first; the red island shows when Lumi is acting; Ctrl+Alt+Shift+X / tray / island stops everything
+  (reply, approvals, helper). The whole plugin can be switched off. Elevation prompts are never automated.
+- Project scripts: only `npm run <script>` for scripts in an approved project's package.json; no shell; owned processes
+  are killed on stop and on quit.
+- Local engines bind 127.0.0.1 on random ports; the chat engine requires a per-launch random key. Models are accepted
+  only with the publisher's SHA-256; engines are pinned by release digest.
+- Screenshots go to a cloud model only with the off-by-default switch, a vision provider, and per-action approval.
+- The diagnostic log masks bearer tokens, API keys and token-like strings before writing.
+
 ## PC actions
 
 - `browser_open/click/type` act only in Lumi's own browser window (isolated `lumi-web` session, no cookies kept, public

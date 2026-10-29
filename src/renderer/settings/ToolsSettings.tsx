@@ -3,6 +3,8 @@ import type { ToolsState } from '@shared/ipc'
 const PERMISSION_LABELS: Record<string, string> = {
   'files.read': 'reads files in approved folders',
   'files.write': 'writes notes and files in approved folders (backed up)',
+  'desktop.control': 'sees the active window and operates apps (mouse, keyboard)',
+  'projects.run': 'runs package.json scripts in approved project folders',
   'apps.launch': 'opens approved apps (asks first)',
   notify: 'shows notifications',
   'web.browse': 'opens web pages in a visible window (asks first)',
@@ -91,6 +93,16 @@ export function ToolsSettings({ tools }: { tools: ToolsState }): React.JSX.Eleme
           <small>When Lumi needs your OK, and when tasks finish.</small>
         </span>
         <input type="checkbox" checked={tools.notifications} onChange={(e) => void t.setNotifications(e.target.checked)} />
+      </label>
+      <label className="row">
+        <span>
+          Let cloud AI see screenshots
+          <small>
+            Off by default. When on, and a cloud model that can see images is chosen, Lumi may send a screenshot of a window it cannot read
+            otherwise (asking you first each time). Nothing is sent to Lumi’s built-in AI or stored.
+          </small>
+        </span>
+        <input type="checkbox" checked={tools.screenshots} onChange={(e) => void t.setScreenshots(e.target.checked)} />
       </label>
     </section>
   )

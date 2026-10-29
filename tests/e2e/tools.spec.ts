@@ -32,7 +32,9 @@ const TOOL_FOR: Record<string, (arg: string) => [string, Record<string, string>]
   youtube: (q) => ['web_open', { site: 'youtube', query: q }],
   note: (t) => ['note_write', { title: 'Shopping', text: t }],
   notepad: () => ['apps_open', { name: 'notepad' }],
-  write: (t) => ['files_write', { path: 'docs/new.txt', content: t }]
+  write: (t) => ['files_write', { path: 'docs/new.txt', content: t }],
+  look: () => ['screen_look', {}],
+  run: (s) => ['project_run', { project: basename(folder), script: s }]
 }
 
 test.beforeAll(async () => {
@@ -312,4 +314,33 @@ test('files_write edits a file in an approved folder only after approval, keepin
   await c.getByRole('alertdialog').getByRole('button', { name: 'Allow once' }).click()
   await expect.poll(() => readFileSync(join(folder, 'docs', 'new.txt'), 'utf8')).toBe('new text')
   await expect(c.locator('.bubble.assistant').last()).toContainText('previous version is at')
+})
+
+test('screen_look asks first, then reports the real active window through UI Automation', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click()
+  await c.evaluate(() => window.assistant.chat.send('(tool:look) now'))
+  await expect(c.getByRole('alertdialog')).toContainText('Look at the active window')
+  await c.getByRole('alertdialog').getByRole('button', { name: 'Allow once' }).click()
+  await expect(c.locator('.bubble.assistant').last()).toContainText('Window: “', { timeout: 30_000 })
+})
+
+test('the emergency stop cancels a pending action and the reply', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click()
+  await c.evaluate(() => window.assistant.chat.send('(tool:look) again'))
+  await expect(c.getByRole('alertdialog')).toBeVisible()
+  await c.evaluate(() => window.assistant.stop())
+  await expect(c.getByRole('alertdialog')).toHaveCount(0)
+  await expect.poll(async () => (await c.evaluate(() => window.assistant.chat.get())).status).toBe('idle')
+  expect((await c.evaluate(() => window.assistant.getState())).controlling).toBe(false)
+})
+
+test('project_run refuses a folder without package.json before asking', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click()
+  await c.evaluate(() => window.assistant.chat.send('(tool:run) build'))
+  await expect(c.locator('.activity').last()).toContainText('(not allowed)')
+  await expect(c.getByRole('alertdialog')).toHaveCount(0)
+  expect(seen.at(-1)!.messages.at(-1)!.content).toContain('No package.json')
 })

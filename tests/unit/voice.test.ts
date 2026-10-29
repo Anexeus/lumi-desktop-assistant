@@ -106,3 +106,13 @@ describe('pickVoice', () => {
     expect(pickVoice(voices, 'robot')).toBeUndefined()
   })
 })
+
+describe('cleanTranscript', () => {
+  it('drops non-speech markers and keeps real words', async () => {
+    const { cleanTranscript } = await import('../../src/main/ai/voice')
+    expect(cleanTranscript(' [BLANK_AUDIO] ')).toBe('')
+    expect(cleanTranscript('(music) [ Silence ]')).toBe('')
+    expect(cleanTranscript('*cough* open notepad (inaudible)')).toBe('open notepad')
+    expect(cleanTranscript('Run npm build.')).toBe('Run npm build.')
+  })
+})

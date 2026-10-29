@@ -25,6 +25,18 @@ async function failure(res: Response, cfg: ProviderConfig, what: string): Promis
 const unreachable = (cfg: ProviderConfig): ProviderError =>
   new ProviderError('unreachable', `Can't reach the AI at ${cfg.baseUrl}. If you use Ollama, make sure it is running.`)
 
+/**
+ * Drops what speech recognisers write for non-speech ("[BLANK_AUDIO]", "(music)", "[ Silence ]", "*cough*"), so noise
+ * is never sent as a message. Returns '' when nothing spoken is left.
+ */
+export function cleanTranscript(text: string): string {
+  const spoken = text
+    .replace(/\[[^\]]*\]|\([^)]*\)|\*[^*]*\*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return /\p{L}/u.test(spoken) ? spoken : ''
+}
+
 /** Speech to text. `audio` is a WAV file. */
 export async function transcribe(cfg: ProviderConfig, audio: Uint8Array, fetchImpl: typeof fetch = fetch): Promise<string> {
   if (audio.byteLength > MAX_AUDIO_BYTES) throw new ProviderError('http', 'The recording is too long.')
@@ -45,7 +57,7 @@ export async function transcribe(cfg: ProviderConfig, audio: Uint8Array, fetchIm
   if (!res.ok) throw await failure(res, cfg, 'transcription')
   const body = (await res.json().catch(() => null)) as { text?: unknown } | null
   if (typeof body?.text !== 'string') throw new ProviderError('bad-response', 'The transcription service sent an unexpected reply.')
-  return body.text.trim()
+  return cleanTranscript(body.text)
 }
 
 /** Text to speech. Returns a WAV file. */

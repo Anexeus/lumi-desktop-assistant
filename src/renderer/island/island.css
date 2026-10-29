@@ -351,3 +351,21 @@ kbd {
   overflow-x: auto;
   white-space: pre;
 }
+
+/* Lumi is operating the desktop: an unmistakable red rim, and the whole pill is the stop button. */
+.pill.controlling {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 60%),
+    inset 0 0 0 1px rgb(248 113 113 / 85%),
+    inset 0 0 18px rgb(248 113 113 / 35%);
+}
+
+.pill.controlling .pill-text {
+  color: var(--text);
+}
+
+.dot.controlling {
+  background: radial-gradient(circle at 35% 30%, #fff 0 15%, #f87171 30%);
+  box-shadow: 0 0 10px #f87171;
+  animation: breathe 0.8s ease-in-out infinite;
+}

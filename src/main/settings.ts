@@ -1,14 +1,17 @@
 import { app, safeStorage } from 'electron'
 import { randomBytes } from 'node:crypto'
 import type { CharacterId } from '@shared/characters'
+import { providerForUrl } from '@shared/providers'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
 import type { AiSettings, ApprovedApp, Graphics, McpServerConfig, VoiceSettings } from '@shared/ipc'
 import type { Store } from './storage/store'
 
-export const DEFAULT_AI: AiSettings = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:4b' }
-export const DEFAULT_VOICE: VoiceSettings = { output: 'local', input: true, model: 'lfm3-audio', voice: '', speed: 1, micId: '' }
+// New installs use Lumi's own engine and the Windows voice: nothing else to install.
+export const DEFAULT_AI: AiSettings = { provider: 'builtin', baseUrl: '', model: 'qwen3' }
+export const DEFAULT_VOICE: VoiceSettings = { output: 'system', input: true, stt: 'builtin', wake: false, model: 'lfm3-audio', voice: '', speed: 1, micId: '' }
+export const DEFAULT_LOCAL = { llm: 'qwen3-4b', stt: 'whisper-small-en' }
 
 const path = (name: string): string => join(app.getPath('userData'), name)
 
@@ -42,8 +45,9 @@ export interface ToolsSettings {
   apps: ApprovedApp[]
   disabled: string[]
   notifications: boolean
+  screenshots: boolean
 }
-export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true }
+export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true, screenshots: false }
 
 export interface Settings {
   assistantName: string
@@ -56,11 +60,15 @@ export interface Settings {
   claude: { path: string; hookToken: string }
   character: CharacterId
   graphics: Graphics
+  local: { llm: string; stt: string }
 }
 
 export function loadSettings(store: Store): Settings {
   importLegacyJson(store, 'settings.json', 'settings')
-  const parsed = settingsFileSchema.safeParse(store.getJson('settings'))
+  const raw = store.getJson('settings') as { ai?: { provider?: string; baseUrl?: string } } | null
+  // Saved before providers existed: keep the service they used (e.g. Ollama) rather than failing validation.
+  if (raw?.ai && !raw.ai.provider && typeof raw.ai.baseUrl === 'string') raw.ai.provider = providerForUrl(raw.ai.baseUrl)
+  const parsed = settingsFileSchema.safeParse(raw)
   const file: SettingsFile = parsed.success ? parsed.data : {}
   return {
     assistantName: file.assistantName ?? DEFAULT_NAME,
@@ -72,7 +80,8 @@ export function loadSettings(store: Store): Settings {
     mcp: file.mcp ?? [],
     claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') },
     character: file.character ?? 'seed-san',
-    graphics: file.graphics ?? 'balanced'
+    graphics: file.graphics ?? 'balanced',
+    local: file.local ?? DEFAULT_LOCAL
   }
 }
 

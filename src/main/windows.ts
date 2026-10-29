@@ -3,7 +3,7 @@ import { release } from 'node:os'
 import { join } from 'node:path'
 import type { WindowName } from '@shared/ipc'
 import { devServerUrl } from './env'
-import { clampSize, fitToDisplays, placeBeside, type Rect } from './geometry'
+import { clampSize, fitToDisplays, placeBeside, scaleBounds, type Rect } from './geometry'
 import { APP_HOST, APP_SCHEME } from './policy'
 
 type Page = 'character' | 'island' | WindowName
@@ -183,13 +183,24 @@ export class WindowManager {
     this.settleCharacter()
   }
 
+  private scaleBase: Rect | undefined
+
   resizeCharacter(width: number, height: number): void {
     const { x, y } = this.characterBounds()
     this.character.setContentBounds({ x, y, ...clampSize(width, height) })
   }
 
+  /** Mouse-wheel / keyboard resize: proportional, feet stay put. */
+  scaleCharacter(factor: number): void {
+    // Exact (unrounded) bounds across one wheel gesture, so many small steps don't drift her off her feet.
+    this.scaleBase = scaleBounds(this.scaleBase ?? this.characterBounds(), factor)
+    const { x, y, width, height } = this.scaleBase
+    this.character.setContentBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) })
+  }
+
   /** Pulls the character back onto a display if needed and reports the final bounds. */
   settleCharacter(): void {
+    this.scaleBase = undefined
     const { all, primary } = workAreas()
     const fitted = fitToDisplays(this.characterBounds(), all, primary)
     this.character.setContentBounds(fitted)

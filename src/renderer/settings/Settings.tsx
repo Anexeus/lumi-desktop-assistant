@@ -54,9 +54,9 @@ export function Settings(): React.JSX.Element {
         </label>
       </section>
 
-      <AiSettings ai={state.ai} />
+      <AiSettings ai={state.ai} local={state.local} />
 
-      <VoiceSettings voice={state.voice} />
+      <VoiceSettings voice={state.voice} local={state.local} />
 
       <section aria-labelledby="character-heading">
         <h2 id="character-heading">Character</h2>

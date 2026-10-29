@@ -1,7 +1,7 @@
 {
   "name": "desktop-assistant",
   "productName": "Lumi",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Windows desktop AI companion with a 3D character",
   "license": "MIT",
@@ -17,8 +17,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "electron-vite build && playwright test",
-    "package:dir": "npm run build && electron-builder --dir",
-    "package": "npm run build && electron-builder --win"
+    "runtimes": "node scripts/fetch-runtimes.mjs",
+    "package:dir": "npm run runtimes && npm run build && electron-builder --dir",
+    "package": "npm run runtimes && npm run build && electron-builder --win"
   },
   "dependencies": {
     "zod": "4.6.7"

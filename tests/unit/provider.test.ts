@@ -161,3 +161,13 @@ describe('listModels', () => {
     expect(await listModels(cfg, impl)).toEqual(['a', 'b'])
   })
 })
+
+describe('wellFormedJson', () => {
+  it('replaces lone surrogates (text cut mid-emoji) and keeps whole emoji', async () => {
+    const { wellFormedJson } = await import('../../src/main/ai/provider')
+    const cut = '🎵 lofi 🎧'.slice(0, 1) // half of an emoji
+    expect(JSON.parse(wellFormedJson({ t: `a${cut}b` })).t).toBe('a�b')
+    expect(JSON.parse(wellFormedJson({ t: '🎵 ok' })).t).toBe('🎵 ok')
+    expect(wellFormedJson({ t: `x${cut}` })).not.toMatch(/\ud83c/i)
+  })
+})

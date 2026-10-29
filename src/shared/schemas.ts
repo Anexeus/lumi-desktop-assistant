@@ -1,3 +1,5 @@
+import { LOCAL_MODEL_IDS } from './localModels'
+import { PROVIDER_IDS } from './providers'
 import { CHARACTER_IDS } from './characters'
 import { z } from 'zod'
 import { CHARACTER_EVENTS } from './character'
@@ -7,23 +9,35 @@ const coord = z.number().finite().min(-100_000).max(100_000)
 const point = z.object({ screenX: coord, screenY: coord }).strict()
 const none = z.undefined()
 
+const parseUrl = (v: string): URL | null => {
+  try {
+    return new URL(v)
+  } catch {
+    return null
+  }
+}
+
 /** http(s) only, no embedded credentials (keys go in the encrypted key store). */
 export const baseUrlSchema = z
   .string()
   .trim()
   .max(500)
   .url()
-  .refine((v) => /^https?:$/.test(new URL(v).protocol), 'Use an http:// or https:// address.')
-  .refine((v) => !new URL(v).username && !new URL(v).password, 'Do not put credentials in the address.')
+  // Zod runs refinements even after .url() fails, so these must not throw on a malformed address.
+  .refine((v) => /^https?:$/.test(parseUrl(v)?.protocol ?? ''), 'Use an http:// or https:// address.')
+  .refine((v) => !parseUrl(v)?.username && !parseUrl(v)?.password, 'Do not put credentials in the address.')
 
 export const aiSettingsSchema = z
-  .object({ baseUrl: baseUrlSchema, model: z.string().trim().min(1).max(200) })
+  .object({ provider: z.enum(PROVIDER_IDS), baseUrl: z.union([z.literal(''), baseUrlSchema]), model: z.string().trim().max(200) })
   .strict()
+  .refine((a) => a.provider === 'builtin' || (a.baseUrl !== '' && a.model !== ''), 'Choose an address and a model.')
 
 export const voiceSettingsSchema = z
   .object({
     output: z.enum(['local', 'system', 'off']),
     input: z.boolean(),
+    stt: z.enum(['builtin', 'server']).default('server'),
+    wake: z.boolean().default(false),
     model: z.string().trim().min(1).max(200),
     voice: z.string().trim().max(200),
     speed: z.number().min(0.5).max(2),
@@ -51,7 +65,8 @@ export const toolsSettingsSchema = z
     folders: z.array(pathSchema).max(50),
     apps: z.array(z.object({ name: z.string().trim().min(1).max(120), path: pathSchema }).strict()).max(100),
     disabled: z.array(z.string().max(100)).max(100),
-    notifications: z.boolean()
+    notifications: z.boolean(),
+    screenshots: z.boolean().default(false)
   })
   .strict()
 
@@ -68,7 +83,8 @@ export const settingsFileSchema = z
     mcp: z.array(mcpServerSchema).max(30),
     claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict(),
     character: z.enum(CHARACTER_IDS),
-    graphics: graphicsSchema
+    graphics: graphicsSchema,
+    local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict()
   })
   .partial()
   .strict()
@@ -87,6 +103,11 @@ export const invokeSchemas = {
   [Invoke.chooseModel]: none,
   [Invoke.selectCharacter]: z.object({ id: z.enum(CHARACTER_IDS) }).strict(),
   [Invoke.setGraphics]: z.object({ quality: graphicsSchema }).strict(),
+  [Invoke.localDownload]: z.object({ id: z.enum(LOCAL_MODEL_IDS) }).strict(),
+  [Invoke.localCancel]: none,
+  [Invoke.emergencyStop]: none,
+  [Invoke.localRemove]: z.object({ id: z.enum(LOCAL_MODEL_IDS) }).strict(),
+  [Invoke.localSelect]: z.object({ kind: z.enum(['llm', 'stt']), id: z.enum(LOCAL_MODEL_IDS) }).strict(),
   [Invoke.setIslandVisible]: z.object({ value: z.boolean() }).strict(),
   [Invoke.setIslandExpanded]: z.object({ expanded: z.boolean() }).strict(),
   [Invoke.chatGet]: none,
@@ -117,6 +138,7 @@ export const invokeSchemas = {
   [Invoke.toolsRemoveApp]: z.object({ path: pathSchema }).strict(),
   [Invoke.toolsSetPlugin]: z.object({ id: z.string().max(100), enabled: z.boolean() }).strict(),
   [Invoke.toolsSetNotifications]: z.object({ value: z.boolean() }).strict(),
+  [Invoke.toolsSetScreenshots]: z.object({ value: z.boolean() }).strict(),
   [Invoke.githubSetToken]: z.object({ token: z.string().trim().min(10).max(500).nullable() }).strict(),
   [Invoke.mcpAdd]: z.object({ name: z.string().trim().min(1).max(60), target: z.string().trim().min(1).max(1000) }).strict(),
   [Invoke.mcpRemove]: z.object({ id: z.string().max(40) }).strict(),
@@ -139,6 +161,7 @@ export const sendSchemas = {
   [Send.resize]: z
     .object({ width: z.number().int().min(1).max(10_000), height: z.number().int().min(1).max(10_000) })
     .strict(),
+  [Send.scale]: z.object({ factor: z.number().min(0.5).max(2) }).strict(),
   [Send.resizeEnd]: none,
   [Send.showMenu]: none
 } as const

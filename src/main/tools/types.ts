@@ -1,7 +1,7 @@
 import type { ZodType } from 'zod'
 
 /** What a tool may touch; shown to the user in Settings → Tools. */
-export type Permission = 'files.read' | 'files.write' | 'apps.launch' | 'notify' | 'web.browse' | 'github.read' | 'mcp' | 'claude-code'
+export type Permission = 'files.read' | 'files.write' | 'desktop.control' | 'projects.run' | 'apps.launch' | 'notify' | 'web.browse' | 'github.read' | 'mcp' | 'claude-code'
 
 export interface Tool<I = unknown> {
   name: string

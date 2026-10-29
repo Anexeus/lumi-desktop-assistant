@@ -193,6 +193,37 @@ Browser control uses DOM item numbers instead of screen vision, because qwen3:4b
 Dragging moves the OS window, not the model, so VRM spring bones never saw motion. The renderer feeds each drag delta into
 a damped spring that offsets the model root; hair and clothes then swing through three-vrm's own spring bones.
 
+## ADR-042 Bundle llama.cpp + whisper.cpp; download models on first use (2026-10-30)
+Requirement: local Qwen3 with no separate Ollama. llama-server (MIT) speaks the OpenAI API with tool calling, so the
+existing adapter works unchanged; its Vulkan build covers NVIDIA/AMD/Intel GPUs with a CPU fallback in ~90 MB (the CUDA
+build is 280 MB + 390 MB of runtime). whisper-server (MIT, 17 MB) serves speech-to-text on the same OpenAI path.
+Models (2.5 GB + 190 MB, Apache-2.0/MIT, redistributable) are downloaded on first use rather than bundled: a 3 GB
+installer is fragile, and the models are verified by SHA-256 either way. Engines are pinned by release and checksum in
+`scripts/fetch-runtimes.mjs`. Runtime dependency count is unchanged (binaries, not npm packages). Qwen3 runs with thinking
+off on the built-in engine (`enable_thinking:false`): desktop tasks went from 110 s to 5 s.
+
+## ADR-043 Providers through OpenAI-compatible endpoints, one key per provider (2026-10-30)
+Gemini, Anthropic, Groq, OpenRouter and OpenAI all offer OpenAI-compatible chat endpoints, so one adapter and one test
+path serve them. Capabilities differ and are declared per provider (vision, speech-to-text). Keys are stored per provider
+(DPAPI via safeStorage) so switching providers no longer deletes a key; a "custom" key stays bound to its address.
+
+## ADR-044 Desktop control through UI Automation in a bundled PowerShell helper (2026-10-30)
+Considered: FlaUI/.NET (needs a .NET runtime and a build step), pywinauto (Python), native Node addons (rebuilds per
+Electron version). Windows PowerShell 5.1 and .NET UIAutomationClient ship with every Windows 10/11, so a fixed script
+reading JSON requests is zero-dependency. Controls are numbered from the accessibility tree and operated through their
+patterns first; coordinate clicks are a fallback. The model never supplies a command, only operation names and values.
+Every action returns the re-read window so success is judged from evidence. Windows OCR fills in when UIA sees little.
+
+## ADR-045 Project scripts, not a shell (2026-10-30)
+The user asked for "run the dev server / tests / build". Lumi runs `npm run <script>` only when that script exists in an
+approved project's package.json, via node + npm-cli.js (no shell, explicit cwd, timeout, cancel, owned-process cleanup).
+This keeps the invariant "no general shell, no model-generated commands": the project's own scripts are the allow-list.
+
+## ADR-046 Screenshots leave the PC only by explicit switch (2026-10-30)
+qwen3 is text-only, so "seeing" uses UI Automation and OCR locally. A screenshot can go to a vision-capable cloud model
+only with Settings → Tools → "Let cloud AI see screenshots" (off by default), a vision-capable provider selected, and an
+approval naming the destination each time.
+
 ## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
 Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
 nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.

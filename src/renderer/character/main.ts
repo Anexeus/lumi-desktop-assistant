@@ -3,7 +3,6 @@ import { createScene } from './scene'
 import { createSpeaker } from './speaker'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
-const grip = document.getElementById('grip') as HTMLDivElement
 const api = window.assistant.character
 const scene = createScene(canvas)
 const speaker = createSpeaker((level) => scene.setMouth(level))
@@ -12,10 +11,9 @@ const CLICK_SLOP = 4 // px of movement before a press becomes a drag
 const KEY_RESIZE_STEP = 0.1
 
 let interactive = false
-let mode: 'idle' | 'pressing' | 'dragging' | 'resizing' = 'idle'
+let mode: 'idle' | 'pressing' | 'dragging' = 'idle'
 let pressX = 0
 let pressY = 0
-let startSize = { width: 0, height: 0 }
 let lastX = 0
 let lastY = 0
 
@@ -26,11 +24,20 @@ function setInteractive(next: boolean): void {
   api.setIgnoreMouse(!next)
 }
 
+/** Ends a press or drag. Also runs when the release was never delivered, so the window can't stay click-blocking. */
+function endPress(): void {
+  if (mode === 'dragging') {
+    api.dragEnd()
+    scene.setHeld(false)
+  }
+  mode = 'idle'
+}
+
 // Mouse moves are forwarded even while the window ignores clicks, so hover can be hit-tested.
 window.addEventListener('mousemove', (e) => {
+  if (mode !== 'idle' && e.buttons === 0) endPress() // the button was released somewhere we didn't hear about
   if (mode !== 'idle') return
-  const overGrip = (e.target as Element | null)?.closest('[data-interactive]') != null
-  setInteractive(overGrip || scene.hitTest(e.clientX, e.clientY))
+  setInteractive(scene.hitTest(e.clientX, e.clientY))
 })
 document.addEventListener('mouseleave', () => mode === 'idle' && setInteractive(false))
 
@@ -60,17 +67,16 @@ canvas.addEventListener('pointermove', (e) => {
 })
 
 canvas.addEventListener('pointerup', (e) => {
-  canvas.releasePointerCapture(e.pointerId)
   if (mode === 'pressing') {
     scene.play('wave')
     void window.assistant.openWindow('chat')
   }
-  if (mode === 'dragging') {
-    api.dragEnd()
-    scene.setHeld(false)
-  }
-  mode = 'idle'
+  endPress() // before releasing capture, which fires lostpointercapture
+  canvas.releasePointerCapture(e.pointerId)
 })
+canvas.addEventListener('lostpointercapture', endPress)
+canvas.addEventListener('pointercancel', endPress)
+window.addEventListener('blur', () => mode !== 'idle' && endPress())
 
 // Right-clicks only arrive over the body (elsewhere they pass through), and Chromium also
 // fires this for Shift+F10 and the Menu key, so no hit test is needed here.
@@ -79,35 +85,41 @@ canvas.addEventListener('contextmenu', (e) => {
   api.showMenu()
 })
 
-grip.addEventListener('pointerdown', (e) => {
-  grip.setPointerCapture(e.pointerId)
-  mode = 'resizing'
-  document.body.classList.add('resizing')
-  pressX = e.screenX
-  pressY = e.screenY
-  startSize = { width: window.innerWidth, height: window.innerHeight }
-})
-
-grip.addEventListener('pointermove', (e) => {
-  if (mode !== 'resizing') return
-  api.resize(Math.round(startSize.width + e.screenX - pressX), Math.round(startSize.height + e.screenY - pressY))
-})
-
-grip.addEventListener('pointerup', (e) => {
-  grip.releasePointerCapture(e.pointerId)
-  if (mode === 'resizing') api.resizeEnd()
-  document.body.classList.remove('resizing')
-  mode = 'idle'
-})
+// Scroll over her to resize. The wheel only reaches this window while the cursor is over her: everywhere else the
+// window is click-through, so scrolling other apps (or the chat) never resizes her. Notches are eased over a few frames.
+const WHEEL_RATE = 0.0012 // one 100-unit notch ≈ 13 %
+let pendingScale = 0 // log of the scale still to apply
+let scaling = 0
+function stepScale(): void {
+  const step = pendingScale * 0.35
+  pendingScale -= step
+  api.scale(Math.exp(step))
+  if (Math.abs(pendingScale) > 0.002) scaling = requestAnimationFrame(stepScale)
+  else {
+    pendingScale = 0
+    scaling = 0
+    api.resizeEnd() // keeps her on screen and saves the size
+  }
+}
+function scaleBy(logFactor: number): void {
+  pendingScale = Math.max(-0.7, Math.min(0.7, pendingScale + logFactor))
+  if (!scaling) scaling = requestAnimationFrame(stepScale)
+}
+window.addEventListener(
+  'wheel',
+  (e) => {
+    e.preventDefault() // never page zoom (Ctrl+wheel) or scroll
+    if (mode === 'idle') scaleBy(-e.deltaY * WHEEL_RATE)
+  },
+  { passive: false }
+)
 
 canvas.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     void window.assistant.openWindow('chat')
   } else if (e.key === '+' || e.key === '=' || e.key === '-') {
-    const factor = e.key === '-' ? 1 - KEY_RESIZE_STEP : 1 + KEY_RESIZE_STEP
-    api.resize(Math.round(window.innerWidth * factor), Math.round(window.innerHeight * factor))
-    api.resizeEnd()
+    scaleBy(e.key === '-' ? -KEY_RESIZE_STEP : KEY_RESIZE_STEP)
   }
 })
 

@@ -39,3 +39,13 @@ describe('IPC schemas', () => {
     expect(windowStateSchema.safeParse({}).success).toBe(true)
   })
 })
+
+describe('ai settings', () => {
+  it('accepts the built-in provider with no address, and never throws on a bad address', async () => {
+    const { aiSettingsSchema } = await import('../../src/shared/schemas')
+    expect(aiSettingsSchema.safeParse({ provider: 'builtin', baseUrl: '', model: 'qwen3' }).success).toBe(true)
+    expect(aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: '', model: 'x' }).success).toBe(false)
+    expect(() => aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: 'not a url', model: 'x' })).not.toThrow()
+    expect(aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: 'not a url', model: 'x' }).success).toBe(false)
+  })
+})

@@ -95,6 +95,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'history',
     'integrations',
     'island',
+    'local',
     'memory',
     'model',
     'onDataChanged',
@@ -104,6 +105,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'setAssistantName',
     'setCharacterVisible',
     'setIslandVisible',
+    'stop',
     'tools',
     'voice',
     'windowControl'
@@ -205,6 +207,29 @@ test('character can be resized within limits and dragged', async () => {
   })
   await expect.poll(() => characterWindow((w) => { const b = w.getContentBounds(); return [b.x, b.y] })).toEqual([before[0]! - 40, before[1]! - 30])
   await expect.poll(() => characterWindow((w) => w.getContentSize())).toEqual([320, 420])
+})
+
+test('scrolling over her resizes smoothly around her feet; scrolling elsewhere does not', async () => {
+  await character.evaluate(() => {
+    window.assistant.character.resize(320, 420)
+    window.assistant.character.resizeEnd()
+  })
+  await expect.poll(() => characterWindow((w) => w.getContentSize())).toEqual([320, 420])
+  const feet = (): Promise<number[]> => characterWindow((w) => { const b = w.getContentBounds(); return [b.x + b.width / 2, b.y + b.height] })
+  const before = await feet()
+  await character.mouse.move(160, 250)
+  await character.mouse.wheel(0, -300) // scroll up = bigger
+  await expect.poll(() => characterWindow((w) => w.getContentSize()[0]), { timeout: 5000 }).toBeGreaterThan(400)
+  await character.waitForTimeout(600) // let the easing finish
+  const [w, h] = await characterWindow((win) => win.getContentSize())
+  expect(w! / h!).toBeCloseTo(320 / 420, 1)
+  const after = await feet()
+  expect(Math.abs(after[0]! - before[0]!)).toBeLessThanOrEqual(2)
+  expect(Math.abs(after[1]! - before[1]!)).toBeLessThanOrEqual(2)
+  await character.mouse.wheel(0, 2000) // scroll down a lot = smaller, but never below the minimum
+  await character.waitForTimeout(1500)
+  expect((await characterWindow((win) => win.getContentSize()))[0]).toBeGreaterThanOrEqual(160)
+  expect(await character.evaluate(() => document.getElementById('grip'))).toBeNull()
 })
 
 test('character can be hidden and shown; shortcut state matches registration', async () => {

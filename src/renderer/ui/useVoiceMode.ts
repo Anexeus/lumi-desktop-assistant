@@ -11,7 +11,12 @@ const PRE_ROLL_FRAMES = 6 // ~250 ms kept from before speech was detected, so fi
  * Hands-free voice mode: while on, the mic stays open and each pause in speech sends what was said.
  * Audio is ignored while `paused` (Lumi is thinking or talking) so she never hears herself.
  */
-export function useVoiceMode(micId: string, paused: boolean): {
+export function useVoiceMode(
+  micId: string,
+  paused: boolean,
+  /** If set, only utterances containing this word (the assistant's name) are sent, without it. */
+  wakeWord?: string
+): {
   phase: VoicePhase
   level: number
   error: string | null
@@ -23,6 +28,9 @@ export function useVoiceMode(micId: string, paused: boolean): {
   const session = useRef<{ stream: MediaStream; ctx: AudioContext } | null>(null)
   const pausedRef = useRef(paused)
   const busy = useRef(false) // transcribing
+  const lastSent = useRef({ text: '', at: 0 })
+  const wake = useRef(wakeWord)
+  wake.current = wakeWord
   pausedRef.current = paused
 
   const stop = useCallback(() => {
@@ -49,9 +57,21 @@ export function useVoiceMode(micId: string, paused: boolean): {
       void window.assistant.characterEvent('cancel')
       return setError(result.message)
     }
-    if (!result.text) return void window.assistant.characterEvent('cancel')
+    let text = result.text
+    if (!text) {
+      void window.assistant.characterEvent('cancel')
+      return setError('Didn’t catch that. Try again.')
+    }
+    if (wake.current) {
+      const at = text.toLowerCase().indexOf(wake.current.toLowerCase())
+      if (at < 0) return void window.assistant.characterEvent('cancel') // not addressed to her
+      text = (text.slice(0, at) + text.slice(at + wake.current.length)).replace(/^[\s,.!?]+|[\s,]+$/g, '').trim() || 'Hi'
+    }
+    // The same sentence twice in a row within a few seconds is an echo or a double detection, not a new request.
+    if (text === lastSent.current.text && Date.now() - lastSent.current.at < 5000) return
+    lastSent.current = { text, at: Date.now() }
     setError(null)
-    void window.assistant.chat.send(result.text)
+    void window.assistant.chat.send(text)
   }, [])
 
   const start = useCallback(async () => {
@@ -64,6 +84,11 @@ export function useVoiceMode(micId: string, paused: boolean): {
     } catch {
       return setError('The microphone is not available. Turn on voice input in Settings → Voice, and allow mic access in Windows.')
     }
+    // Unplugging the mic ends the stream: stop cleanly and say why, instead of listening to silence.
+    stream.getAudioTracks()[0]?.addEventListener('ended', () => {
+      stop()
+      setError('The microphone was disconnected.')
+    })
     const ctx = new AudioContext()
     const source = ctx.createMediaStreamSource(stream)
     // shortcut: ScriptProcessorNode is deprecated but universally supported (same as useRecorder); move both to an AudioWorklet together.

@@ -1,3 +1,4 @@
+import type { ProviderId } from './providers'
 // IPC contract shared by main, preload and renderers. Types and channel names only:
 // the preload imports this file, so it must stay free of runtime dependencies.
 import type { CharacterEvent, CharacterState } from './character'
@@ -94,6 +95,8 @@ export interface ToolsState {
   folders: string[]
   apps: ApprovedApp[]
   notifications: boolean
+  /** The user allows sending a screenshot to a cloud vision model when Lumi can't read a window otherwise. */
+  screenshots: boolean
 }
 
 export interface ChatSnapshot {
@@ -129,6 +132,10 @@ export interface VoiceSettings {
   output: 'local' | 'system' | 'off'
   /** Push-to-talk microphone buttons. The mic is only ever open while recording. */
   input: boolean
+  /** Speech-to-text engine: Lumi's built-in whisper, or the AI server's /audio/transcriptions with `model`. */
+  stt: 'builtin' | 'server'
+  /** Hands-free voice mode only responds when the assistant's name is said. */
+  wake: boolean
   /** Speech model on the AI server (both directions), e.g. lfm3-audio. */
   model: string
   /** Voice name: for the Ollama model, or a Windows voice name. Empty = default. */
@@ -142,8 +149,29 @@ export type TranscribeResult = { ok: true; text: string } | { ok: false; message
 export type SpeechResult = { ok: true; audio: Uint8Array } | { ok: false; message: string }
 
 export interface AiSettings {
+  /** See PROVIDERS in providers.ts. "builtin" is Lumi's own engine (baseUrl unused). */
+  provider: ProviderId
   baseUrl: string
   model: string
+}
+
+export interface LocalServerStatus {
+  state: 'stopped' | 'starting' | 'ready' | 'error'
+  /** GPU name, "CPU", or null when stopped. */
+  device: string | null
+  message: string
+}
+
+/** Lumi's built-in engines (llama.cpp chat, whisper.cpp speech-to-text). */
+export interface LocalState {
+  /** False if the engines are missing from this install. */
+  runtime: boolean
+  llm: string
+  stt: string
+  installed: string[]
+  download: { id: string; received: number; total: number } | null
+  downloadError: string | null
+  servers: { llm: LocalServerStatus; stt: LocalServerStatus }
 }
 
 export interface AiStatus extends AiSettings {
@@ -192,6 +220,11 @@ export interface AppState {
   integrations: IntegrationsState
   claude: ClaudeState
   graphics: Graphics
+  local: LocalState
+  /** True while Lumi is operating the desktop (shown on the island, with the emergency stop). */
+  controlling: boolean
+  /** The emergency-stop shortcut, e.g. Control+Alt+Shift+X. */
+  stopShortcut: string
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -209,6 +242,11 @@ export const Invoke = {
   chooseModel: 'model:choose',
   selectCharacter: 'model:select',
   setGraphics: 'graphics:set',
+  emergencyStop: 'app:emergency-stop',
+  localDownload: 'local:download',
+  localCancel: 'local:cancel',
+  localRemove: 'local:remove',
+  localSelect: 'local:select',
   setIslandVisible: 'island:set-visible',
   setIslandExpanded: 'island:set-expanded',
   chatGet: 'chat:get',
@@ -238,6 +276,7 @@ export const Invoke = {
   toolsRemoveApp: 'tools:remove-app',
   toolsSetPlugin: 'tools:set-plugin',
   toolsSetNotifications: 'tools:set-notifications',
+  toolsSetScreenshots: 'tools:set-screenshots',
   githubSetToken: 'github:set-token',
   mcpAdd: 'mcp:add',
   mcpRemove: 'mcp:remove',
@@ -257,6 +296,7 @@ export const Send = {
   dragMove: 'character:drag-move',
   dragEnd: 'character:drag-end',
   resize: 'character:resize',
+  scale: 'character:scale',
   resizeEnd: 'character:resize-end',
   showMenu: 'character:show-menu'
 } as const
@@ -302,6 +342,15 @@ export interface AssistantApi {
     /** Lists models at baseUrl (default: the saved one); doubles as a connection test. */
     listModels(baseUrl?: string): Promise<ListModelsResult>
   }
+  /** Emergency stop: cancels the reply, any pending approval and any desktop action in flight. */
+  stop(): Promise<void>
+  local: {
+    /** Downloads a built-in model (resumable, checksum-verified); progress arrives in state.local. */
+    download(id: string): Promise<AppState>
+    cancel(): Promise<AppState>
+    remove(id: string): Promise<AppState>
+    select(kind: 'llm' | 'stt', id: string): Promise<AppState>
+  }
   memory: {
     list(): Promise<MemoryItem[]>
     /** Refuses empty, over-long or secret-looking text with a readable message. */
@@ -332,6 +381,7 @@ export interface AssistantApi {
     removeApp(path: string): Promise<AppState>
     setPluginEnabled(id: string, enabled: boolean): Promise<AppState>
     setNotifications(enabled: boolean): Promise<AppState>
+    setScreenshots(enabled: boolean): Promise<AppState>
   }
   integrations: {
     /** Stored encrypted; null removes it. Use a read-only fine-grained token. */
@@ -368,6 +418,8 @@ export interface AssistantApi {
     dragMove(screenX: number, screenY: number): void
     dragEnd(): void
     resize(width: number, height: number): void
+    /** Proportional resize by `factor` around her feet (mouse wheel, + and −); finish with resizeEnd(). */
+    scale(factor: number): void
     resizeEnd(): void
     showMenu(): void
     onCursor(listener: (x: number, y: number) => void): () => void

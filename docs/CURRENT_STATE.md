@@ -1,7 +1,7 @@
 # Current State
 
-_Last updated: 2026-10-29. Milestones 6–9 (tools, integrations, Claude Code, release) plus the Lumi name and liquid-glass UI are
-implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdeefd`, `60e4209`; 4–5: `50201fc`._
+_Last updated: 2026-10-30. Version 0.2.0: built-in local AI (no Ollama), online providers, screen understanding and desktop control, project scripts, voice fixes, wheel resize, installer. Details and the verification matrix: [UPGRADE_PROGRESS.md](UPGRADE_PROGRESS.md). Earlier milestones below._
+
 
 ## PC actions, physics, graphics (new, after `8343a79`)
 - **Ollama** now starts hidden (`ollama.exe serve`, no window to close) at Lumi's launch and whenever chat or voice finds it

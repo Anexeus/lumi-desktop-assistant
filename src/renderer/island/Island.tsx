@@ -17,7 +17,7 @@ export function Island(): React.JSX.Element {
   const replyEnd = useRef<HTMLDivElement>(null)
   const expanded = state?.islandExpanded ?? false
   const busy = status !== 'idle' || state?.character === 'SPEAKING'
-  const voice = useVoiceMode(state?.voice.micId ?? '', busy)
+  const voice = useVoiceMode(state?.voice.micId ?? '', busy, state?.voice.wake ? state.assistantName : undefined)
   const talking = voice.phase !== 'off'
 
   const lastUser = [...items].reverse().find((i) => i.role === 'user')
@@ -52,12 +52,26 @@ export function Island(): React.JSX.Element {
       : status === 'streaming' && lastReply
         ? tail(lastReply.text, 46)
         : talking
-          ? VOICE_LABEL[voice.phase as Exclude<VoicePhase, 'off'>]
+          ? (voice.error ?? VOICE_LABEL[voice.phase as Exclude<VoicePhase, 'off'>])
           : voice.error
             ? voice.error
             : state?.voice.input
               ? `🎙 Tap here to talk to ${state.assistantName}`
               : `Ask ${state?.assistantName ?? 'Lumi'}…`
+
+  if (!expanded && state?.controlling) {
+    // While Lumi operates the desktop the pill becomes the emergency stop.
+    const keys = state.stopShortcut.replaceAll('Control', 'Ctrl').replaceAll('+', ' ')
+    return (
+      <div className="pill liquid controlling">
+        <button type="button" className="pill-main" onClick={() => void window.assistant.stop()} aria-label={`${state.assistantName} is using your PC. Click to stop.`}>
+          <span className="dot controlling" aria-hidden="true" />
+          <span className="pill-text">{state.assistantName} is using your PC · tap to stop</span>
+        </button>
+        <kbd>{keys}</kbd>
+      </div>
+    )
+  }
 
   if (!expanded) {
     const canTalk = !!state?.voice.input

@@ -7,6 +7,12 @@ files:
   - package.json
   - '!**/*.map'
 asar: true
+# Lumi's local AI engines (fetched and checksum-verified by `npm run runtimes`) and the desktop helper script.
+extraResources:
+  - from: resources/runtimes
+    to: runtimes
+  - from: resources/scripts
+    to: scripts
 npmRebuild: false
 electronFuses:
   runAsNode: false

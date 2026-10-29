@@ -23,6 +23,19 @@ export function clampSize(width: number, height: number): { width: number; heigh
   }
 }
 
+/**
+ * Scales a character window by `factor` without changing its proportions, clamped so both sides stay within the
+ * limits, and keeps the bottom centre (her feet) where it was.
+ */
+export function scaleBounds(b: Rect, factor: number): Rect {
+  const lo = Math.max(CHARACTER_MIN.width / b.width, CHARACTER_MIN.height / b.height)
+  const hi = Math.min(CHARACTER_MAX.width / b.width, CHARACTER_MAX.height / b.height)
+  const f = Math.min(hi, Math.max(lo, factor))
+  const width = b.width * f
+  const height = b.height * f
+  return { x: b.x + (b.width - width) / 2, y: b.y + b.height - height, width, height } // unrounded: callers round once
+}
+
 function overlap(a: Rect, b: Rect): { w: number; h: number } {
   return {
     w: Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x),

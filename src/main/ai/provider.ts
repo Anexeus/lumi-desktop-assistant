@@ -109,6 +109,14 @@ async function describeHttpError(res: Response, cfg: ProviderConfig): Promise<Pr
 }
 
 /** Streams the assistant's reply as text chunks, then any tool calls. Throws ProviderError. */
+/**
+ * JSON without lone UTF-16 surrogates. Text cut mid-emoji (e.g. a truncated web page) has them; JavaScript tolerates
+ * that but strict parsers (llama.cpp) reject the whole request.
+ */
+export const wellFormedJson = (value: unknown): string =>
+  // JSON.stringify writes a lone surrogate as the escape "\udXXX" (a backslash and 5 characters); swap those for U+FFFD.
+  JSON.stringify(value).replace(/\\ud[89ab][0-9a-f]{2}(?!\\ud[c-f][0-9a-f]{2})|(?<!\\ud[89ab][0-9a-f]{2})\\ud[c-f][0-9a-f]{2}/gi, '\\ufffd')
+
 export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], opts: StreamOptions = {}): AsyncGenerator<StreamEvent> {
   const { signal, fetchImpl = fetch, firstTokenTimeoutMs = 120_000, idleTimeoutMs = 60_000, tools } = opts
   const controller = new AbortController()
@@ -139,7 +147,7 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
       res = await fetchImpl(endpoint(cfg, '/chat/completions'), {
         method: 'POST',
         headers: headers(cfg),
-        body: JSON.stringify({ model: cfg.model, messages, stream: true, ...(tools?.length ? { tools } : {}) }),
+        body: wellFormedJson({ model: cfg.model, messages, stream: true, ...(tools?.length ? { tools } : {}) }),
         signal: controller.signal
       })
     } catch (error) {
@@ -219,6 +227,30 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
 }
 
 /** Lists model ids the endpoint offers; doubles as a connection test. */
+/** Asks a vision-capable model one question about a PNG (non-streaming). */
+export async function describeImage(cfg: ProviderConfig, pngBase64: string, question: string, fetchImpl: typeof fetch = fetch): Promise<string> {
+  let res: Response
+  try {
+    res = await fetchImpl(endpoint(cfg, '/chat/completions'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers(cfg) },
+      body: JSON.stringify({
+        model: cfg.model,
+        stream: false,
+        messages: [{ role: 'user', content: [{ type: 'text', text: question }, { type: 'image_url', image_url: { url: `data:image/png;base64,${pngBase64}` } }] }]
+      }),
+      signal: AbortSignal.timeout(90_000)
+    })
+  } catch {
+    throw new ProviderError('unreachable', `Can't reach ${new URL(cfg.baseUrl).host}.`)
+  }
+  if (!res.ok) throw new ProviderError(res.status === 401 || res.status === 403 ? 'auth' : 'http', `The vision request failed (${res.status}).`)
+  const body = (await res.json().catch(() => null)) as { choices?: { message?: { content?: unknown } }[] } | null
+  const text = body?.choices?.[0]?.message?.content
+  if (typeof text !== 'string' || !text.trim()) throw new ProviderError('bad-response', 'The model did not describe the image.')
+  return text.trim()
+}
+
 export async function listModels(cfg: ProviderConfig, fetchImpl: typeof fetch = fetch): Promise<string[]> {
   let res: Response
   try {

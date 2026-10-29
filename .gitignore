@@ -14,3 +14,4 @@ graphify-out/cache/
 Thumbs.db
 *.tsbuildinfo
 graphify-out/graph.html
+resources/runtimes/

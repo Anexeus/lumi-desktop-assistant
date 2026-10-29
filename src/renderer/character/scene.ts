@@ -53,12 +53,14 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     if (avatar) {
-      // Fit the whole body with a small margin, whichever of height or width is tighter.
+      // Fit the whole body, whichever of height or width is tighter, with room above the head and at the sides
+      // for raised arms (wave, cheer, stretch) and accessories. The margins are click-through, so they cost nothing.
       const size = avatar.bounds.getSize(new Vector3())
       const centre = avatar.bounds.getCenter(new Vector3())
+      centre.y += size.y * 0.1 // most of the extra room goes above the head
       const halfFov = (camera.fov * Math.PI) / 360
-      const fitHeight = (size.y * 1.08) / 2 / Math.tan(halfFov)
-      const fitWidth = (size.x * 1.15) / 2 / Math.tan(halfFov) / camera.aspect
+      const fitHeight = (size.y * 1.3) / 2 / Math.tan(halfFov)
+      const fitWidth = (Math.max(size.x, size.y * 0.55) * 1.5) / 2 / Math.tan(halfFov) / camera.aspect
       camera.position.set(centre.x, centre.y, centre.z + Math.max(fitHeight, fitWidth))
       camera.lookAt(centre)
     }

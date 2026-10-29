@@ -6,6 +6,7 @@ export interface TrayActions {
   setAlwaysOnTop(value: boolean): void
   openChat(): void
   openSettings(): void
+  stop(): void
   quit(): void
 }
 
@@ -39,6 +40,8 @@ export function menuTemplate(state: AppState, actions: TrayActions): MenuItemCon
     { type: 'separator' },
     { label: 'Open chat', click: actions.openChat },
     { label: 'Settings…', click: actions.openSettings },
+    { type: 'separator' },
+    { label: `Stop what ${state.assistantName} is doing (${state.stopShortcut.replaceAll('Control', 'Ctrl')})`, click: actions.stop },
     { type: 'separator' },
     { label: `Quit ${state.assistantName}`, click: actions.quit }
   ]

@@ -58,7 +58,8 @@ const api: AssistantApi = {
     addApp: (kind) => ipcRenderer.invoke(Invoke.toolsAddApp, { kind }),
     removeApp: (path) => ipcRenderer.invoke(Invoke.toolsRemoveApp, { path }),
     setPluginEnabled: (id, enabled) => ipcRenderer.invoke(Invoke.toolsSetPlugin, { id, enabled }),
-    setNotifications: (value) => ipcRenderer.invoke(Invoke.toolsSetNotifications, { value })
+    setNotifications: (value) => ipcRenderer.invoke(Invoke.toolsSetNotifications, { value }),
+    setScreenshots: (value) => ipcRenderer.invoke(Invoke.toolsSetScreenshots, { value })
   },
   integrations: {
     setGithubToken: (token) => ipcRenderer.invoke(Invoke.githubSetToken, { token }),
@@ -80,6 +81,13 @@ const api: AssistantApi = {
     ipcRenderer.on(Events.dataChanged, handler)
     return () => ipcRenderer.removeListener(Events.dataChanged, handler)
   },
+  stop: () => ipcRenderer.invoke(Invoke.emergencyStop),
+  local: {
+    download: (id) => ipcRenderer.invoke(Invoke.localDownload, { id }),
+    cancel: () => ipcRenderer.invoke(Invoke.localCancel),
+    remove: (id) => ipcRenderer.invoke(Invoke.localRemove, { id }),
+    select: (kind, id) => ipcRenderer.invoke(Invoke.localSelect, { kind, id })
+  },
   model: {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),
@@ -97,6 +105,7 @@ const api: AssistantApi = {
     dragMove: (screenX, screenY) => ipcRenderer.send(Send.dragMove, { screenX, screenY }),
     dragEnd: () => ipcRenderer.send(Send.dragEnd),
     resize: (width, height) => ipcRenderer.send(Send.resize, { width, height }),
+    scale: (factor) => ipcRenderer.send(Send.scale, { factor }),
     resizeEnd: () => ipcRenderer.send(Send.resizeEnd),
     showMenu: () => ipcRenderer.send(Send.showMenu)
   }

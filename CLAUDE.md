@@ -33,8 +33,12 @@ model: `ai.spec.ts` uses an in-test fake server. Live Ollama check: `OLLAMA_TEST
 AI requests, the conversation and API keys live in main (`src/main/ai/`, `settings.ts`); renderers never see a key.
 Storage is `node:sqlite` in `src/main/storage/` (no native deps). Voice uses the AI server's `/audio/*` endpoints (`src/main/ai/voice.ts`);
 the character window speaks replies (`speaker.ts`) and sends "done" itself while voice output is on.
-Pure renderer helpers that unit tests import (gestures, speech, wav, markdown) must be listed in `tsconfig.node.json`.
+Pure renderer helpers that unit tests import (gestures, speech, wav, markdown, vad) must be listed in `tsconfig.node.json`.
 Tools live in `src/main/tools/` (every act-risk tool goes through `PermissionBroker`); Claude Code in `src/main/claude/`.
+Local AI: `src/main/ai/local.ts` (llama-server / whisper-server from `resources/runtimes`, fetched by `npm run runtimes`;
+models in userData `models/local`). Desktop control: `src/main/tools/desktop.ts` + `resources/scripts/desktop.ps1`.
+Project scripts: `src/main/tools/projects.ts` (package.json scripts only; this is the allow-list, not a shell).
+Progress of the 2026-10-30 upgrade: `docs/UPGRADE_PROGRESS.md`. Logs: userData `logs/lumi.log`.
 E2E fakes the Claude CLI and hook config with `DESKTOP_ASSISTANT_FAKE_CLAUDE`, `_NODE`, `_CLAUDE_SETTINGS`, `_HOOK_PORT`
 (unpackaged only): never point tests at the real `~/.claude/settings.json`.
 

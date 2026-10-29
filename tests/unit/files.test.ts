@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -49,5 +49,30 @@ describe('scoped files', () => {
   it('refuses binary files and returns nothing with no approved folders', async () => {
     await expect(createScopedFiles(() => [root]).read(join(root, 'binary.txt'))).rejects.toThrow(/binary/)
     expect((await createScopedFiles(() => []).search('resume')).hits).toEqual([])
+  })
+})
+
+describe('scoped write', () => {
+  const files = () => createScopedFiles(() => [root])
+  const backups = () => join(outside, 'backups')
+
+  it('creates a file, and replaces one after backing up the old version', async () => {
+    const created = await files().write('docs/todo.txt', 'buy milk', backups())
+    expect(created.created).toBe(true)
+    expect(readFileSync(join(root, 'docs', 'todo.txt'), 'utf8')).toBe('buy milk')
+    const replaced = await files().write(join(root, 'docs', 'notes.md'), 'new notes', backups())
+    expect(replaced.created).toBe(false)
+    expect(readFileSync(replaced.backup!, 'utf8')).toContain('Meeting notes')
+    expect(readFileSync(join(root, 'docs', 'notes.md'), 'utf8')).toBe('new notes')
+  })
+
+  it('refuses anything outside the approved folders, binaries, and missing folders', async () => {
+    await expect(files().write(join(outside, 'x.txt'), 'no', backups())).rejects.toThrow(/approved/)
+    await expect(files().write('../x.txt', 'no', backups())).rejects.toThrow(/approved/)
+    await expect(files().write('docs/app.exe', 'MZ', backups())).rejects.toThrow(/text and code/)
+    await expect(files().write('nope/x.txt', 'no', backups())).rejects.toThrow(/approved|exist/)
+    await expect(files().write('\\\\server\\share\\x.txt', 'no', backups())).rejects.toThrow(/not allowed/)
+    if (existsSync(join(root, 'escape'))) await expect(files().write('escape/secret.txt', 'no', backups())).rejects.toThrow()
+    expect(readFileSync(join(outside, 'secret.txt'), 'utf8')).toBe('outside the approved folder')
   })
 })

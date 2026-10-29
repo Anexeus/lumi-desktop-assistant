@@ -33,6 +33,10 @@ const POSES: Record<CharacterState, Pose> = {
 const VISEMES = ['aa', 'oh', 'ee', 'ih', 'ou'] as const
 const BLEND_RATE = 6 // per second; ~0.4 s to settle into a new state
 
+// Relaxed standing: arms hang close to the body (not the A-pose most models are rigged in), elbows softly bent.
+const REST_ARM = 1.36
+const REST_ELBOW = 0.22
+
 export interface Avatar {
   readonly vrm: VRM
   /** World-space box used to frame the camera. */
@@ -44,6 +48,10 @@ export interface Avatar {
   setMouth(level: number | null): void
   /** Point the eyes at a world-space position; null returns to looking at the viewer. */
   lookAt(world: Vector3 | null): void
+  /** Picked up by the mouse: arms up, legs dangle, a surprised smile. */
+  setHeld(held: boolean): void
+  /** The window moved by (dx, dy) screen pixels; the body lags and swings back, and hair and clothes follow. */
+  nudge(dx: number, dy: number): void
   update(dt: number, elapsed: number): void
   dispose(): void
 }
@@ -73,12 +81,12 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   // Twist about the forearm's own length first, then bend (three's default XYZ order would twist in the upper arm's frame).
   rLower?.rotation.reorder('ZYX')
   const applyArms = (o: typeof ZERO): void => {
-    turn(rUpper, 0, 0, 1.2 + o.rUpperZ)
-    turn(lUpper, 0, 0, -1.2 + o.lUpperZ)
+    turn(rUpper, 0, 0, REST_ARM + o.rUpperZ)
+    turn(lUpper, 0, 0, -REST_ARM + o.lUpperZ)
     // Split the twist between forearm and wrist so the skin doesn't candy-wrap at the wrist.
-    turn(rLower, o.rTwist * 0.6, 0.15 + o.rLowerY, o.rLowerZ)
+    turn(rLower, o.rTwist * 0.6, REST_ELBOW + o.rLowerY, o.rLowerZ)
     turn(rHand, o.rTwist * 0.4, 0, 0)
-    turn(lLower, 0, -0.15 + o.lLowerY, o.lLowerZ)
+    turn(lLower, 0, -REST_ELBOW + o.lLowerY, o.lLowerZ)
   }
   applyArms(ZERO)
 
@@ -94,6 +102,12 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   const chest = bone('chest') ?? bone('spine')
   const hips = bone('hips')
   const hipsRestY = hips?.position.y ?? 0
+  const lLeg = bone('leftUpperLeg')
+  const rLeg = bone('rightUpperLeg')
+  const rootRest = vrm.scene.position.clone()
+  let held = false
+  let heldWeight = 0
+  const inertia = { x: 0, y: 0, vx: 0, vy: 0 } // world-space offset of the body behind the window
 
   let target = POSES.IDLE
   const pose: Pose = { ...POSES.IDLE }
@@ -126,6 +140,14 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
     setMouth(level) {
       mouth = level === null ? null : Math.min(1, Math.max(0, level))
     },
+    setHeld(next) {
+      held = next
+    },
+    nudge(dx, dy) {
+      // A quick flick swings her noticeably; the clamps below keep her in the window.
+      inertia.vx -= dx * 0.05
+      inertia.vy += dy * 0.05
+    },
     lookAt(world) {
       if (!vrm.lookAt) return
       if (world) {
@@ -147,11 +169,25 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
         nextIdleGesture = t + 12 + Math.random() * 13
       }
       talk += ((state === 'SPEAKING' ? 1 : 0) - talk) * k
+      heldWeight += ((held ? 1 : 0) - heldWeight) * Math.min(1, dt * 8)
       const g = addOffsets(
         talkingOffsets(t, talk),
         gesture ? gestureOffsets(gesture.name, (t - gesture.start) / GESTURE_SECONDS[gesture.name]) : ZERO
       )
-      applyArms(g)
+      const h = heldWeight
+      // Held: both arms up in a cheerful V with bent elbows ("wheee!").
+      applyArms({ ...g, rUpperZ: g.rUpperZ - 1.8 * h, lUpperZ: g.lUpperZ + 1.8 * h, rLowerZ: g.rLowerZ - 0.7 * h, lLowerZ: g.lLowerZ + 0.7 * h })
+      const kick = Math.sin(t * 7) * 0.25 * h // legs dangle and kick while held
+      turn(lLeg, kick, 0, 0.06 * h)
+      turn(rLeg, -kick, 0, -0.06 * h)
+
+      // Damped spring: the body trails the window's motion, then settles.
+      const clampDt = Math.min(dt, 0.05)
+      inertia.vx += (-60 * inertia.x - 7 * inertia.vx) * clampDt
+      inertia.vy += (-60 * inertia.y - 7 * inertia.vy) * clampDt
+      inertia.x = Math.max(-0.14, Math.min(0.14, inertia.x + inertia.vx * clampDt))
+      inertia.y = Math.max(-0.1, Math.min(0.1, inertia.y + inertia.vy * clampDt))
+      vrm.scene.position.set(rootRest.x + inertia.x, rootRest.y + inertia.y, rootRest.z)
 
       const breathe = Math.sin(t * 1.7)
       turn(chest, breathe * 0.015 - pose.lean - g.chest, 0, 0)
@@ -168,7 +204,7 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
 
       expr('happy', Math.min(1, pose.happy + g.happy))
       expr('sad', pose.sad)
-      expr('surprised', pose.surprised)
+      expr('surprised', Math.min(1, pose.surprised + 0.5 * heldWeight))
       expr('relaxed', pose.relaxed)
 
       // Blink at natural intervals; VRM's own override rules keep it off during strong expressions.

@@ -5,7 +5,7 @@ import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 import { useVoiceMode, type VoicePhase } from '../ui/useVoiceMode'
 
-const VOICE_LABEL: Record<Exclude<VoicePhase, 'off'>, string> = { listening: 'Listening…', hearing: 'Hearing you…', transcribing: 'Got it…' }
+const VOICE_LABEL: Record<Exclude<VoicePhase, 'off'>, string> = { listening: 'Listening… tap to stop', hearing: 'Hearing you…', transcribing: 'Got it…' }
 const tail = (text: string, n: number): string => (text.length > n ? '…' + text.slice(-n).trimStart() : text)
 
 export function Island(): React.JSX.Element {
@@ -56,7 +56,7 @@ export function Island(): React.JSX.Element {
           : voice.error
             ? voice.error
             : state?.voice.input
-              ? `Talk to ${state.assistantName}…`
+              ? `🎙 Tap here to talk to ${state.assistantName}`
               : `Ask ${state?.assistantName ?? 'Lumi'}…`
 
   if (!expanded) {

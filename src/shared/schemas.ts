@@ -55,6 +55,8 @@ export const toolsSettingsSchema = z
   })
   .strict()
 
+export const graphicsSchema = z.enum(['low', 'balanced', 'high'])
+
 export const settingsFileSchema = z
   .object({
     assistantName: assistantNameSchema,
@@ -65,7 +67,8 @@ export const settingsFileSchema = z
     tools: toolsSettingsSchema,
     mcp: z.array(mcpServerSchema).max(30),
     claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict(),
-    character: z.enum(CHARACTER_IDS)
+    character: z.enum(CHARACTER_IDS),
+    graphics: graphicsSchema
   })
   .partial()
   .strict()
@@ -83,6 +86,7 @@ export const invokeSchemas = {
   [Invoke.getModel]: none,
   [Invoke.chooseModel]: none,
   [Invoke.selectCharacter]: z.object({ id: z.enum(CHARACTER_IDS) }).strict(),
+  [Invoke.setGraphics]: z.object({ quality: graphicsSchema }).strict(),
   [Invoke.setIslandVisible]: z.object({ value: z.boolean() }).strict(),
   [Invoke.setIslandExpanded]: z.object({ expanded: z.boolean() }).strict(),
   [Invoke.chatGet]: none,

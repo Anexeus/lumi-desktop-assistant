@@ -13,7 +13,10 @@ interface Sentence {
 export function createSpeaker(setMouth: (level: number | null) => void): {
   onChat(event: ChatEvent): void
   onState(state: AppState): void
+  /** A quick line like "Wheee!" in her voice, unless she is already talking or voice is off. Cached per voice. */
+  exclaim(text: string): void
 } {
+  const exclaims = new Map<string, Promise<Uint8Array | null>>()
   let voice: VoiceSettings | undefined
   let replyId = -1
   let buffer = ''
@@ -163,6 +166,17 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
         enqueue([tail])
         finishIfDone()
       }
+    },
+    exclaim(text) {
+      if (!voice || voice.output === 'off' || playing || streaming) return
+      const gen = generation
+      if (voice.output === 'system') return void speakWithWindows(text, gen)
+      const key = `${voice.voice}|${text}`
+      if (!exclaims.has(key)) exclaims.set(key, synth(text))
+      void exclaims
+        .get(key)!
+        .then((audio) => (audio && gen === generation && !playing ? playWav(audio, gen) : undefined))
+        .catch(() => {})
     },
     onState(state) {
       voice = state.voice

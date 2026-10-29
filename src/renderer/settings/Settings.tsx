@@ -1,3 +1,4 @@
+import type { Graphics } from '@shared/ipc'
 import { CHARACTERS } from '@shared/characters'
 import { useState } from 'react'
 import { TitleBar } from '../ui/TitleBar'
@@ -8,6 +9,12 @@ import { ClaudeSettings } from './ClaudeSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
 import { ToolsSettings } from './ToolsSettings'
 import { VoiceSettings } from './VoiceSettings'
+
+const GRAPHICS: { value: Graphics; label: string; hint: string }[] = [
+  { value: 'low', label: 'Low', hint: 'Lower resolution, 24 fps. Easiest on battery and older PCs.' },
+  { value: 'balanced', label: 'Balanced', hint: 'Sharp on most screens, 30 fps.' },
+  { value: 'high', label: 'High', hint: 'Full resolution, smooth 60 fps. Uses more GPU.' }
+]
 
 export function Settings(): React.JSX.Element {
   const state = useAppState()
@@ -125,6 +132,23 @@ export function Settings(): React.JSX.Element {
             <button type="button" className="secondary" onClick={() => void chooseModel()} disabled={busy}>
               Use my own .vrm file…
             </button>
+          </div>
+          <div className="field">
+            <span id="graphics-label">Graphics quality</span>
+            <div className="segmented" role="radiogroup" aria-labelledby="graphics-label">
+              {GRAPHICS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={state.graphics === g.value}
+                  onClick={() => void window.assistant.model.setGraphics(g.value)}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+            <small className="model-license">{GRAPHICS.find((g) => g.value === state.graphics)?.hint}</small>
           </div>
           {modelError && (
             <p className="warn" role="alert">

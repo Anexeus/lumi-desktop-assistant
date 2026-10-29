@@ -16,6 +16,8 @@ let mode: 'idle' | 'pressing' | 'dragging' | 'resizing' = 'idle'
 let pressX = 0
 let pressY = 0
 let startSize = { width: 0, height: 0 }
+let lastX = 0
+let lastY = 0
 
 function setInteractive(next: boolean): void {
   if (next === interactive) return
@@ -44,8 +46,17 @@ canvas.addEventListener('pointermove', (e) => {
   if (mode === 'pressing' && Math.hypot(e.screenX - pressX, e.screenY - pressY) > CLICK_SLOP) {
     mode = 'dragging'
     api.dragStart(pressX, pressY)
+    lastX = pressX
+    lastY = pressY
+    scene.setHeld(true)
+    speaker.exclaim('Wheee!')
   }
-  if (mode === 'dragging') api.dragMove(e.screenX, e.screenY)
+  if (mode === 'dragging') {
+    api.dragMove(e.screenX, e.screenY)
+    scene.nudge(e.screenX - lastX, e.screenY - lastY)
+    lastX = e.screenX
+    lastY = e.screenY
+  }
 })
 
 canvas.addEventListener('pointerup', (e) => {
@@ -54,7 +65,10 @@ canvas.addEventListener('pointerup', (e) => {
     scene.play('wave')
     void window.assistant.openWindow('chat')
   }
-  if (mode === 'dragging') api.dragEnd()
+  if (mode === 'dragging') {
+    api.dragEnd()
+    scene.setHeld(false)
+  }
   mode = 'idle'
 })
 
@@ -117,6 +131,7 @@ async function loadModel(): Promise<void> {
 
 function applyState(state: AppState): void {
   scene.setState(state.character)
+  scene.setQuality(state.graphics)
   speaker.onState(state)
   document.body.dataset['state'] = state.character
   if (state.model.revision !== modelRevision) {

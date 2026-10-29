@@ -17,6 +17,7 @@ let userData: string
 let folder: string
 let claudeSettings: string
 let hookPort: number
+let documents: string
 const HOOK_TOKEN = 'ab'.repeat(24)
 const seen: Seen[] = []
 const pageErrors: string[] = []
@@ -28,7 +29,10 @@ const TOOL_FOR: Record<string, (arg: string) => [string, Record<string, string>]
   mcp: (t) => ['mcp_echo_echo', { text: t }],
   web: (u) => ['web_read', { url: u }],
   claude: (t) => ['claude_task', { task: t, project: basename(folder) }],
-  youtube: (q) => ['web_open', { site: 'youtube', query: q }]
+  youtube: (q) => ['web_open', { site: 'youtube', query: q }],
+  note: (t) => ['note_write', { title: 'Shopping', text: t }],
+  notepad: () => ['apps_open', { name: 'notepad' }],
+  write: (t) => ['files_write', { path: 'docs/new.txt', content: t }]
 }
 
 test.beforeAll(async () => {
@@ -94,6 +98,8 @@ test.beforeAll(async () => {
     p.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()))
   })
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('/character.html'))).toBe(true)
+  documents = mkdtempSync(join(tmpdir(), 'lumi-documents-'))
+  await app.evaluate(({ app: electronApp }, d) => electronApp.setPath('documents', d), documents)
   // Record launches instead of opening anything for real.
   await app.evaluate(({ shell }) => {
     const g = globalThis as unknown as { opened: string[] }
@@ -165,7 +171,7 @@ test('"Allow for this chat" stops asking until a new chat', async () => {
 
 test('an app that is not on the list is refused without asking', async () => {
   const c = await chat()
-  await c.evaluate(() => window.assistant.chat.send('(tool:apps) Calculator'))
+  await c.evaluate(() => window.assistant.chat.send('(tool:apps) Photoshop'))
   await expect(c.locator('.activity').last()).toContainText('(not allowed)')
   await expect(c.getByRole('alertdialog')).toHaveCount(0)
   expect(seen.at(-1)!.messages.at(-1)!.content).toContain('not on the approved list')
@@ -276,4 +282,34 @@ test('"open YouTube and search…" opens the search in the user’s browser afte
   await expect(card).toContainText('Open youtube and search for “lofi beats” in your browser')
   await card.getByRole('button', { name: 'Allow once' }).click()
   await expect.poll(async () => (await opened()).at(-1)).toBe('https://www.youtube.com/results?search_query=lofi%20beats')
+})
+
+test('notes are written to Documents and opened in Notepad; Windows apps are always available', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click()
+  await c.evaluate(() => window.assistant.chat.send('(tool:note) milk, eggs'))
+  await expect(c.getByRole('alertdialog')).toContainText('Write “Shopping.txt” (1 lines) and open it in Notepad')
+  await c.getByRole('alertdialog').getByRole('button', { name: 'Allow once' }).click()
+  const note = join(documents, 'Lumi Notes', 'Shopping.txt')
+  await expect.poll(() => existsSync(note) && readFileSync(note, 'utf8')).toBe('milk, eggs')
+  await expect.poll(async () => (await opened()).at(-1)).toBe(note)
+
+  await c.evaluate(() => window.assistant.chat.send('(tool:notepad) go'))
+  await c.getByRole('alertdialog').getByRole('button', { name: 'Allow once' }).click()
+  await expect.poll(async () => (await opened()).at(-1)?.toLowerCase()).toMatch(/system32[\\/]notepad\.exe$/)
+})
+
+test('files_write edits a file in an approved folder only after approval, keeping a backup', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click()
+  writeFileSync(join(folder, 'docs', 'new.txt'), 'old text')
+  await c.evaluate(() => window.assistant.chat.send('(tool:write) new text'))
+  await c.getByRole('alertdialog').getByRole('button', { name: 'Deny' }).click()
+  await expect(c.locator('.activity').last()).toContainText('(you declined)')
+  expect(readFileSync(join(folder, 'docs', 'new.txt'), 'utf8')).toBe('old text')
+
+  await c.evaluate(() => window.assistant.chat.send('(tool:write) new text'))
+  await c.getByRole('alertdialog').getByRole('button', { name: 'Allow once' }).click()
+  await expect.poll(() => readFileSync(join(folder, 'docs', 'new.txt'), 'utf8')).toBe('new text')
+  await expect(c.locator('.bubble.assistant').last()).toContainText('previous version is at')
 })

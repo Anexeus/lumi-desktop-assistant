@@ -128,6 +128,7 @@ export class Conversation {
       ...history,
       { role: 'user', content: text }
     ]
+    let retried = false
     try {
       for (let round = 0; ; round++) {
         let stepText = ''
@@ -151,6 +152,11 @@ export class Conversation {
           this.deps.onDelta(reply.id, event)
         }
         if (turn !== this.turn) return save()
+        // Small local models now and then think and then say nothing; one quiet retry usually fixes it.
+        if (!stepText && !calls.length && !usedTools && !retried) {
+          retried = true
+          continue
+        }
         if (!calls.length || !this.deps.runTool || round >= MAX_TOOL_ROUNDS) break
 
         usedTools = true

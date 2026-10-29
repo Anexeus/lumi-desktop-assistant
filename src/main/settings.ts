@@ -4,7 +4,7 @@ import type { CharacterId } from '@shared/characters'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
-import type { AiSettings, ApprovedApp, McpServerConfig, VoiceSettings } from '@shared/ipc'
+import type { AiSettings, ApprovedApp, Graphics, McpServerConfig, VoiceSettings } from '@shared/ipc'
 import type { Store } from './storage/store'
 
 export const DEFAULT_AI: AiSettings = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:4b' }
@@ -55,6 +55,7 @@ export interface Settings {
   mcp: McpServerConfig[]
   claude: { path: string; hookToken: string }
   character: CharacterId
+  graphics: Graphics
 }
 
 export function loadSettings(store: Store): Settings {
@@ -70,7 +71,8 @@ export function loadSettings(store: Store): Settings {
     tools: file.tools ?? DEFAULT_TOOLS,
     mcp: file.mcp ?? [],
     claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') },
-    character: file.character ?? 'seed-san'
+    character: file.character ?? 'seed-san',
+    graphics: file.graphics ?? 'balanced'
   }
 }
 

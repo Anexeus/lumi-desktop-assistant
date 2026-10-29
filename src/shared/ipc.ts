@@ -152,6 +152,9 @@ export interface AiStatus extends AiSettings {
   local: boolean
 }
 
+/** Character render quality: resolution and frame rate. */
+export type Graphics = 'low' | 'balanced' | 'high'
+
 export interface ModelInfo {
   /** A bundled character's id, or 'custom' for the user's own .vrm. */
   id: string
@@ -188,6 +191,7 @@ export interface AppState {
   approvals: ApprovalRequest[]
   integrations: IntegrationsState
   claude: ClaudeState
+  graphics: Graphics
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -204,6 +208,7 @@ export const Invoke = {
   getModel: 'model:get',
   chooseModel: 'model:choose',
   selectCharacter: 'model:select',
+  setGraphics: 'graphics:set',
   setIslandVisible: 'island:set-visible',
   setIslandExpanded: 'island:set-expanded',
   chatGet: 'chat:get',
@@ -355,6 +360,7 @@ export interface AssistantApi {
     choose(): Promise<ChooseModelResult>
     /** Switches to a bundled character (dropping any custom model) and matches the voice to it. */
     select(id: string): Promise<AppState>
+    setGraphics(quality: Graphics): Promise<AppState>
   }
   character: {
     setIgnoreMouse(ignore: boolean): void

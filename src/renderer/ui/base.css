@@ -13,6 +13,7 @@
   --rim: rgb(255 255 255 / 75%);
   --shade: rgb(16 12 40 / 10%);
   --sheen: linear-gradient(180deg, rgb(255 255 255 / 55%) 0%, rgb(255 255 255 / 0%) 55%);
+  --highlight: rgb(255 255 255 / 40%); /* the specular line along a surface's top edge */
   --accent: #6b5ae6;
   --accent-2: #4f8cff;
   --accent-text: #ffffff;
@@ -27,12 +28,14 @@
   :root {
     --text: #f4f2fa;
     --muted: rgb(244 242 250 / 64%);
-    --tint: rgb(14 12 22 / 28%);
-    --glass: rgb(255 255 255 / 8%);
-    --glass-strong: rgb(255 255 255 / 14%);
-    --rim: rgb(255 255 255 / 22%);
+    /* Deeper tint and quieter layers: in dark mode stacked white turns the glass into flat grey. */
+    --tint: rgb(12 10 20 / 52%);
+    --glass: rgb(255 255 255 / 5%);
+    --glass-strong: rgb(255 255 255 / 10%);
+    --rim: rgb(255 255 255 / 13%);
     --shade: rgb(0 0 0 / 35%);
-    --sheen: linear-gradient(180deg, rgb(255 255 255 / 14%) 0%, rgb(255 255 255 / 0%) 55%);
+    --sheen: linear-gradient(180deg, rgb(255 255 255 / 7%) 0%, rgb(255 255 255 / 0%) 55%);
+    --highlight: rgb(255 255 255 / 10%);
     --accent: #8f81f5;
     --accent-2: #5aa2ff;
     --accent-text: #120f1c;
@@ -77,7 +80,7 @@ body {
   border: 1px solid var(--rim);
   border-radius: var(--radius);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 45%),
+    inset 0 1px 0 var(--highlight),
     inset 0 -1px 0 var(--shade),
     0 6px 20px var(--shade);
   backdrop-filter: blur(14px) saturate(170%);
@@ -168,7 +171,7 @@ button {
     linear-gradient(180deg, rgb(255 255 255 / 28%), rgb(255 255 255 / 0%) 60%),
     linear-gradient(135deg, var(--accent), var(--accent-2));
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 45%),
+    inset 0 1px 0 var(--highlight),
     0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
   transition:
     transform 120ms ease,
@@ -194,7 +197,7 @@ button.stop {
   color: var(--text);
   background: var(--sheen), var(--glass-strong);
   border-color: var(--rim);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 40%);
+  box-shadow: inset 0 1px 0 var(--highlight);
 }
 
 button.ghost {

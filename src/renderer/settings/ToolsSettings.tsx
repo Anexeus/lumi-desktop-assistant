@@ -2,6 +2,7 @@ import type { ToolsState } from '@shared/ipc'
 
 const PERMISSION_LABELS: Record<string, string> = {
   'files.read': 'reads files in approved folders',
+  'files.write': 'writes notes and files in approved folders (backed up)',
   'apps.launch': 'opens approved apps (asks first)',
   notify: 'shows notifications',
   'web.browse': 'opens web pages in a visible window (asks first)',

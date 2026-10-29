@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, shell, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, type MenuItemConstructorOptions } from 'electron'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
@@ -13,7 +13,7 @@ import { HOOK_PORT, hooksInstalled, installHooks, startHookServer, uninstallHook
 import { ClaudeTasks, findClaude } from './claude/tasks'
 import { PermissionBroker } from './tools/broker'
 import { tool, type Plugin } from './tools/types'
-import { appsPlugin, filesPlugin, notifyPlugin } from './tools/builtin'
+import { appsPlugin, filesPlugin, notifyPlugin, systemApps, writePlugin } from './tools/builtin'
 import { githubPlugin } from './tools/github'
 import { McpManager, parseCommandLine } from './tools/mcp'
 import { createRegistry, runToolCall } from './tools/registry'
@@ -113,7 +113,8 @@ async function start(): Promise<void> {
     tools: { plugins: [], folders: settings.tools.folders, apps: settings.tools.apps, notifications: settings.tools.notifications },
     approvals: [],
     integrations: { githubToken: hasSecret(GITHUB_TOKEN), mcp: [] },
-    claude: { path: null, hooksInstalled: false, hookServer: false, tasks: [], events: [] }
+    claude: { path: null, hooksInstalled: false, hookServer: false, tasks: [], events: [] },
+    graphics: settings.graphics
   }
 
   const persist = (): void => saveWindowState(store, { character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
@@ -265,9 +266,13 @@ async function start(): Promise<void> {
   const builtins = [
     claudePlugin,
     filesPlugin(() => settings.tools.folders),
-    appsPlugin(() => settings.tools.apps),
+    appsPlugin(() => [...settings.tools.apps, ...systemApps()]),
+    writePlugin(
+      () => settings.tools.folders,
+      () => join(app.getPath('userData'), 'backups')
+    ),
     notifyPlugin(() => settings.tools.notifications),
-    webPlugin(),
+    webPlugin((title, body) => notify(title, body)),
     githubPlugin(() => getSecret(GITHUB_TOKEN))
   ]
   const registry = createRegistry(() => [...builtins, ...mcp.plugins()], () => settings.tools.disabled)
@@ -296,20 +301,31 @@ async function start(): Promise<void> {
     n.show()
   }
 
-  // Ollama stops when its window is closed. If the local AI is unreachable, start it (fixed known path only) and retry once.
-  const OLLAMA_APP = join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'Ollama', 'ollama app.exe')
+  // Ollama stops when its window is closed. If the local AI is unreachable, start its server hidden (fixed known path only;
+  // no window to close by accident, and it keeps running after Lumi quits) and retry once.
+  const OLLAMA_EXE = join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'Ollama', 'ollama.exe')
+  const ollamaUp = (): Promise<boolean> => fetch('http://127.0.0.1:11434/api/version', { signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false)
   let ollamaStarting: Promise<boolean> | undefined
   async function startOllama(): Promise<boolean> {
-    if (!/^http:\/\/(127\.0\.0\.1|localhost):11434\b/.test(settings.ai.baseUrl) || !existsSync(OLLAMA_APP)) return false
+    if (!/^http:\/\/(127\.0\.0\.1|localhost):11434\b/.test(settings.ai.baseUrl) || !existsSync(OLLAMA_EXE)) return false
     ollamaStarting ??= (async () => {
-      await shell.openPath(OLLAMA_APP)
+      if (await ollamaUp()) return true
+      spawn(OLLAMA_EXE, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref()
       for (let i = 0; i < 40; i++) {
         await new Promise((r) => setTimeout(r, 500))
-        if (await fetch('http://127.0.0.1:11434/api/version').then((r) => r.ok, () => false)) return true
+        if (await ollamaUp()) return true
       }
       return false
     })().finally(() => (ollamaStarting = undefined))
     return ollamaStarting
+  }
+  async function withOllama<T>(fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (error) {
+      if (!(error instanceof ProviderError && error.kind === 'unreachable') || !(await startOllama())) throw error
+      return fn()
+    }
   }
   async function* chatStream(messages: Parameters<typeof streamChat>[1], signal: AbortSignal): AsyncGenerator<StreamEvent> {
     const run = async function* (): AsyncGenerator<StreamEvent> {
@@ -541,7 +557,7 @@ async function start(): Promise<void> {
     const allowed = settings.voice.input && (windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)
     if (!allowed) throw new Error('Rejected voice:transcribe: voice input is off or not allowed from this window')
     try {
-      return { ok: true as const, text: await transcribe(await voiceConfig(), wav) }
+      return { ok: true as const, text: await withOllama(async () => transcribe(await voiceConfig(), wav)) }
     } catch (error) {
       return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not understand the recording.' }
     }
@@ -550,7 +566,7 @@ async function start(): Promise<void> {
     // The character speaks replies; Settings plays the "Test voice" sample.
     if (!fromCharacter(e.sender) && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected voice:synthesize: not allowed from this window')
     try {
-      const audio = await synthesize({ ...(await voiceConfig()), voice: settings.voice.voice, speed: settings.voice.speed }, text)
+      const audio = await withOllama(async () => synthesize({ ...(await voiceConfig()), voice: settings.voice.voice, speed: settings.voice.speed }, text))
       return { ok: true as const, audio }
     } catch (error) {
       return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not speak.' }
@@ -571,6 +587,11 @@ async function start(): Promise<void> {
     } catch (error) {
       return { ok: false, message: error instanceof ProviderError ? error.message : 'Could not list models.' }
     }
+  })
+  handle(Invoke.setGraphics, ({ quality }) => {
+    settings.graphics = quality
+    saveSettings(store, settings)
+    return setState({ graphics: quality })
   })
   handle(Invoke.selectCharacter, async ({ id }) => {
     await removeCustomModel()
@@ -623,6 +644,7 @@ async function start(): Promise<void> {
 
   setState({ tools: toolsState() })
   void mcp.sync()
+  void startOllama() // warm up at launch so the first message doesn't wait for it
   const hookPort = (testMode && Number(process.env['DESKTOP_ASSISTANT_HOOK_PORT'])) || HOOK_PORT
   void startHookServer(() => settings.claude.hookToken, onHookEvent, hookPort).then((server) => {
     hookServerUp = !!server

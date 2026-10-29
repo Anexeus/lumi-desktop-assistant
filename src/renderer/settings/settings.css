@@ -17,7 +17,7 @@
   border: 1px solid var(--rim);
   border-radius: var(--radius);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 40%),
+    inset 0 1px 0 var(--highlight),
     0 6px 18px var(--shade);
   backdrop-filter: blur(14px) saturate(170%);
 }
@@ -236,7 +236,7 @@
   color: var(--text);
   background: var(--sheen), var(--glass);
   border: 1px solid var(--rim);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 40%);
+  box-shadow: inset 0 1px 0 var(--highlight);
 }
 
 .character-choice small {
@@ -247,6 +247,31 @@
 .character-choice[aria-checked='true'] {
   border-color: var(--accent);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 40%),
+    inset 0 1px 0 var(--highlight),
     0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.segmented {
+  display: inline-flex;
+  justify-self: start;
+  width: fit-content;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--rim);
+}
+
+.segmented button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.segmented button[aria-checked='true'] {
+  color: var(--accent-text);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
 }

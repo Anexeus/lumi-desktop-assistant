@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { on: () => {} }, BrowserWindow: class {}, session: {}, shell: {} }))
-const { isPublicWebUrl, openTarget, unwrapResultUrl } = await import('../../src/main/tools/web')
+const { downloadName, isPublicWebUrl, openTarget, unwrapResultUrl } = await import('../../src/main/tools/web')
 
 describe('isPublicWebUrl', () => {
   it('allows public http(s) pages', () => {
@@ -44,5 +44,14 @@ describe('openTarget', () => {
     expect(openTarget({ site: 'youtube', query: 'lofi hip hop & chill' })).toBe('https://www.youtube.com/results?search_query=lofi%20hip%20hop%20%26%20chill')
     expect(openTarget({ site: 'youtube' })).toBe('https://www.youtube.com')
     expect(openTarget({ url: 'https://example.com/a' })).toBe('https://example.com/a')
+  })
+})
+
+describe('downloadName', () => {
+  it('takes the name from the header or the URL and makes it safe', () => {
+    expect(downloadName('https://x.com/files/report%20v2.pdf', null)).toBe('report v2.pdf')
+    expect(downloadName('https://x.com/get?id=1', 'attachment; filename="setup.exe"')).toBe('setup.exe')
+    expect(downloadName('https://x.com/a/..%5C..%5Cevil.txt', null)).toBe('_.._evil.txt')
+    expect(downloadName('https://x.com/', null)).toBe('download')
   })
 })

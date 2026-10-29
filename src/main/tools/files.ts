@@ -1,12 +1,13 @@
-import { readdir, readFile, realpath, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { copyFile, mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
-// Read-only access to folders the user approved. Every path is resolved (symlinks and junctions
+// Access to folders the user approved (writes only through the approval prompt). Every path is resolved (symlinks and junctions
 // included) and must stay inside an approved folder.
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.svn', '.hg', '__pycache__', '.venv', 'dist', 'out', 'build', '$RECYCLE.BIN'])
 const TEXT_EXT = /\.(txt|md|markdown|json|jsonc|ya?ml|toml|ini|cfg|conf|csv|tsv|log|xml|html?|css|scss|less|js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|kt|cs|cpp|cc|c|h|hpp|php|sh|ps1|bat|cmd|sql|env\.example|gitignore|vue|svelte|lua|r|swift|dart)$/i
 const MAX_READ_BYTES = 200 * 1024
+const MAX_WRITE_BYTES = 1024 * 1024
 const MAX_SCAN_FILES = 5000
 const MAX_RESULTS = 40
 const SCAN_BUDGET_MS = 3000
@@ -105,6 +106,34 @@ export function createScopedFiles(roots: () => string[]) {
       if (bytes.subarray(0, 8000).includes(0)) throw new Error('That looks like a binary file, so I can’t read it as text.')
       const truncated = bytes.byteLength > MAX_READ_BYTES
       return { path: real, text: bytes.subarray(0, MAX_READ_BYTES).toString('utf8'), truncated }
+    },
+
+    /**
+     * Creates or replaces a text/code file inside an approved folder (its folder must already exist there).
+     * A replaced file's old contents are copied to `backupDir` first, so every edit can be undone.
+     */
+    async write(path: string, text: string, backupDir: string): Promise<{ path: string; created: boolean; backup: string | null }> {
+      if (Buffer.byteLength(text) > MAX_WRITE_BYTES) throw new Error('That is more than 1 MB of text.')
+      if (unsafePath(path)) throw new Error('That path is not allowed.')
+      for (const root of roots()) {
+        const target = isAbsolute(path) ? path : join(root, path)
+        const parent = await within([root], dirname(target))
+        if (!parent) continue
+        const file = join(parent, basename(target))
+        if (!TEXT_EXT.test(file)) throw new Error('Lumi only writes text and code files.')
+        const existing = await stat(file).catch(() => null)
+        // An existing file must itself resolve inside the folder (a link could point elsewhere).
+        if (existing && (!existing.isFile() || !(await within([root], file)))) throw new Error('That path is not a regular file in your folder.')
+        let backup: string | null = null
+        if (existing) {
+          await mkdir(backupDir, { recursive: true })
+          backup = join(backupDir, `${Date.now()}-${basename(file)}`)
+          await copyFile(file, backup)
+        }
+        await writeFile(file, text, 'utf8')
+        return { path: file, created: !existing, backup }
+      }
+      throw new Error('That folder is not inside a folder you approved (Settings → Tools), or it does not exist.')
     },
 
     within: (path: string) => within(roots(), path)

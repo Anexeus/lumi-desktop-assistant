@@ -1,9 +1,15 @@
 import { DirectionalLight, AmbientLight, PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three'
 import type { CharacterState } from '@shared/character'
+import type { Graphics } from '@shared/ipc'
 import { loadAvatar, type Avatar } from './avatar'
 import type { Gesture } from './gestures'
 
-const FRAME_MS = 1000 / 30 // idle budget: 30 fps is plenty for a desktop character
+// Graphics presets: render resolution and frame rate (Balanced is the old default budget).
+const QUALITY: Record<Graphics, { pixelRatio: number; fps: number }> = {
+  low: { pixelRatio: 0.75, fps: 24 },
+  balanced: { pixelRatio: 1.5, fps: 30 },
+  high: { pixelRatio: 2, fps: 60 }
+}
 
 export interface CharacterScene {
   /** True when the pixel under (clientX, clientY) belongs to the character. */
@@ -16,6 +22,9 @@ export interface CharacterScene {
   setMouth(level: number | null): void
   /** Cursor position relative to the window's top-left, in CSS pixels (may be outside the window). */
   lookAtCursor(x: number, y: number): void
+  setHeld(held: boolean): void
+  nudge(dx: number, dy: number): void
+  setQuality(quality: Graphics): void
   dispose(): void
 }
 
@@ -23,7 +32,8 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   // preserveDrawingBuffer lets hit tests read the last frame's alpha at any time.
   const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power', preserveDrawingBuffer: true })
   renderer.setClearColor(0x000000, 0)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY.balanced.pixelRatio))
+  let frameMs = 1000 / QUALITY.balanced.fps
 
   const scene = new Scene()
   const camera = new PerspectiveCamera(22, 1, 0.1, 20)
@@ -63,7 +73,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   let raf = 0
   const tick = (now: number): void => {
     raf = requestAnimationFrame(tick)
-    if (now - last < FRAME_MS) return
+    if (now - last < frameMs) return
     last = now
     timer.update(now)
     avatar?.update(Math.min(timer.getDelta(), 0.1), timer.getElapsed())
@@ -130,6 +140,19 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     lookAtCursor(x, y) {
       cursor = { x, y }
       applyGaze()
+    },
+    setHeld(held) {
+      avatar?.setHeld(held)
+    },
+    nudge(dx, dy) {
+      avatar?.nudge(dx, dy)
+    },
+    setQuality(quality) {
+      const q = QUALITY[quality]
+      frameMs = 1000 / q.fps
+      if (renderer.getPixelRatio() === Math.min(window.devicePixelRatio, q.pixelRatio)) return
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, q.pixelRatio))
+      frame() // re-size the drawing buffer at the new resolution
     },
     dispose() {
       cancelAnimationFrame(raf)

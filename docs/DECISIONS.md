@@ -182,6 +182,17 @@ Opening sites and site searches goes through `shell.openExternal` with public ht
 "full access to my PC" stay out of scope by design (SECURITY.md: no shell, no model-generated commands). Code changes go
 through Claude Code tasks in approved folders; apps through the approved-apps list.
 
+## ADR-040 PC actions through narrow tools, still no shell (2026-10-29)
+The user asked for Lumi to control the PC "without restrictions". Lumi now clicks and types in its own browser window,
+writes notes and files in approved folders (with backups), opens Windows' own apps, and downloads files. It still has no
+shell and runs no model-generated commands: a 4B local model that reads web pages can be steered by those pages, and a
+shell would turn one bad step into real damage. Each new tool is `act` risk (asks; "Allow for this chat" stops repeats).
+Browser control uses DOM item numbers instead of screen vision, because qwen3:4b can't see. Supersedes ADR-039's scope.
+
+## ADR-041 Window motion drives spring-bone physics (2026-10-29)
+Dragging moves the OS window, not the model, so VRM spring bones never saw motion. The renderer feeds each drag delta into
+a damped spring that offsets the model root; hair and clothes then swing through three-vrm's own spring bones.
+
 ## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
 Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
 nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.

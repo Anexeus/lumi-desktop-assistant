@@ -87,6 +87,16 @@ hints are not trusted for the confirmation decision unless the user marks the se
   folders the user explicitly approved, and show that warning when a folder is added.
 - The hook ingress binds `127.0.0.1` only, requires a per-install token, rate-limits requests, and validates payloads.
 
+## PC actions
+
+- `browser_open/click/type` act only in Lumi's own browser window (isolated `lumi-web` session, no cookies kept, public
+  URLs only, downloads blocked there). Page content stays untrusted data.
+- `files_write` writes only text/code extensions, only inside approved folders (realpath containment, existing files must
+  resolve inside too, no UNC/device paths), at most 1 MB, and copies the old version to userDataackups first.
+- `web_download` follows at most 5 redirects and stops if one leads to a private address; files go to Downloads with a
+  unique name, capped at 4 GB, and are never opened or run. Program files are flagged in the approval prompt.
+- Built-in Windows apps open with no arguments. There is still no shell and no model-generated command.
+
 ## Voice mode and web_open
 
 - Voice mode keeps the mic open only while the user has it switched on (one click on, one click off); audio is never

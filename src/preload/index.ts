@@ -83,7 +83,8 @@ const api: AssistantApi = {
   model: {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),
-    select: (id) => ipcRenderer.invoke(Invoke.selectCharacter, { id })
+    select: (id) => ipcRenderer.invoke(Invoke.selectCharacter, { id }),
+    setGraphics: (quality) => ipcRenderer.invoke(Invoke.setGraphics, { quality })
   },
   character: {
     onCursor(listener) {

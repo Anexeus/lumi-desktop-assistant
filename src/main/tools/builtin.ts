@@ -1,5 +1,7 @@
-import { Notification, shell } from 'electron'
-import { basename } from 'node:path'
+import { app, Notification, shell } from 'electron'
+import { existsSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import { z } from 'zod'
 import type { ApprovedApp } from '@shared/ipc'
 import { createScopedFiles } from './files'
@@ -51,6 +53,76 @@ export function filesPlugin(folders: () => string[]): Plugin {
   }
 }
 
+/** Windows' own apps, always on the list (opening them runs nothing by itself). */
+export function systemApps(): ApprovedApp[] {
+  const win = process.env['SystemRoot'] ?? 'C:\\Windows'
+  const local = process.env['LOCALAPPDATA'] ?? ''
+  return [
+    { name: 'Notepad', path: join(win, 'System32', 'notepad.exe') },
+    { name: 'Calculator', path: join(win, 'System32', 'calc.exe') },
+    { name: 'Paint', path: join(win, 'System32', 'mspaint.exe') },
+    { name: 'File Explorer', path: join(win, 'explorer.exe') },
+    { name: 'Terminal', path: join(local, 'Microsoft', 'WindowsApps', 'wt.exe') },
+    { name: 'Command Prompt', path: join(win, 'System32', 'cmd.exe') }
+  ].filter((a) => existsSync(a.path))
+}
+
+/** A note title as a safe file name (no characters Windows forbids, no control characters). */
+export const noteFileName = (title: string): string =>
+  // eslint-disable-next-line no-control-regex
+  `${title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').replace(/[. ]+$/, '').trim().slice(0, 80) || 'Note'}.txt`
+
+/** Writing: notes into Documents\\Lumi Notes (opened in Notepad), and text/code files in approved folders (backed up first). */
+export function writePlugin(folders: () => string[], backupDir: () => string): Plugin {
+  const files = createScopedFiles(folders)
+  return {
+    id: 'core.write',
+    name: 'Writing',
+    version: '1.0.0',
+    description: 'Write notes (opened in Notepad) and create or edit text and code files in approved folders. Asks first; edits are backed up.',
+    permissions: ['files.write'],
+    tools: [
+      tool({
+        name: 'note_write',
+        description: 'Write a note or any text for the user and open it in Notepad (saved in Documents\\Lumi Notes).',
+        parameters: {
+          type: 'object',
+          properties: { title: { type: 'string', description: 'Short file title' }, text: { type: 'string', description: 'The full text to write' } },
+          required: ['title', 'text']
+        },
+        input: z.object({ title: z.string().trim().min(1).max(120), text: z.string().max(200_000) }),
+        risk: 'act',
+        describe: ({ title, text }) => `Write “${noteFileName(title)}” (${text.split('\n').length} lines) and open it in Notepad`,
+        async run({ title, text }) {
+          const dir = join(app.getPath('documents'), 'Lumi Notes')
+          await mkdir(dir, { recursive: true })
+          const file = join(dir, noteFileName(title))
+          await writeFile(file, text, 'utf8')
+          const error = await shell.openPath(file)
+          return error ? `Saved ${file}, but Windows could not open it: ${error}` : `Saved and opened ${file}.`
+        }
+      }),
+      tool({
+        name: 'files_write',
+        description:
+          'Create a text/code file, or replace one with new full contents, inside the user’s approved folders. Read it first with files_read, then send the complete new text.',
+        parameters: {
+          type: 'object',
+          properties: { path: { type: 'string', description: 'Path from files_search, or relative to an approved folder' }, content: { type: 'string' } },
+          required: ['path', 'content']
+        },
+        input: z.object({ path: z.string().trim().min(1).max(1000), content: z.string().max(1024 * 1024) }),
+        risk: 'act',
+        describe: ({ path, content }) => `Write ${basename(path)} (${content.split('\n').length} lines). The old version is backed up.`,
+        async run({ path, content }) {
+          const r = await files.write(path, content, backupDir())
+          return r.created ? `Created ${r.path}.` : `Saved ${r.path}. The previous version is at ${r.backup}.`
+        }
+      })
+    ]
+  }
+}
+
 /** Matches a spoken or typed app name against the allow-list ("vs code" → "Visual Studio Code"). */
 export function findApp(apps: ApprovedApp[], name: string): ApprovedApp | undefined {
   const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -73,7 +145,7 @@ export function appsPlugin(apps: () => ApprovedApp[]): Plugin {
     tools: [
       tool({
         name: 'apps_open',
-        description: 'Open an app or folder the user has approved. Only names from the approved list work.',
+        description: 'Open an app or folder the user has approved (Windows apps like Notepad, Terminal and Calculator are always available).',
         // A getter, so the model always sees the current allow-list.
         get parameters() {
           return {

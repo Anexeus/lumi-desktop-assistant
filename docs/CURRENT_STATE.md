@@ -3,7 +3,22 @@
 _Last updated: 2026-10-29. Milestones 6–9 (tools, integrations, Claude Code, release) plus the Lumi name and liquid-glass UI are
 implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdeefd`, `60e4209`; 4–5: `50201fc`._
 
-## Voice mode, characters, web_open (new, after `9e762b0`)
+## PC actions, physics, graphics (new, after `8343a79`)
+- **Ollama** now starts hidden (`ollama.exe serve`, no window to close) at Lumi's launch and whenever chat or voice finds it
+  unreachable; it keeps running after Lumi quits.
+- **Browser control:** `browser_open` (site/search/url in Lumi's visible browser window), `browser_click` and `browser_type`
+  by item number. Real videos are listed first. Live: "Play lofi music on YouTube" → search → click → the video plays.
+- **Writing:** `note_write` saves to Documents\Lumi Notes and opens Notepad; `files_write` creates/replaces text and code
+  files in approved folders, backing up the old version to userDataackups. **Apps:** Notepad, Calculator, Paint, File
+  Explorer, Terminal and Command Prompt are always on the list. **Downloads:** `web_download` saves to Downloads in the
+  background (notification when done) and never opens the file. All of these ask first.
+- **Character:** relaxed standing pose (arms at the sides); when dragged she cheers with arms up, kicks her legs and says
+  "Wheee!" in her own voice; the body trails the window's motion so hair and clothes swing (VRM spring bones).
+- **Graphics quality** (Settings → Character): Low (0.75× resolution, 24 fps), Balanced (1.5×, 30 fps), High (2×, 60 fps).
+- **UI:** dark-mode glass is deeper and the cards' top-edge highlight no longer glares; the island says "Tap here to talk".
+- **Fixed:** an empty reply from the model is retried once before showing an error.
+
+## Voice mode, characters, web_open (after `9e762b0`)
 - **Voice mode:** click the island pill ("Talk to Lumi…") and the mic stays open hands-free; each pause in your speech is
   transcribed and sent, Lumi answers, and it listens again until you click the pill again. It ignores audio while Lumi
   thinks or speaks (so she never hears herself). Voice activity detection tracks the room's noise floor (`ui/vad.ts`).
@@ -154,6 +169,10 @@ implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdee
 ## Verified this session (commands actually run)
 | Check | Result |
 |---|---|
+| After `8343a79`: lint, typecheck, `npm test` | pass; 128 unit tests (adds scoped writes with backup and escape refusal, download names) |
+| After `8343a79`: `npm run test:e2e` | 46/46 on 2 consecutive runs. Adds: note to Documents + Notepad opened, built-in Notepad, files_write deny/allow with backup |
+| Live qwen3 + YouTube | "Play lofi music on YouTube for me" and "Open YouTube…, search lofi music and play the first video": browser_open → browser_click → a real video playing (not paused, 15–16 s in) in Lumi's browser |
+| Character screenshots | relaxed pose on Seed-san, Shino, Fumiriya; mid-drag arms-up pose and skirt/hair swing; settles after release |
 | After `9e762b0`: lint, typecheck, `npm test` | pass; 125 unit tests (adds VAD, Markdown fences, voice picking, web_open targets) |
 | After `9e762b0`: `npm run test:e2e` | 44/44 on 2 consecutive runs. Adds: voice mode hears a fake-mic burst, sends it, gets a reply, and hears nothing once off; character switching sets the voice; web_open asks then opens the YouTube search |
 | Live, real Ollama | Spoken "Open YouTube and search for lofi music" (lfm3-audio TTS fed as the mic) → voice mode transcribed it in 4.6 s → qwen3 called `web_open` → approval → `youtube.com/results?search_query=lo-fi%20music` opened (browser launch stubbed). Character screenshots: all VRoid models stand and wave correctly |
@@ -177,6 +196,8 @@ implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdee
 | Milestone 2 dev + packaged | Seed-san loads in `npm run dev` and in `release/win-unpacked` (asar 19 MB), with no console errors |
 
 ## Not verified (needs a person at the screen)
+- Hearing the "Wheee!" (audio isn't captured in tests) and how the drag physics feels with a real mouse.
+- The hidden `ollama serve` start from cold (Ollama was already running during these tests).
 - Voice mode with a real microphone and a real room (tested with a fake mic fed real speech).
 - Running the NSIS installer and uninstaller (only built; the unpacked exe was run).
 - A real Claude Code task (the bundled CLI here is not logged in; tests use a fake CLI) and real hooks firing from Claude Code

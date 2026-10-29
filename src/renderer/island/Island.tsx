@@ -3,7 +3,9 @@ import { MicButton } from '../ui/MicButton'
 import { RichText } from '../ui/RichText'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
+import { useVoiceMode, type VoicePhase } from '../ui/useVoiceMode'
 
+const VOICE_LABEL: Record<Exclude<VoicePhase, 'off'>, string> = { listening: 'Listening…', hearing: 'Hearing you…', transcribing: 'Got it…' }
 const tail = (text: string, n: number): string => (text.length > n ? '…' + text.slice(-n).trimStart() : text)
 
 export function Island(): React.JSX.Element {
@@ -15,6 +17,8 @@ export function Island(): React.JSX.Element {
   const replyEnd = useRef<HTMLDivElement>(null)
   const expanded = state?.islandExpanded ?? false
   const busy = status !== 'idle' || state?.character === 'SPEAKING'
+  const voice = useVoiceMode(state?.voice.micId ?? '', busy)
+  const talking = voice.phase !== 'off'
 
   const lastUser = [...items].reverse().find((i) => i.role === 'user')
   const lastReply = lastUser ? [...items].reverse().find((i) => i.id > lastUser.id && (i.role === 'assistant' || i.role === 'error')) : undefined
@@ -47,15 +51,32 @@ export function Island(): React.JSX.Element {
       ? 'Thinking…'
       : status === 'streaming' && lastReply
         ? tail(lastReply.text, 46)
-        : `Ask ${state?.assistantName ?? 'Lumi'}…`
+        : talking
+          ? VOICE_LABEL[voice.phase as Exclude<VoicePhase, 'off'>]
+          : voice.error
+            ? voice.error
+            : state?.voice.input
+              ? `Talk to ${state.assistantName}…`
+              : `Ask ${state?.assistantName ?? 'Lumi'}…`
 
   if (!expanded) {
+    const canTalk = !!state?.voice.input
     return (
-      <button type="button" className={`pill liquid ${status}`} onClick={() => setExpanded(true)} aria-label={`Assistant: ${label}. Open quick ask.`}>
-        <span className={`dot ${status}`} aria-hidden="true" />
-        <span className="pill-text">{label}</span>
-        {state?.islandShortcut.registered && <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' ')}</kbd>}
-      </button>
+      <div className={`pill liquid ${status}${talking ? ' talking' : ''}`} style={{ '--level': voice.level } as React.CSSProperties}>
+        <button
+          type="button"
+          className="pill-main"
+          onClick={() => void (canTalk ? voice.toggle() : setExpanded(true))}
+          aria-pressed={canTalk ? talking : undefined}
+          aria-label={canTalk ? `Voice mode${talking ? ' on' : ''}: ${label}. Click to ${talking ? 'stop' : 'talk'}.` : `Assistant: ${label}. Click to type.`}
+        >
+          <span className={`dot ${talking ? 'talking' : status}`} aria-hidden="true" />
+          <span className={`pill-text${voice.error && !talking ? ' error' : ''}`}>{label}</span>
+        </button>
+        <button type="button" className="pill-type" onClick={() => setExpanded(true)} aria-label="Open quick ask" title="Type instead">
+          {state?.islandShortcut.registered ? <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' ')}</kbd> : <kbd>Type</kbd>}
+        </button>
+      </div>
     )
   }
 

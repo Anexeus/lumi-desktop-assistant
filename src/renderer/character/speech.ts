@@ -26,6 +26,17 @@ export function speakable(text: string): string {
     .trim()
 }
 
+const MALE = /\b(david|mark|guy|george|james|ryan|christopher|eric|roger|andrew|brian|davis|tony|jason|steffan)\b/i
+const FEMALE = /\b(zira|aria|jenny|hazel|susan|libby|sonia|emma|ava|michelle|ana|heera|catherine|linda|nanami)\b/i
+
+/** A Windows voice by exact name, or, for "male"/"female" (a character's voice), the first voice of that gender. */
+export function pickVoice<V extends { name: string }>(voices: V[], wanted: string): V | undefined {
+  const named = voices.find((v) => v.name === wanted)
+  if (named || !wanted) return named
+  const gender = /^(female|male)/.exec(wanted)?.[1]
+  return gender ? voices.find((v) => (gender === 'male' ? MALE : FEMALE).test(v.name)) : undefined
+}
+
 /** Mouth openness from an audio frame's RMS loudness (speech sits around 0.02–0.2). */
 export function mouthLevel(rms: number): number {
   return Math.min(1, Math.max(0, (rms - 0.015) * 7))

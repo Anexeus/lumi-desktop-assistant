@@ -153,11 +153,16 @@ export interface AiStatus extends AiSettings {
 }
 
 export interface ModelInfo {
+  /** A bundled character's id, or 'custom' for the user's own .vrm. */
+  id: string
   name: string
   authors: string[]
   licenseUrl: string | null
-  /** True when the user loaded their own .vrm; false for the bundled default. */
+  /** True when the user loaded their own .vrm; false for a bundled character. */
   custom: boolean
+  /** The bundled .vrm file to load (null for a custom model, whose bytes come from model.get()). */
+  file: string | null
+  license: string | null
   /** Bumped on every model change so the character window knows to reload. */
   revision: number
 }
@@ -198,7 +203,7 @@ export const Invoke = {
   characterEvent: 'character:event',
   getModel: 'model:get',
   chooseModel: 'model:choose',
-  resetModel: 'model:reset',
+  selectCharacter: 'model:select',
   setIslandVisible: 'island:set-visible',
   setIslandExpanded: 'island:set-expanded',
   chatGet: 'chat:get',
@@ -348,7 +353,8 @@ export interface AssistantApi {
     /** The user's model bytes, or null to use the bundled default. Character window only. */
     get(): Promise<Uint8Array | null>
     choose(): Promise<ChooseModelResult>
-    reset(): Promise<AppState>
+    /** Switches to a bundled character (dropping any custom model) and matches the voice to it. */
+    select(id: string): Promise<AppState>
   }
   character: {
     setIgnoreMouse(ignore: boolean): void

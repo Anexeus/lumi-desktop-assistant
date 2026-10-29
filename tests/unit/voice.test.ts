@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { synthesize, transcribe } from '../../src/main/ai/voice'
-import { mouthLevel, speakable, takeSentences } from '../../src/renderer/character/speech'
+import { mouthLevel, pickVoice, speakable, takeSentences } from '../../src/renderer/character/speech'
 import { downsample, encodeWav, fixWavSizes } from '../../src/renderer/ui/wav'
 
 const cfg = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'lfm3-audio' }
@@ -93,5 +93,16 @@ describe('audio endpoints', () => {
     expect(audio.byteLength).toBe(1000)
     expect(body).toMatchObject({ model: 'lfm3-audio', response_format: 'wav', voice: 'alloy', speed: 1.2 })
     expect((body['input'] as string).length).toBe(1000)
+  })
+})
+
+describe('pickVoice', () => {
+  const voices = [{ name: 'Microsoft Zira - English (United States)' }, { name: 'Microsoft David - English (United States)' }]
+  it('matches an exact name, or a character gender to a Windows voice', () => {
+    expect(pickVoice(voices, 'Microsoft Zira - English (United States)')).toBe(voices[0])
+    expect(pickVoice(voices, 'male')).toBe(voices[1])
+    expect(pickVoice(voices, 'female-japanese')).toBe(voices[0])
+    expect(pickVoice(voices, '')).toBeUndefined()
+    expect(pickVoice(voices, 'robot')).toBeUndefined()
   })
 })

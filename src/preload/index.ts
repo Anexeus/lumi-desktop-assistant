@@ -83,7 +83,7 @@ const api: AssistantApi = {
   model: {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),
-    reset: () => ipcRenderer.invoke(Invoke.resetModel)
+    select: (id) => ipcRenderer.invoke(Invoke.selectCharacter, { id })
   },
   character: {
     onCursor(listener) {

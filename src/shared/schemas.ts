@@ -1,3 +1,4 @@
+import { CHARACTER_IDS } from './characters'
 import { z } from 'zod'
 import { CHARACTER_EVENTS } from './character'
 import { Invoke, Send } from './ipc'
@@ -63,7 +64,8 @@ export const settingsFileSchema = z
     voice: voiceSettingsSchema,
     tools: toolsSettingsSchema,
     mcp: z.array(mcpServerSchema).max(30),
-    claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict()
+    claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict(),
+    character: z.enum(CHARACTER_IDS)
   })
   .partial()
   .strict()
@@ -80,7 +82,7 @@ export const invokeSchemas = {
   [Invoke.characterEvent]: z.object({ event: z.enum(CHARACTER_EVENTS).exclude(['timeout']) }).strict(),
   [Invoke.getModel]: none,
   [Invoke.chooseModel]: none,
-  [Invoke.resetModel]: none,
+  [Invoke.selectCharacter]: z.object({ id: z.enum(CHARACTER_IDS) }).strict(),
   [Invoke.setIslandVisible]: z.object({ value: z.boolean() }).strict(),
   [Invoke.setIslandExpanded]: z.object({ expanded: z.boolean() }).strict(),
   [Invoke.chatGet]: none,

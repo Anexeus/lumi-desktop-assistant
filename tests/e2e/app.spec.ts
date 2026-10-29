@@ -253,9 +253,15 @@ test('only the character window may read the model bytes', async () => {
   expect(outcome).toBe('rejected')
 })
 
-test('settings credits the default model, loads a custom .vrm and resets', async () => {
+test('settings credits the model, switches characters with a matching voice, loads a custom .vrm', async () => {
   const settings = await panel('settings')
-  await expect(settings.getByText('Seed-san © VirtualCast, Inc.')).toBeVisible()
+  await expect(settings.getByText(/© VirtualCast, Inc. · VRM Public License 1.0/)).toBeVisible()
+  const characters = settings.getByRole('radiogroup', { name: 'Characters' })
+  await characters.getByRole('radio', { name: /Sendagaya Shino/ }).click()
+  await expect(characters.getByRole('radio', { name: /Sendagaya Shino/ })).toHaveAttribute('aria-checked', 'true')
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
+  const shino = await character.evaluate(() => window.assistant.getState())
+  expect([shino.model.file, shino.voice.voice]).toEqual(['Sendagaya-Shino.vrm', 'female'])
 
   const stubDialog = (file: string): Promise<void> =>
     app.evaluate(({ dialog }, path) => {
@@ -264,19 +270,20 @@ test('settings credits the default model, loads a custom .vrm and resets', async
 
   // A file that is not a VRM is refused with a message and changes nothing.
   await stubDialog(join(process.cwd(), 'package.json'))
-  await settings.getByRole('button', { name: 'Choose a .vrm file…' }).click()
+  await settings.getByRole('button', { name: 'Use my own .vrm file…' }).click()
   await expect(settings.getByRole('alert')).toHaveText(/Not a VRM/)
   expect((await character.evaluate(() => window.assistant.getState())).model.custom).toBe(false)
 
   // A real VRM is copied into the profile and the character reloads it.
   await stubDialog(join(process.cwd(), 'src/renderer/public/models/Seed-san.vrm'))
-  await settings.getByRole('button', { name: 'Choose a .vrm file…' }).click()
-  await expect(settings.getByRole('button', { name: 'Use the default' })).toBeVisible()
+  await settings.getByRole('button', { name: 'Use my own .vrm file…' }).click()
+  await expect(characters.getByRole('radio', { checked: true })).toHaveCount(0)
   await expect(character.locator('body')).toHaveAttribute('data-model', 'custom', { timeout: 20_000 })
   expect(readFileSync(join(userData, 'models', 'custom.vrm')).byteLength).toBeGreaterThan(1_000_000)
 
-  await settings.getByRole('button', { name: 'Use the default' }).click()
+  await characters.getByRole('radio', { name: /Sakurada Fumiriya/ }).click()
   await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
+  expect((await character.evaluate(() => window.assistant.getState())).voice.voice).toBe('male')
   expect(existsSync(join(userData, 'models', 'custom.vrm'))).toBe(false)
 })
 

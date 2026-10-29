@@ -1,3 +1,4 @@
+import { CHARACTERS } from '@shared/characters'
 import { useState } from 'react'
 import { TitleBar } from '../ui/TitleBar'
 import { useAppState } from '../ui/useAppState'
@@ -94,23 +95,36 @@ export function Settings(): React.JSX.Element {
             {model.name}
             {model.authors.length > 0 && <small> by {model.authors.join(', ')}</small>}
           </p>
-          {model.licenseUrl && (
+          {model.custom && model.licenseUrl && (
             <p className="model-license">
               License: <span className="selectable">{model.licenseUrl}</span>
             </p>
           )}
-          {!model.custom && (
-            <p className="model-license">Default model. Seed-san © VirtualCast, Inc., VRM Public License 1.0.</p>
+          {model.license && (
+            <p className="model-license">
+              © {model.authors.join(', ')} · {model.license} · <span className="selectable">{model.licenseUrl}</span>
+            </p>
           )}
-          <div className="model-actions">
-            <button type="button" onClick={() => void chooseModel()} disabled={busy}>
-              Choose a .vrm file…
-            </button>
-            {model.custom && (
-              <button type="button" className="secondary" onClick={() => void window.assistant.model.reset()}>
-                Use the default
+          <div className="characters" role="radiogroup" aria-label="Characters">
+            {CHARACTERS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={model.id === c.id}
+                className="character-choice"
+                disabled={busy}
+                onClick={() => void window.assistant.model.select(c.id)}
+              >
+                <strong>{c.name}</strong>
+                <small>{c.voice} voice</small>
               </button>
-            )}
+            ))}
+          </div>
+          <div className="model-actions">
+            <button type="button" className="secondary" onClick={() => void chooseModel()} disabled={busy}>
+              Use my own .vrm file…
+            </button>
           </div>
           {modelError && (
             <p className="warn" role="alert">

@@ -23,6 +23,7 @@
     "src/renderer/character/speech.ts",
     "src/renderer/ui/wav.ts",
     "src/renderer/ui/markdown.ts",
+    "src/renderer/ui/vad.ts",
     "tests/unit/**/*",
     "electron.vite.config.ts",
     "vitest.config.mts",

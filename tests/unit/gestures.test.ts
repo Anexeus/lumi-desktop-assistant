@@ -21,6 +21,7 @@ describe('gestures', () => {
   it('wave raises the right arm and smiles; stretch raises both arms', () => {
     const wave = gestureOffsets('wave', 0.5)
     expect(wave.rUpperZ).toBeLessThan(-1)
+    expect(wave.rTwist).toBeCloseTo(-Math.PI / 2) // palm faces the viewer
     expect(wave.happy).toBeGreaterThan(0.5)
     expect(wave.lUpperZ).toBe(0)
     const stretch = gestureOffsets('stretch', 0.5)

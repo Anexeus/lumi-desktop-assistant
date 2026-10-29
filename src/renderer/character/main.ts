@@ -99,12 +99,14 @@ canvas.addEventListener('keydown', (e) => {
 
 // data-model / data-state mirror what is on screen (used by E2E tests and handy in DevTools).
 let modelRevision = -1
+let modelFile: string | null = null
+
 async function loadModel(): Promise<void> {
   document.body.dataset['model'] = 'loading'
   try {
     const bytes = await window.assistant.model.get()
     const buffer = bytes ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer) : null
-    document.body.dataset['model'] = await scene.setModel(buffer)
+    document.body.dataset['model'] = await scene.setModel(buffer, modelFile)
     scene.play('wave') // hello on first appearance and after a model change
   } catch (error) {
     console.error('Could not load the character model', error)
@@ -119,6 +121,7 @@ function applyState(state: AppState): void {
   document.body.dataset['state'] = state.character
   if (state.model.revision !== modelRevision) {
     modelRevision = state.model.revision
+    modelFile = state.model.file
     void loadModel()
   }
 }

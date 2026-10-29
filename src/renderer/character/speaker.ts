@@ -1,6 +1,6 @@
 import type { AppState, ChatEvent, VoiceSettings } from '@shared/ipc'
 import { fixWavSizes } from '../ui/wav'
-import { mouthLevel, speakable, takeSentences } from './speech'
+import { mouthLevel, pickVoice, speakable, takeSentences } from './speech'
 
 // Speaks streamed replies sentence by sentence and drives the mouth from the real audio.
 // Main does not send "done" while voice is on; this module sends it once the last sentence ends.
@@ -119,7 +119,7 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
     return new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text)
       u.rate = voice?.speed ?? 1
-      const named = voice?.voice ? speechSynthesis.getVoices().find((v) => v.name === voice!.voice) : undefined
+      const named = voice?.voice ? pickVoice(speechSynthesis.getVoices(), voice.voice) : undefined
       if (named) u.voice = named
       // No audio access here, so open the mouth on each word and let it fall shut.
       let level = 0

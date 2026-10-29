@@ -1,3 +1,4 @@
+import { pickVoice } from '../character/speech'
 import { useEffect, useRef, useState } from 'react'
 import type { VoiceSettings as Voice } from '@shared/ipc'
 import { fixWavSizes } from '../ui/wav'
@@ -26,7 +27,7 @@ export function VoiceSettings({ voice }: { voice: Voice }): React.JSX.Element {
     if (voice.output === 'system') {
       const u = new SpeechSynthesisUtterance(SAMPLE)
       u.rate = voice.speed
-      const named = speechSynthesis.getVoices().find((v) => v.name === voice.voice)
+      const named = pickVoice(speechSynthesis.getVoices(), voice.voice)
       if (named) u.voice = named
       speechSynthesis.speak(u)
       return
@@ -98,7 +99,19 @@ export function VoiceSettings({ voice }: { voice: Voice }): React.JSX.Element {
           <span>Voice model and voice</span>
           <span className="inline">
             <input value={voice.model} onChange={(e) => save({ model: e.target.value })} spellCheck={false} aria-label="Voice model" />
-            <input value={voice.voice} onChange={(e) => save({ voice: e.target.value })} placeholder="default voice" spellCheck={false} aria-label="Voice name" />
+            <input
+              value={voice.voice}
+              onChange={(e) => save({ voice: e.target.value })}
+              placeholder="female"
+              spellCheck={false}
+              aria-label="Voice name"
+              list="ollama-voices"
+            />
+            <datalist id="ollama-voices">
+              {['female', 'male', 'female-japanese', 'male-japanese', 'female-british-english', 'male-british-english'].map((v) => (
+                <option key={v} value={v} />
+              ))}
+            </datalist>
           </span>
           <small className="model-license">Needs the model in Ollama once: ollama pull {voice.model}</small>
         </label>

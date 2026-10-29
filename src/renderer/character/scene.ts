@@ -4,13 +4,12 @@ import { loadAvatar, type Avatar } from './avatar'
 import type { Gesture } from './gestures'
 
 const FRAME_MS = 1000 / 30 // idle budget: 30 fps is plenty for a desktop character
-const DEFAULT_MODEL_URL = './models/Seed-san.vrm'
 
 export interface CharacterScene {
   /** True when the pixel under (clientX, clientY) belongs to the character. */
   hitTest(clientX: number, clientY: number): boolean
-  /** Loads the user's model bytes, or the bundled default when null. Falls back to the default on failure. */
-  setModel(bytes: ArrayBuffer | null): Promise<'custom' | 'default'>
+  /** Loads the user's model bytes, or the bundled `file` (also the fallback if the bytes don't load). */
+  setModel(bytes: ArrayBuffer | null, file: string | null): Promise<'custom' | 'default'>
   setState(state: CharacterState): void
   play(gesture: Gesture): void
   /** Mouth openness 0..1 from speech audio, or null for placeholder movement. */
@@ -104,16 +103,16 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
       gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
       return pixel[3]! > 16
     },
-    async setModel(bytes) {
+    async setModel(bytes, file) {
       if (bytes) {
         try {
           await use(bytes)
           return 'custom'
         } catch (error) {
-          console.error('Could not load the custom model, using the default', error)
+          console.error('Could not load the custom model, using a bundled one', error)
         }
       }
-      await use(DEFAULT_MODEL_URL)
+      await use(`./models/${file ?? 'Seed-san.vrm'}`)
       return 'default'
     },
     setState(next) {

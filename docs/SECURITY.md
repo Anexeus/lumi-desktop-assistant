@@ -87,6 +87,13 @@ hints are not trusted for the confirmation decision unless the user marks the se
   folders the user explicitly approved, and show that warning when a folder is added.
 - The hook ingress binds `127.0.0.1` only, requires a per-install token, rate-limits requests, and validates payloads.
 
+## Voice mode and web_open
+
+- Voice mode keeps the mic open only while the user has it switched on (one click on, one click off); audio is never
+  saved, only sent to the configured speech-to-text endpoint per utterance. Audio is ignored while Lumi speaks.
+- `web_open` hands a public http(s) URL to the default browser after approval. Local/private addresses are refused
+  (`isPublicWebUrl`), and the model never runs commands.
+
 ## Release hardening
 
 - A packaged build exits when started with `--remote-debugging-port`, `--remote-debugging-pipe` or `--inspect*`

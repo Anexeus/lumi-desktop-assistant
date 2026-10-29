@@ -9,6 +9,7 @@ export interface Offsets {
   lUpperZ: number // left upper arm: + raises it
   lLowerZ: number // left forearm: + bends it up
   rLowerY: number // forearm bend toward the viewer
+  rTwist: number // right forearm + wrist twist: − turns the palm from facing down to facing the viewer
   lLowerY: number
   headYaw: number
   headPitch: number
@@ -23,6 +24,7 @@ export const ZERO: Offsets = {
   lUpperZ: 0,
   lLowerZ: 0,
   rLowerY: 0,
+  rTwist: 0,
   lLowerY: 0,
   headYaw: 0,
   headPitch: 0,
@@ -52,6 +54,7 @@ export function gestureOffsets(gesture: Gesture, p: number): Offsets {
     case 'wave':
       o.rUpperZ = -1.45 * w // arm out and up
       o.rLowerZ = (-1.1 + Math.sin(T * 11) * 0.35) * w // forearm up, waggling
+      o.rTwist = -Math.PI / 2 * w // palm to the viewer, not edge-on
       o.headRoll = 0.08 * w
       o.happy = 0.6 * w
       break

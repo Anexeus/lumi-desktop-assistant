@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, session, shell } from 'electron'
 import { z } from 'zod'
 import { tool, type Plugin } from './types'
 
@@ -87,6 +87,34 @@ export function unwrapResultUrl(href: string): string {
 
 const urlInput = z.object({ url: z.url().max(2000).refine(isPublicWebUrl, 'Only public http(s) web addresses.') })
 
+/** Sites the model can search by name, so a small model never has to build the URL itself. */
+export const SITE_SEARCH = {
+  youtube: 'https://www.youtube.com/results?search_query=',
+  google: 'https://www.google.com/search?q=',
+  wikipedia: 'https://en.wikipedia.org/w/index.php?search=',
+  github: 'https://github.com/search?q=',
+  reddit: 'https://www.reddit.com/search/?q=',
+  maps: 'https://www.google.com/maps/search/',
+  spotify: 'https://open.spotify.com/search/',
+  amazon: 'https://www.amazon.com/s?k='
+} as const
+type Site = keyof typeof SITE_SEARCH
+
+const openInput = z
+  .object({
+    url: z.url().max(2000).refine(isPublicWebUrl, 'Only public http(s) web addresses.').optional(),
+    site: z.enum(Object.keys(SITE_SEARCH) as [Site, ...Site[]]).optional(),
+    query: z.string().trim().min(1).max(300).optional()
+  })
+  .refine((i) => i.url || i.site, 'Give a url, or a site (with an optional query).')
+
+/** Where web_open goes: the url, a site's search page, or the site's home page. */
+export function openTarget({ url, site, query }: z.infer<typeof openInput>): string {
+  if (url) return url
+  const search = SITE_SEARCH[site!]
+  return query ? search + encodeURIComponent(query) : new URL(search).origin
+}
+
 export function webPlugin(): Plugin {
   return {
     id: 'core.web',
@@ -109,6 +137,26 @@ export function webPlugin(): Plugin {
           return results
             .map((r, i) => `${i + 1}. ${String(r.title).slice(0, 200)}\n   ${unwrapResultUrl(String(r.href))}\n   ${String(r.snippet).slice(0, 300)}`)
             .join('\n')
+        }
+      }),
+      tool({
+        name: 'web_open',
+        description: `Open a website, or search on one, in the user's own browser so they can watch or use it (for "open YouTube and search lofi", "play X on YouTube"). Give site (${Object.keys(SITE_SEARCH).join(', ')}) and query, or a url. You can't see the page; use web_read to read one.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            site: { type: 'string', enum: Object.keys(SITE_SEARCH) },
+            query: { type: 'string', description: 'What to search for on that site' },
+            url: { type: 'string', description: 'A full https address, instead of site' }
+          }
+        },
+        input: openInput,
+        risk: 'act',
+        describe: (i) => (i.url ? `Open ${new URL(i.url).host} in your browser` : `Open ${i.site}${i.query ? ` and search for “${i.query}”` : ''} in your browser`),
+        async run(i) {
+          const target = openTarget(i)
+          await shell.openExternal(target)
+          return `Opened ${target} in the user's browser.`
         }
       }),
       tool({

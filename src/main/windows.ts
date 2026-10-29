@@ -228,19 +228,20 @@ export class WindowManager {
 
   private createPanel(name: WindowName): BrowserWindow {
     const spec = panelSpecs[name]
-    // Frosted glass: a frameless transparent window with the OS Acrylic material behind it. The page
-    // draws its own title bar (native title buttons turn Acrylic off). Transparent windows can't be
-    // resized on Windows, hence fixed sizes.
+    // Frosted glass: a frameless window with the OS Acrylic material behind a clear page, which draws its
+    // own title bar (native title buttons turn Acrylic off). Not `transparent` and resizable on purpose:
+    // that keeps Windows 11's rounded corners and shadow, and a non-resizable frameless window loses Acrylic.
     const win = new BrowserWindow({
       title: spec.title,
       width: spec.width,
       height: spec.height,
+      minWidth: 360,
+      minHeight: 420,
       show: false,
       frame: false,
-      transparent: true,
       backgroundColor: '#00000000',
       ...(glassSupported ? { backgroundMaterial: 'acrylic' as const } : {}),
-      resizable: false,
+      roundedCorners: true,
       maximizable: false,
       fullscreenable: false,
       webPreferences: secureWebPreferences

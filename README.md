@@ -8,7 +8,8 @@ tools, and works alongside Claude Code.
 liquid-glass chat, settings and quick-ask "island" at the top of the screen. Chat by typing or push-to-talk; it remembers what
 you tell it (`/remember`). With your permission it can search and read your approved folders, open approved apps, read web
 pages, use GitHub and MCP servers, and hand coding tasks to your Claude Code. Everything runs free and locally through Ollama
-(qwen3:4b for chat, lfm3-audio for voice). See [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).
+(qwen3:4b for chat, lfm3-audio for voice). Click the island to talk hands-free, pick from 5 characters with matching
+voices, and say things like "open YouTube and search lofi". See [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).
 
 ## Run it
 

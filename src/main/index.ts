@@ -20,7 +20,8 @@ import { createRegistry, runToolCall } from './tools/registry'
 import { webPlugin } from './tools/web'
 import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
-import { DEFAULT_MODEL, importModel, readCustomModel, removeCustomModel } from './model'
+import { findCharacter } from '@shared/characters'
+import { importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
 import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
 import { openStore } from './storage/store'
@@ -80,13 +81,20 @@ async function start(): Promise<void> {
     local: isLocalUrl(settings.ai.baseUrl)
   })
   const custom = await readCustomModel()
-  const modelInfo = (meta: VrmMeta, isCustom: boolean, revision: number): AppState['model'] => ({
+  const modelInfo = (meta: VrmMeta, revision: number): AppState['model'] => ({
+    id: 'custom',
     name: meta.name,
     authors: meta.authors,
     licenseUrl: meta.licenseUrl,
-    custom: isCustom,
+    license: null,
+    custom: true,
+    file: null,
     revision
   })
+  const bundledInfo = (id: string, revision: number): AppState['model'] => {
+    const c = findCharacter(id)
+    return { id: c.id, name: c.name, authors: [...c.authors], licenseUrl: c.licenseUrl, license: c.license, custom: false, file: c.file, revision }
+  }
 
   let state: AppState = {
     glass: glassSupported,
@@ -95,7 +103,7 @@ async function start(): Promise<void> {
     alwaysOnTop: saved.alwaysOnTop ?? true,
     shortcut: { accelerator: SHORTCUT, registered: false },
     character: initialSnapshot.state,
-    model: custom ? modelInfo(custom.meta, true, 0) : modelInfo(DEFAULT_MODEL, false, 0),
+    model: custom ? modelInfo(custom.meta, 0) : bundledInfo(settings.character, 0),
     islandVisible: settings.islandVisible,
     islandExpanded: false,
     islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: false },
@@ -389,7 +397,7 @@ async function start(): Promise<void> {
     if (picked.canceled || !file) return { ok: false, canceled: true }
     try {
       const meta = await importModel(file)
-      return { ok: true, state: setState({ model: modelInfo(meta, true, state.model.revision + 1) }) }
+      return { ok: true, state: setState({ model: modelInfo(meta, state.model.revision + 1) }) }
     } catch (error) {
       return { ok: false, canceled: false, message: error instanceof Error ? error.message : 'Could not load that file.' }
     }
@@ -564,9 +572,13 @@ async function start(): Promise<void> {
       return { ok: false, message: error instanceof ProviderError ? error.message : 'Could not list models.' }
     }
   })
-  handle(Invoke.resetModel, async () => {
+  handle(Invoke.selectCharacter, async ({ id }) => {
     await removeCustomModel()
-    return setState({ model: modelInfo(DEFAULT_MODEL, false, state.model.revision + 1) })
+    const c = findCharacter(id)
+    settings.character = c.id
+    settings.voice = { ...settings.voice, voice: c.voice } // a male character gets a male voice, and so on
+    saveSettings(store, settings)
+    return setState({ model: bundledInfo(c.id, state.model.revision + 1), voice: settings.voice })
   })
 
   // Send channels drive the character window and are accepted only from it.

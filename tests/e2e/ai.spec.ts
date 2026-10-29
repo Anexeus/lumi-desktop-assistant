@@ -89,10 +89,33 @@ test.beforeAll(async () => {
   await launch()
 })
 
+/** A looping fake mic: 1.2 s of a speech-loud tone, then 1.5 s of quiet, so voice activity detection fires. */
+function fakeMicWav(): string {
+  const rate = 16000
+  const samples = Math.round(rate * 2.7)
+  const wav = Buffer.alloc(44 + samples * 2)
+  wav.write('RIFF', 0)
+  wav.writeUInt32LE(36 + samples * 2, 4)
+  wav.write('WAVEfmt ', 8)
+  wav.writeUInt32LE(16, 16)
+  wav.writeUInt16LE(1, 20) // PCM
+  wav.writeUInt16LE(1, 22) // mono
+  wav.writeUInt32LE(rate, 24)
+  wav.writeUInt32LE(rate * 2, 28)
+  wav.writeUInt16LE(2, 32)
+  wav.writeUInt16LE(16, 34)
+  wav.write('data', 36)
+  wav.writeUInt32LE(samples * 2, 40)
+  for (let i = 0; i < samples; i++) wav.writeInt16LE(i < rate * 1.2 ? Math.round(Math.sin((i / rate) * 2 * Math.PI * 220) * 9000) : 0, 44 + i * 2)
+  const file = join(userData, 'fake-mic.wav')
+  writeFileSync(file, wav)
+  return file
+}
+
 async function launch(): Promise<void> {
   const env = { ...process.env, DESKTOP_ASSISTANT_USER_DATA: userData } as Record<string, string>
   delete env['ELECTRON_RENDERER_URL']
-  app = await electron.launch({ args: ['.', '--use-fake-device-for-media-stream'], env })
+  app = await electron.launch({ args: ['.', '--use-fake-device-for-media-stream', `--use-file-for-fake-audio-capture=${fakeMicWav()}`], env })
   const watch = (page: Page): void => {
     page.on('pageerror', (e) => pageErrors.push(`${page.url()}: ${e.message}`))
     page.on('console', (m) => {
@@ -348,6 +371,26 @@ test('push to talk: the mic records, is transcribed, and is sent as a message', 
   await expect.poll(() => transcriptions).toBe(before + 1)
   await expect(chat.locator('.bubble.user').last()).toHaveText('You: hello from the mic')
   await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
+  await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
+})
+
+test('voice mode: clicking the island listens hands-free until clicked again', async () => {
+  const island = await page('island')
+  const talk = island.getByRole('button', { name: /^Voice mode/ })
+  await expect(talk).toHaveAttribute('aria-pressed', 'false')
+  const before = transcriptions
+  await talk.click()
+  await expect(talk).toHaveAttribute('aria-pressed', 'true')
+  // The tone burst is heard as speech, the pause ends it, and what was said is sent and answered.
+  await expect.poll(() => transcriptions, { timeout: 15_000 }).toBeGreaterThan(before)
+  const chat = await openPanel('chat')
+  await expect(chat.locator('.bubble.user').last()).toHaveText('You: hello from the mic')
+  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
+  await talk.click()
+  await expect(talk).toHaveAttribute('aria-pressed', 'false')
+  const after = transcriptions
+  await island.waitForTimeout(3500) // a full burst + pause: nothing is heard while it's off
+  expect(transcriptions).toBe(after)
   await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
 })
 

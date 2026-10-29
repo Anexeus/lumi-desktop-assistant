@@ -156,6 +156,32 @@ Tasks run the user's own `claude -p` with `stream-json` and an explicit permissi
 `shell: false`, only in approved folders. Hooks are optional, backed up, and token-authenticated. Tests swap the CLI
 for `tests/fixtures/fake-claude.mjs` via env vars that packaged builds ignore, so no test needs a Claude login.
 
+## ADR-035 Panels: non-transparent frameless Acrylic (2026-10-29)
+A probe on this machine showed frameless + `transparent` Acrylic has square corners and no shadow, and a frameless
+non-resizable window loses Acrylic entirely. Frameless, not transparent, resizable, `roundedCorners: true` keeps Acrylic
+and gets Windows 11's rounded corners and shadow. Supersedes the fixed sizes in ADR-029.
+
+## ADR-036 Bundled CC0 VRoid characters with matching voices (2026-10-29)
+Four VRoid Studio sample models released by the VRoid Project under CC0 (mirrored at opengameart.org/content/vroid-studio-cc0-models;
+each file's own VRM license also says redistribution, modification and commercial use allowed, credit unnecessary) ship
+next to Seed-san. They add ~70 MB to the installer. Each character has a voice gender; choosing one sets lfm3-audio's
+`male`/`female` voice. No anime voice model is bundled: candidates (Kokoro-82M via Kokoro-FastAPI, Apache-2.0, OpenAI-compatible
+`/v1/audio/speech`) need a separate server, so they are a documented option rather than a dependency.
+
+## ADR-037 Mirror X/Z bone rotations for VRM 0.x (2026-10-29)
+VRM 0.x humanoids face -Z; after `VRMUtils.rotateVRM0` the same local rotations mirror. Procedural poses negate X and Z for
+`metaVersion === '0'`, as three-vrm's own animation examples do.
+
+## ADR-038 Hands-free voice mode with energy VAD, not a VAD model (2026-10-29)
+Loudness against a tracked noise floor (with hysteresis and a 30 s cap) is enough for one speaker at a desk and needs no
+model or dependency. The mic is open only while voice mode is on (Windows shows its mic indicator); audio is dropped while
+Lumi thinks or speaks. Shortcut: no barge-in (interrupting her by talking); use Stop.
+
+## ADR-039 web_open uses the user's browser; no general PC control (2026-10-29)
+Opening sites and site searches goes through `shell.openExternal` with public https URLs only, after approval. Requests for
+"full access to my PC" stay out of scope by design (SECURITY.md: no shell, no model-generated commands). Code changes go
+through Claude Code tasks in approved folders; apps through the approved-apps list.
+
 ## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
 Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
 nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.

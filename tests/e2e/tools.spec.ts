@@ -27,7 +27,8 @@ const TOOL_FOR: Record<string, (arg: string) => [string, Record<string, string>]
   apps: (n) => ['apps_open', { name: n }],
   mcp: (t) => ['mcp_echo_echo', { text: t }],
   web: (u) => ['web_read', { url: u }],
-  claude: (t) => ['claude_task', { task: t, project: basename(folder) }]
+  claude: (t) => ['claude_task', { task: t, project: basename(folder) }],
+  youtube: (q) => ['web_open', { site: 'youtube', query: q }]
 }
 
 test.beforeAll(async () => {
@@ -98,6 +99,7 @@ test.beforeAll(async () => {
     const g = globalThis as unknown as { opened: string[] }
     g.opened = []
     shell.openPath = (async (p: string) => (g.opened.push(p), '')) as typeof shell.openPath
+    shell.openExternal = (async (u: string) => void g.opened.push(u)) as typeof shell.openExternal
   })
 })
 
@@ -264,4 +266,14 @@ test('hooks install with a backup, report Claude Code events, and uninstall clea
   await expect(section.getByRole('checkbox')).not.toBeChecked()
   expect(JSON.parse(readFileSync(claudeSettings, 'utf8'))).toEqual({ model: 'opus' })
   expect(existsSync(claudeSettings)).toBe(true)
+})
+
+test('"open YouTube and search…" opens the search in the user’s browser after approval', async () => {
+  const c = await chat()
+  await c.getByRole('button', { name: 'New chat' }).click() // forget earlier "allow for this chat" decisions
+  await c.evaluate(() => window.assistant.chat.send('(tool:youtube) lofi beats'))
+  const card = c.getByRole('alertdialog')
+  await expect(card).toContainText('Open youtube and search for “lofi beats” in your browser')
+  await card.getByRole('button', { name: 'Allow once' }).click()
+  await expect.poll(async () => (await opened()).at(-1)).toBe('https://www.youtube.com/results?search_query=lofi%20beats')
 })

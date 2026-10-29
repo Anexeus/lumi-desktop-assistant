@@ -1,5 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { randomBytes } from 'node:crypto'
+import type { CharacterId } from '@shared/characters'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
@@ -53,6 +54,7 @@ export interface Settings {
   tools: ToolsSettings
   mcp: McpServerConfig[]
   claude: { path: string; hookToken: string }
+  character: CharacterId
 }
 
 export function loadSettings(store: Store): Settings {
@@ -67,7 +69,8 @@ export function loadSettings(store: Store): Settings {
     voice: file.voice ?? DEFAULT_VOICE,
     tools: file.tools ?? DEFAULT_TOOLS,
     mcp: file.mcp ?? [],
-    claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') }
+    claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') },
+    character: file.character ?? 'seed-san'
   }
 }
 

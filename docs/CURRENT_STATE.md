@@ -3,7 +3,21 @@
 _Last updated: 2026-10-29. Milestones 6–9 (tools, integrations, Claude Code, release) plus the Lumi name and liquid-glass UI are
 implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdeefd`, `60e4209`; 4–5: `50201fc`._
 
-## Lumi and liquid glass (new)
+## Voice mode, characters, web_open (new, after `9e762b0`)
+- **Voice mode:** click the island pill ("Talk to Lumi…") and the mic stays open hands-free; each pause in your speech is
+  transcribed and sent, Lumi answers, and it listens again until you click the pill again. It ignores audio while Lumi
+  thinks or speaks (so she never hears herself). Voice activity detection tracks the room's noise floor (`ui/vad.ts`).
+  The small key chip on the pill (or Alt+Shift+Space) still opens typing. Needs voice input on in Settings → Voice.
+- **Characters:** Settings → Character has 5 bundled characters: Seed-san, Sendagaya Shino, Sendagaya Shibu (female voices
+  for the girls, male for the boys), Sakurada Fumiriya and a hoodie boy. Picking one sets the matching voice (lfm3-audio
+  `male`/`female`; with Windows voices, the first male/female voice). `female-japanese` etc. are offered as voice presets.
+- **Fixed:** VRM 0.x models (all VRoid exports, many custom files) had mirrored arm and head rotations (arms up at rest).
+  The wave now twists the forearm and wrist so the palm faces you instead of staying edge-on.
+- **web_open:** "open YouTube and search lofi" opens the site/search in your own browser (asks first; YouTube, Google,
+  Wikipedia, GitHub, Reddit, Maps, Spotify, Amazon, or any public https URL).
+- **Panels** now have Windows 11 rounded corners and shadow, are resizable, and use a lighter tint so more blur shows.
+
+## Lumi and liquid glass
 - The assistant is called **Lumi** (renameable in Settings → Name; the name goes into the system prompt). `productName` is Lumi;
   `userData` stays pinned to `%APPDATA%\Desktop Assistant` so the rename never moved anyone's data.
 - Chat and settings are frameless, transparent windows with Windows 11 **acrylic** (`backgroundMaterial`, build ≥ 22621) under
@@ -140,6 +154,10 @@ implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdee
 ## Verified this session (commands actually run)
 | Check | Result |
 |---|---|
+| After `9e762b0`: lint, typecheck, `npm test` | pass; 125 unit tests (adds VAD, Markdown fences, voice picking, web_open targets) |
+| After `9e762b0`: `npm run test:e2e` | 44/44 on 2 consecutive runs. Adds: voice mode hears a fake-mic burst, sends it, gets a reply, and hears nothing once off; character switching sets the voice; web_open asks then opens the YouTube search |
+| Live, real Ollama | Spoken "Open YouTube and search for lofi music" (lfm3-audio TTS fed as the mic) → voice mode transcribed it in 4.6 s → qwen3 called `web_open` → approval → `youtube.com/results?search_query=lo-fi%20music` opened (browser launch stubbed). Character screenshots: all VRoid models stand and wave correctly |
+| `npm run package` | installer 186 MB (5 characters); packaged exe starts |
 | Milestones 6–9: `npm run lint`, `npm run typecheck` | pass |
 | Milestones 6–9: `npm test` | 120 pass + 2 opt-in skipped. Adds: scoped file search/read (escape, links, UNC, binary, size), broker (once/chat/deny/timeout/reset), registry and tool loop, web URL safety, GitHub errors, MCP over real stdio (fixture server), Claude stream-json parsing, task run/fail/cancel with a fake CLI, hook install/backup/uninstall, hook server auth, Markdown parsing |
 | Milestones 6–9: `npm run test:e2e` | 42/42 pass on 2 consecutive runs (tools spec also 3× repeated). Adds: file search answer, approve/deny/allow-for-chat, unknown app refused, disabled plugin hidden, MCP tools ask first, browser refuses private addresses, Claude task from the Tasks panel, `claude_task` only after approval, hooks install with backup → hook POST → event → clean uninstall, crashed window reloads |
@@ -159,6 +177,7 @@ implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdee
 | Milestone 2 dev + packaged | Seed-san loads in `npm run dev` and in `release/win-unpacked` (asar 19 MB), with no console errors |
 
 ## Not verified (needs a person at the screen)
+- Voice mode with a real microphone and a real room (tested with a fake mic fed real speech).
 - Running the NSIS installer and uninstaller (only built; the unpacked exe was run).
 - A real Claude Code task (the bundled CLI here is not logged in; tests use a fake CLI) and real hooks firing from Claude Code
   (the hook server was tested with direct POSTs).

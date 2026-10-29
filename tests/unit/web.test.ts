@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('electron', () => ({ app: { on: () => {} }, BrowserWindow: class {}, session: {} }))
-const { isPublicWebUrl, unwrapResultUrl } = await import('../../src/main/tools/web')
+vi.mock('electron', () => ({ app: { on: () => {} }, BrowserWindow: class {}, session: {}, shell: {} }))
+const { isPublicWebUrl, openTarget, unwrapResultUrl } = await import('../../src/main/tools/web')
 
 describe('isPublicWebUrl', () => {
   it('allows public http(s) pages', () => {
@@ -36,5 +36,13 @@ describe('unwrapResultUrl', () => {
   it('extracts the real link from a search redirect', () => {
     expect(unwrapResultUrl('//duckduckgo.com/l/?uddg=https%3A%2F%2Fnodejs.org%2Fdocs&rut=x')).toBe('https://nodejs.org/docs')
     expect(unwrapResultUrl('https://example.com/a')).toBe('https://example.com/a')
+  })
+})
+
+describe('openTarget', () => {
+  it('builds a site search, a site home page, or passes a url through', () => {
+    expect(openTarget({ site: 'youtube', query: 'lofi hip hop & chill' })).toBe('https://www.youtube.com/results?search_query=lofi%20hip%20hop%20%26%20chill')
+    expect(openTarget({ site: 'youtube' })).toBe('https://www.youtube.com')
+    expect(openTarget({ url: 'https://example.com/a' })).toBe('https://example.com/a')
   })
 })

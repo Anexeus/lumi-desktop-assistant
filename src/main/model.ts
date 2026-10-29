@@ -8,14 +8,6 @@ import { MAX_MODEL_BYTES, readVrmMeta, type VrmMeta } from './vrm-meta'
 const dir = (): string => join(app.getPath('userData'), 'models')
 const customPath = (): string => join(dir(), 'custom.vrm')
 
-/** Bundled default (src/renderer/public/models). Credit is required by its license. */
-export const DEFAULT_MODEL: VrmMeta = {
-  name: 'Seed-san',
-  authors: ['VirtualCast, Inc.'],
-  licenseUrl: 'https://vrm.dev/licenses/1.0/',
-  specVersion: '1.0'
-}
-
 /** The saved custom model's bytes and metadata, or null if there is none or it is unusable. */
 export async function readCustomModel(): Promise<{ bytes: Buffer; meta: VrmMeta } | null> {
   try {

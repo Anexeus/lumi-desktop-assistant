@@ -7,7 +7,7 @@
   --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --text: #15131c;
   --muted: rgb(21 19 28 / 62%);
-  --tint: rgb(255 255 255 / 38%); /* over the whole window, for text contrast on any wallpaper */
+  --tint: rgb(255 255 255 / 22%); /* kept light so the OS blur shows; bubbles and cards carry the contrast */
   --glass: rgb(255 255 255 / 46%);
   --glass-strong: rgb(255 255 255 / 70%);
   --rim: rgb(255 255 255 / 75%);
@@ -27,7 +27,7 @@
   :root {
     --text: #f4f2fa;
     --muted: rgb(244 242 250 / 64%);
-    --tint: rgb(14 12 22 / 42%);
+    --tint: rgb(14 12 22 / 28%);
     --glass: rgb(255 255 255 / 8%);
     --glass-strong: rgb(255 255 255 / 14%);
     --rim: rgb(255 255 255 / 22%);

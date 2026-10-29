@@ -61,16 +61,24 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   vrm.scene.traverse((o) => (o.frustumCulled = false))
 
   const bone = (name: VRMHumanBoneName): Object3D | null => vrm.humanoid.getNormalizedBoneNode(name)
+  // VRM 0.x bones face -Z; after rotateVRM0 their X and Z rotations are mirrored (as in three-vrm's own examples).
+  const m = vrm.meta.metaVersion === '0' ? -1 : 1
+  const turn = (b: Object3D | null, x: number, y: number, z: number): void => void b?.rotation.set(x * m, y, z * m)
   // The rest pose is a T-pose: arms go down to the sides with a slight elbow bend (re-applied every frame below).
   const rUpper = bone('rightUpperArm')
   const lUpper = bone('leftUpperArm')
   const rLower = bone('rightLowerArm')
   const lLower = bone('leftLowerArm')
+  const rHand = bone('rightHand')
+  // Twist about the forearm's own length first, then bend (three's default XYZ order would twist in the upper arm's frame).
+  rLower?.rotation.reorder('ZYX')
   const applyArms = (o: typeof ZERO): void => {
-    rUpper?.rotation.set(0, 0, 1.2 + o.rUpperZ)
-    lUpper?.rotation.set(0, 0, -1.2 + o.lUpperZ)
-    rLower?.rotation.set(0, 0.15 + o.rLowerY, o.rLowerZ)
-    lLower?.rotation.set(0, -0.15 + o.lLowerY, o.lLowerZ)
+    turn(rUpper, 0, 0, 1.2 + o.rUpperZ)
+    turn(lUpper, 0, 0, -1.2 + o.lUpperZ)
+    // Split the twist between forearm and wrist so the skin doesn't candy-wrap at the wrist.
+    turn(rLower, o.rTwist * 0.6, 0.15 + o.rLowerY, o.rLowerZ)
+    turn(rHand, o.rTwist * 0.4, 0, 0)
+    turn(lLower, 0, -0.15 + o.lLowerY, o.lLowerZ)
   }
   applyArms(ZERO)
 
@@ -146,11 +154,11 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       applyArms(g)
 
       const breathe = Math.sin(t * 1.7)
-      if (chest) chest.rotation.x = breathe * 0.015 - pose.lean - g.chest
-      if (neck) neck.rotation.set(pose.headPitch * 0.4, g.headYaw * 0.4, pose.headRoll * 0.4)
+      turn(chest, breathe * 0.015 - pose.lean - g.chest, 0, 0)
+      turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4, pose.headRoll * 0.4)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       const sway = Math.sin(t * 0.7) * 0.02
-      if (head) head.rotation.set(pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6, pose.headRoll * 0.6 + sway + g.headRoll)
+      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6, pose.headRoll * 0.6 + sway + g.headRoll)
       if (hips) {
         // A single small hop at the start of a notification, then settle.
         const since = t - stateSince

@@ -22,6 +22,9 @@ contain prompt injection. The design assumes any of them may try to cause action
   `EnableNodeOptionsEnvironmentVariable`. Enable ASAR integrity.
 
 Implemented in Milestone 1 (`src/main/security.ts`, `policy.ts`, `ipc.ts`) and covered by unit + E2E tests.
+`connect-src` also allows `blob:` (Milestone 2): GLTFLoader decodes embedded textures through blob URLs the page itself creates.
+User-chosen models are validated in main (`vrm-meta.ts`: magic, version, bounded JSON chunk, VRM metadata, size cap),
+copied into userData, and their bytes are sent only to the character window. Untrusted metadata strings are trimmed and capped.
 Open item: a packaged exe still honors Chromium's `--remote-debugging-port` switch. Fuses don't cover it.
 Mitigate in Milestone 9 (e.g. refuse to start when the switch is present in a packaged build).
 

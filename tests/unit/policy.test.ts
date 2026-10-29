@@ -65,6 +65,6 @@ describe('CSP', () => {
   })
 
   it('dev only adds the HMR socket for its own origin', () => {
-    expect(devCsp('http://localhost:5173')).toContain('connect-src \'self\' ws://localhost:5173')
+    expect(devCsp('http://localhost:5173')).toContain("connect-src 'self' blob: ws://localhost:5173")
   })
 })

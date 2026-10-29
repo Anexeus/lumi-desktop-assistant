@@ -4,8 +4,8 @@ A Windows desktop AI companion: an animated VRM character in a transparent, alwa
 window that talks by voice and text, helps with everyday computer tasks through permissioned
 tools, and works alongside Claude Code.
 
-**Status:** Milestone 1 (desktop shell) done: a transparent character window with a placeholder
-character, plus chat, settings and the tray. No AI yet. See [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).
+**Status:** Milestone 2 done: an animated VRM character (Seed-san by default, or load your own .vrm)
+on a transparent always-on-top window, plus chat, settings and the tray. No AI yet. See [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).
 
 ## Run it
 

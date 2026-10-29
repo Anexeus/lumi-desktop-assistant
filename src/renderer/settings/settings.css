@@ -82,3 +82,38 @@ kbd {
   color: var(--muted);
   font-size: 12.5px;
 }
+
+.model {
+  padding: 8px 0 14px;
+}
+
+.model p {
+  margin: 4px 0;
+}
+
+.model-name {
+  font-weight: 600;
+}
+
+.model-name small,
+.model-license {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.model-actions {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.secondary {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.selectable {
+  user-select: text;
+  overflow-wrap: anywhere;
+}

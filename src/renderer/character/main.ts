@@ -1,3 +1,4 @@
+import type { AppState } from '@shared/ipc'
 import { createScene } from './scene'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
@@ -90,5 +91,33 @@ canvas.addEventListener('keydown', (e) => {
     api.resizeEnd()
   }
 })
+
+// data-model / data-state mirror what is on screen (used by E2E tests and handy in DevTools).
+let modelRevision = -1
+async function loadModel(): Promise<void> {
+  document.body.dataset['model'] = 'loading'
+  try {
+    const bytes = await window.assistant.model.get()
+    const buffer = bytes ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer) : null
+    document.body.dataset['model'] = await scene.setModel(buffer)
+  } catch (error) {
+    console.error('Could not load the character model', error)
+    document.body.dataset['model'] = 'error'
+    void window.assistant.characterEvent('error')
+  }
+}
+
+function applyState(state: AppState): void {
+  scene.setState(state.character)
+  document.body.dataset['state'] = state.character
+  if (state.model.revision !== modelRevision) {
+    modelRevision = state.model.revision
+    void loadModel()
+  }
+}
+
+void window.assistant.getState().then(applyState)
+window.assistant.onState(applyState)
+api.onCursor((x, y) => scene.lookAtCursor(x, y))
 
 window.addEventListener('beforeunload', () => scene.dispose())

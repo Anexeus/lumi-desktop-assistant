@@ -1,113 +1,142 @@
-import {
-  AmbientLight,
-  DirectionalLight,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  PerspectiveCamera,
-  Raycaster,
-  Scene,
-  SphereGeometry,
-  Timer,
-  Vector2,
-  WebGLRenderer
-} from 'three'
+import { DirectionalLight, AmbientLight, PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three'
+import type { CharacterState } from '@shared/character'
+import { loadAvatar, type Avatar } from './avatar'
 
-// Placeholder character for Milestone 1: proves transparency, hit-testing and idle motion.
-// Replaced by a VRM model behind the same surface (hitTest/resize/dispose) in Milestone 2.
-
-const FRAME_MS = 1000 / 30 // idle budget: 30 fps is plenty for a bobbing character
+const FRAME_MS = 1000 / 30 // idle budget: 30 fps is plenty for a desktop character
+const DEFAULT_MODEL_URL = './models/Seed-san.vrm'
 
 export interface CharacterScene {
+  /** True when the pixel under (clientX, clientY) belongs to the character. */
   hitTest(clientX: number, clientY: number): boolean
+  /** Loads the user's model bytes, or the bundled default when null. Falls back to the default on failure. */
+  setModel(bytes: ArrayBuffer | null): Promise<'custom' | 'default'>
+  setState(state: CharacterState): void
+  /** Cursor position relative to the window's top-left, in CSS pixels (may be outside the window). */
+  lookAtCursor(x: number, y: number): void
   dispose(): void
 }
 
 export function createScene(canvas: HTMLCanvasElement): CharacterScene {
-  const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' })
+  // preserveDrawingBuffer lets hit tests read the last frame's alpha at any time.
+  const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power', preserveDrawingBuffer: true })
   renderer.setClearColor(0x000000, 0)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
   const scene = new Scene()
-  const camera = new PerspectiveCamera(30, 1, 0.1, 20)
-  camera.position.set(0, 0.15, 4.2)
-
-  scene.add(new AmbientLight(0xffffff, 1.4))
-  const key = new DirectionalLight(0xffffff, 2.2)
-  key.position.set(1.5, 2, 3)
+  const camera = new PerspectiveCamera(22, 1, 0.1, 20)
+  scene.add(new AmbientLight(0xffffff, 1.6))
+  const key = new DirectionalLight(0xffffff, 1.8)
+  key.position.set(1, 2, 3)
   scene.add(key)
 
-  const character = new Group()
-  const body = new Mesh(
-    new SphereGeometry(0.62, 48, 32),
-    new MeshStandardMaterial({ color: 0x7c6cf0, roughness: 0.45, metalness: 0.05 })
-  )
-  body.scale.set(1, 1.08, 0.92)
-  const eyeGeometry = new SphereGeometry(0.075, 24, 16)
-  const eyeMaterial = new MeshStandardMaterial({ color: 0x1b1830, roughness: 0.2 })
-  const eyes = [-0.2, 0.2].map((x) => {
-    const eye = new Mesh(eyeGeometry, eyeMaterial)
-    eye.position.set(x, 0.12, 0.54)
-    character.add(eye)
-    return eye
-  })
-  character.add(body)
-  scene.add(character)
+  let avatar: Avatar | null = null
+  let state: CharacterState = 'IDLE'
+  let cursor: { x: number; y: number } | null = null
+  let loadToken = 0
 
-  const resize = (): void => {
+  const frame = (): void => {
     const { clientWidth: w, clientHeight: h } = canvas
     renderer.setSize(w, h, false)
     camera.aspect = w / h
+    if (avatar) {
+      // Fit the whole body with a small margin, whichever of height or width is tighter.
+      const size = avatar.bounds.getSize(new Vector3())
+      const centre = avatar.bounds.getCenter(new Vector3())
+      const halfFov = (camera.fov * Math.PI) / 360
+      const fitHeight = (size.y * 1.08) / 2 / Math.tan(halfFov)
+      const fitWidth = (size.x * 1.15) / 2 / Math.tan(halfFov) / camera.aspect
+      camera.position.set(centre.x, centre.y, centre.z + Math.max(fitHeight, fitWidth))
+      camera.lookAt(centre)
+    }
     camera.updateProjectionMatrix()
   }
-  resize()
-  window.addEventListener('resize', resize)
+  frame()
+  window.addEventListener('resize', frame)
 
   const timer = new Timer()
   timer.connect(document) // pauses elapsed time while the page is hidden
-  let nextBlink = 2 + Math.random() * 3
-  let blinkStart = -1
   let last = 0
-  let frame = 0
-
+  let raf = 0
   const tick = (now: number): void => {
-    frame = requestAnimationFrame(tick)
+    raf = requestAnimationFrame(tick)
     if (now - last < FRAME_MS) return
     last = now
     timer.update(now)
-    const t = timer.getElapsed()
-    character.position.y = Math.sin(t * 1.6) * 0.04
-    character.rotation.z = Math.sin(t * 0.8) * 0.03
-    body.scale.y = 1.08 + Math.sin(t * 1.6 + Math.PI / 2) * 0.012 // breathing
-
-    if (blinkStart < 0 && t >= nextBlink) blinkStart = t
-    if (blinkStart >= 0) {
-      const p = (t - blinkStart) / 0.14
-      const open = p >= 1 ? 1 : Math.abs(1 - 2 * p) // 1 → 0 → 1
-      for (const eye of eyes) eye.scale.y = Math.max(0.1, open)
-      if (p >= 1) {
-        blinkStart = -1
-        nextBlink = t + 2.5 + Math.random() * 4
-      }
-    }
+    avatar?.update(Math.min(timer.getDelta(), 0.1), timer.getElapsed())
     renderer.render(scene, camera)
   }
-  frame = requestAnimationFrame(tick)
+  raf = requestAnimationFrame(tick)
 
-  const raycaster = new Raycaster()
-  const ndc = new Vector2()
+  async function use(source: ArrayBuffer | string): Promise<void> {
+    const token = ++loadToken
+    const next = await loadAvatar(source, camera)
+    // Compile shaders off the main thread where supported, so swapping models does not freeze the window.
+    await renderer.compileAsync(next.vrm.scene, camera, scene)
+    if (token !== loadToken) return next.dispose() // a newer load won
+    if (avatar) {
+      scene.remove(avatar.vrm.scene)
+      avatar.dispose()
+    }
+    avatar = next
+    avatar.setState(state)
+    scene.add(avatar.vrm.scene)
+    frame()
+    applyGaze()
+    renderer.render(scene, camera) // so the model is on screen before setModel resolves
+  }
+
+  const gl = renderer.getContext()
+  const pixel = new Uint8Array(4)
+  const ndc = new Vector3()
 
   return {
     hitTest(clientX, clientY) {
-      ndc.set((clientX / canvas.clientWidth) * 2 - 1, -(clientY / canvas.clientHeight) * 2 + 1)
-      raycaster.setFromCamera(ndc, camera)
-      return raycaster.intersectObject(character, true).length > 0
+      const dpr = renderer.getPixelRatio()
+      const x = Math.floor(clientX * dpr)
+      const y = Math.floor((canvas.clientHeight - clientY) * dpr)
+      if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return false
+      gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
+      return pixel[3]! > 16
+    },
+    async setModel(bytes) {
+      if (bytes) {
+        try {
+          await use(bytes)
+          return 'custom'
+        } catch (error) {
+          console.error('Could not load the custom model, using the default', error)
+        }
+      }
+      await use(DEFAULT_MODEL_URL)
+      return 'default'
+    },
+    setState(next) {
+      state = next
+      avatar?.setState(next)
+      applyGaze()
+    },
+    lookAtCursor(x, y) {
+      cursor = { x, y }
+      applyGaze()
     },
     dispose() {
-      cancelAnimationFrame(frame)
+      cancelAnimationFrame(raf)
       timer.dispose()
-      window.removeEventListener('resize', resize)
+      window.removeEventListener('resize', frame)
+      avatar?.dispose()
       renderer.dispose()
     }
+  }
+
+  function applyGaze(): void {
+    if (!avatar) return
+    const b = avatar.bounds
+    if (state === 'THINKING') return avatar.lookAt(new Vector3(b.max.x + 0.4, b.max.y + 0.4, b.max.z + 0.5)) // up, aside
+    if (!cursor) return avatar.lookAt(null)
+    // Project the cursor onto a plane at the face's depth.
+    ndc.set((cursor.x / canvas.clientWidth) * 2 - 1, -(cursor.y / canvas.clientHeight) * 2 + 1, 0.5).unproject(camera)
+    const dir = ndc.sub(camera.position).normalize()
+    const distance = camera.position.z - b.max.z
+    avatar.lookAt(camera.position.clone().add(dir.multiplyScalar(distance / Math.max(0.2, -dir.z))))
   }
 }

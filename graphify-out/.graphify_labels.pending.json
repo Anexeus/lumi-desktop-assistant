@@ -1,6 +1,6 @@
 {
   "0": "main/index.ts",
-  "1": "package.json",
+  "1": "devDependencies",
   "2": "start",
   "3": "Code Review and Quality",
   "4": "Test-Driven Development",
@@ -13,10 +13,10 @@
   "11": "Documentation and ADRs",
   "12": "Incremental Implementation",
   "13": "Debugging and Error Recovery",
-  "14": "Hardening Patterns",
+  "14": "security.ts",
   "15": "electron-builder.yml",
   "16": "Security Checklist",
-  "17": "main.ts",
+  "17": "character.ts",
   "18": "compilerOptions",
   "19": "Accessibility Checklist",
   "20": "compilerOptions",
@@ -36,5 +36,14 @@
   "34": "Desktop Assistant: instructions for Claude Code",
   "35": "Installation",
   "36": "tsconfig.json",
-  "37": ".claude/CLAUDE.md"
+  "37": ".claude/CLAUDE.md",
+  "38": "package.json",
+  "39": "Application Plugin Registry (design)",
+  "40": "eslint.config.mjs",
+  "41": "electron.vite.config.ts",
+  "42": "Third-party notices",
+  "43": "@playwright/test",
+  "44": "@pixiv/three-vrm",
+  "45": "typescript@6.0.3",
+  "46": "vite@8.3.5"
 }

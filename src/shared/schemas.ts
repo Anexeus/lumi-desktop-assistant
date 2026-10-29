@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CHARACTER_EVENTS } from './character'
 import { Invoke, Send } from './ipc'
 
 const coord = z.number().finite().min(-100_000).max(100_000)
@@ -10,7 +11,12 @@ export const invokeSchemas = {
   [Invoke.getState]: none,
   [Invoke.setAlwaysOnTop]: z.object({ value: z.boolean() }).strict(),
   [Invoke.setCharacterVisible]: z.object({ value: z.boolean() }).strict(),
-  [Invoke.openWindow]: z.object({ name: z.enum(['chat', 'settings']) }).strict()
+  [Invoke.openWindow]: z.object({ name: z.enum(['chat', 'settings']) }).strict(),
+  // `timeout` is internal to main's transient-state timers, so renderers cannot send it.
+  [Invoke.characterEvent]: z.object({ event: z.enum(CHARACTER_EVENTS).exclude(['timeout']) }).strict(),
+  [Invoke.getModel]: none,
+  [Invoke.chooseModel]: none,
+  [Invoke.resetModel]: none
 } as const
 
 export const sendSchemas = {

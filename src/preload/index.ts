@@ -7,12 +7,23 @@ const api: AssistantApi = {
   setAlwaysOnTop: (value) => ipcRenderer.invoke(Invoke.setAlwaysOnTop, { value }),
   setCharacterVisible: (value) => ipcRenderer.invoke(Invoke.setCharacterVisible, { value }),
   openWindow: (name) => ipcRenderer.invoke(Invoke.openWindow, { name }),
+  characterEvent: (event) => ipcRenderer.invoke(Invoke.characterEvent, { event }),
   onState(listener) {
     const handler = (_event: IpcRendererEvent, state: AppState): void => listener(state)
     ipcRenderer.on(Events.state, handler)
     return () => ipcRenderer.removeListener(Events.state, handler)
   },
+  model: {
+    get: () => ipcRenderer.invoke(Invoke.getModel),
+    choose: () => ipcRenderer.invoke(Invoke.chooseModel),
+    reset: () => ipcRenderer.invoke(Invoke.resetModel)
+  },
   character: {
+    onCursor(listener) {
+      const handler = (_event: IpcRendererEvent, x: number, y: number): void => listener(x, y)
+      ipcRenderer.on(Events.cursor, handler)
+      return () => ipcRenderer.removeListener(Events.cursor, handler)
+    },
     setIgnoreMouse: (ignore) => ipcRenderer.send(Send.setIgnoreMouse, { ignore }),
     dragStart: (screenX, screenY) => ipcRenderer.send(Send.dragStart, { screenX, screenY }),
     dragMove: (screenX, screenY) => ipcRenderer.send(Send.dragMove, { screenX, screenY }),

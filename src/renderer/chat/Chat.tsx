@@ -17,6 +17,9 @@ export function Chat(): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const nextId = useRef(1)
   const listEnd = useRef<HTMLDivElement>(null)
+  const timers = useRef<number[]>([])
+
+  useEffect(() => () => timers.current.forEach(clearTimeout), [])
 
   // Block body on purpose: newer Chromium returns a Promise from scrollIntoView, and React
   // would treat that return value as the effect's cleanup function.
@@ -28,12 +31,20 @@ export function Chat(): React.JSX.Element {
     event?.preventDefault()
     const text = draft.trim()
     if (!text) return
-    setMessages((m) => [
-      ...m,
-      { id: nextId.current++, role: 'user', text },
-      { id: nextId.current++, role: 'assistant', text: NO_PROVIDER }
-    ])
+    setMessages((m) => [...m, { id: nextId.current++, role: 'user', text }])
     setDraft('')
+
+    // Act out a turn on the character: think, then "speak" the reply for about as long as it would take to say it.
+    timers.current.forEach(clearTimeout)
+    const { characterEvent } = window.assistant
+    void characterEvent('think')
+    timers.current = [
+      window.setTimeout(() => {
+        setMessages((m) => [...m, { id: nextId.current++, role: 'assistant', text: NO_PROVIDER }])
+        void characterEvent('speak')
+      }, 700),
+      window.setTimeout(() => void characterEvent('done'), 700 + Math.max(1500, NO_PROVIDER.length * 45))
+    ]
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {

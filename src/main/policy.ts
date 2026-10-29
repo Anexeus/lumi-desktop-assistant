@@ -11,7 +11,8 @@ export const PROD_CSP = [
   "style-src 'self'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  "connect-src 'self'",
+  // blob: is for textures GLTFLoader unpacks from the model file; only this page can mint its blob URLs.
+  "connect-src 'self' blob:",
   "media-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
@@ -28,7 +29,7 @@ export function devCsp(devOrigin: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src 'self' ${ws}`,
+    `connect-src 'self' blob: ${ws}`,
     "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'none'",

@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -9,6 +9,8 @@ let app: ElectronApplication
 let character: Page
 let userData: string
 const pageErrors: string[] = []
+// Errors the tests provoke on purpose (the CSP and IPC rejection checks).
+const expectedConsoleErrors = [/inline script violates the following Content Security Policy/i, /Rejected (window:open|model:get|character:event)/]
 
 test.beforeAll(async () => {
   userData = mkdtempSync(join(tmpdir(), 'desktop-assistant-e2e-'))
@@ -17,6 +19,10 @@ test.beforeAll(async () => {
   app = await electron.launch({ args: ['.'], env })
   const watch = (page: Page): void => {
     page.on('pageerror', (error) => pageErrors.push(`${page.url()}: ${error.message}`))
+    // Console errors too: a CSP block only shows up here, not as an exception.
+    page.on('console', (m) => {
+      if (m.type() === 'error' && !expectedConsoleErrors.some((re) => re.test(m.text()))) pageErrors.push(`${page.url()}: ${m.text()}`)
+    })
   }
   app.on('window', watch)
   character = await app.firstWindow()
@@ -48,19 +54,21 @@ test('character window is transparent, frameless, on top and served from the bun
   expect(info.prefs).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false })
   await expect(character.locator('#stage')).toBeVisible()
 
-  // Real transparency: the top-left corner of the rendered page has zero alpha,
-  // while the centre (the character's body) is opaque.
+  // Real transparency: once the model has loaded, the corner has zero alpha and the
+  // character covers a plausible share of the window (a full-body figure, not a blank or solid box).
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
   await character.waitForTimeout(300)
   const alpha = await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith('/character.html'))!
     const image = await win.webContents.capturePage()
-    const { width, height } = image.getSize()
     const bitmap = image.toBitmap() // BGRA
-    const at = (x: number, y: number): number => bitmap[(y * width + x) * 4 + 3]!
-    return { corner: at(2, 2), centre: at(Math.floor(width / 2), Math.floor(height / 2)) }
+    let opaque = 0
+    for (let i = 3; i < bitmap.length; i += 4) if (bitmap[i]! > 16) opaque++
+    return { corner: bitmap[3]!, opaqueShare: opaque / (bitmap.length / 4) }
   })
   expect(alpha.corner).toBe(0)
-  expect(alpha.centre).toBe(255)
+  expect(alpha.opaqueShare).toBeGreaterThan(0.08)
+  expect(alpha.opaqueShare).toBeLessThan(0.8)
 })
 
 test('renderer has no Node access and only the typed API', async () => {
@@ -71,10 +79,19 @@ test('renderer has no Node access and only the typed API', async () => {
   }))
   expect(result.require).toBe('undefined')
   expect(result.process).toBe('undefined')
-  expect(result.api).toEqual(['character', 'getState', 'onState', 'openWindow', 'setAlwaysOnTop', 'setCharacterVisible'])
+  expect(result.api).toEqual([
+    'character',
+    'characterEvent',
+    'getState',
+    'model',
+    'onState',
+    'openWindow',
+    'setAlwaysOnTop',
+    'setCharacterVisible'
+  ])
 })
 
-test('CSP blocks inline script, navigation and popups are blocked', async () => {
+test('CSP blocks inline script and popups are blocked', async () => {
   const injected = await character.evaluate(async () => {
     const s = document.createElement('script')
     s.textContent = 'window.__injected = true'
@@ -87,11 +104,6 @@ test('CSP blocks inline script, navigation and popups are blocked', async () => 
   const popup = await character.evaluate(() => window.open('https://example.com') === null)
   expect(popup).toBe(true)
 
-  await character.evaluate(() => {
-    location.href = 'https://example.com/'
-  })
-  await character.waitForTimeout(500)
-  expect(character.url()).toBe('app://bundle/character.html')
 })
 
 test('IPC rejects invalid payloads', async () => {
@@ -133,13 +145,16 @@ test('settings toggle always-on-top and persist it', async () => {
   await settings.waitForLoadState('domcontentloaded')
   const toggle = settings.getByRole('checkbox', { name: /Always on top/ })
   await expect(toggle).toBeChecked()
-  await toggle.uncheck()
+  // The checkbox mirrors main's state, so click and wait for the round trip instead of check()/uncheck().
+  await toggle.click()
+  await expect(toggle).not.toBeChecked()
 
   await expect.poll(() => characterWindow((w) => w.isAlwaysOnTop())).toBe(false)
   const saved = JSON.parse(readFileSync(join(userData, 'window-state.json'), 'utf8'))
   expect(saved.alwaysOnTop).toBe(false)
 
-  await toggle.check()
+  await toggle.click()
+  await expect(toggle).toBeChecked()
   await expect.poll(() => characterWindow((w) => w.isAlwaysOnTop())).toBe(true)
 })
 
@@ -176,6 +191,88 @@ test('character can be hidden and shown; shortcut state matches registration', a
   const state = await character.evaluate(() => window.assistant.getState())
   const registered = await app.evaluate(({ globalShortcut }, acc) => globalShortcut.isRegistered(acc), state.shortcut.accelerator)
   expect(state.shortcut.registered).toBe(registered)
+})
+
+const panel = async (name: 'chat' | 'settings'): Promise<Page> => {
+  await character.evaluate((n) => window.assistant.openWindow(n), name)
+  await expect.poll(() => app.windows().some((w) => w.url().endsWith(`/${name}.html`))).toBe(true)
+  return app.windows().find((w) => w.url().endsWith(`/${name}.html`))!
+}
+const characterState = (): Promise<string | null> => character.locator('body').getAttribute('data-state')
+
+test('chat turn drives the character: thinking, speaking, then idle', async () => {
+  const chat = await panel('chat')
+  await chat.getByRole('textbox', { name: 'Message' }).fill('how are you?')
+  await chat.keyboard.press('Enter')
+  await expect.poll(characterState).toBe('THINKING')
+  await expect.poll(characterState).toBe('SPEAKING')
+  await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
+})
+
+test('transient states end on their own; invalid events are ignored', async () => {
+  await character.evaluate(() => window.assistant.characterEvent('notify'))
+  await expect.poll(characterState).toBe('NOTIFICATION')
+  await expect.poll(characterState, { timeout: 8_000 }).toBe('IDLE')
+
+  const afterDone = await character.evaluate(() => window.assistant.characterEvent('done'))
+  expect(afterDone.character).toBe('IDLE') // done while idle does nothing
+
+  const timeout = await character.evaluate(() =>
+    window.assistant.characterEvent('timeout').then(
+      () => 'accepted',
+      () => 'rejected'
+    )
+  )
+  expect(timeout).toBe('rejected') // only main's own timers may send timeout
+})
+
+test('only the character window may read the model bytes', async () => {
+  const settings = await panel('settings')
+  const outcome = await settings.evaluate(() =>
+    window.assistant.model.get().then(
+      () => 'accepted',
+      () => 'rejected'
+    )
+  )
+  expect(outcome).toBe('rejected')
+})
+
+test('settings credits the default model, loads a custom .vrm and resets', async () => {
+  const settings = await panel('settings')
+  await expect(settings.getByText('Seed-san © VirtualCast, Inc.')).toBeVisible()
+
+  const stubDialog = (file: string): Promise<void> =>
+    app.evaluate(({ dialog }, path) => {
+      dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [path] })) as typeof dialog.showOpenDialog
+    }, file)
+
+  // A file that is not a VRM is refused with a message and changes nothing.
+  await stubDialog(join(process.cwd(), 'package.json'))
+  await settings.getByRole('button', { name: 'Choose a .vrm file…' }).click()
+  await expect(settings.getByRole('alert')).toHaveText(/Not a VRM/)
+  expect((await character.evaluate(() => window.assistant.getState())).model.custom).toBe(false)
+
+  // A real VRM is copied into the profile and the character reloads it.
+  await stubDialog(join(process.cwd(), 'src/renderer/public/models/Seed-san.vrm'))
+  await settings.getByRole('button', { name: 'Choose a .vrm file…' }).click()
+  await expect(settings.getByRole('button', { name: 'Use the default' })).toBeVisible()
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'custom', { timeout: 20_000 })
+  expect(readFileSync(join(userData, 'models', 'custom.vrm')).byteLength).toBeGreaterThan(1_000_000)
+
+  await settings.getByRole('button', { name: 'Use the default' }).click()
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
+  expect(existsSync(join(userData, 'models', 'custom.vrm'))).toBe(false)
+})
+
+// Runs late on purpose: Playwright treats the blocked navigation as still pending, which
+// stalls later locator assertions on the same page.
+test('navigation away from the app is blocked', async () => {
+  await character.evaluate(() => {
+    location.href = 'https://example.com/'
+  })
+  await character.waitForTimeout(500)
+  expect(character.url()).toBe('app://bundle/character.html')
+  expect(await character.evaluate(() => typeof window.assistant)).toBe('object')
 })
 
 test('no uncaught renderer errors', () => {

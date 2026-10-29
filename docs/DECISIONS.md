@@ -62,3 +62,26 @@ Decision: The renderer sends screen coordinates. Main moves the window from the 
 ## ADR-013 Only `zod` is a runtime dependency (2026-10-29)
 React, three etc. are bundled into the renderer by Vite, so they are devDependencies. This shrank
 the asar from ~1,660 to ~750 `node_modules` entries (7.5 MB).
+
+## ADR-014 Seed-san as the bundled default model (2026-10-29)
+Context: The app needs a character that works out of the box without a license risk.
+Decision: Bundle Seed-san from the official VRM samples. Its embedded VRM-PL-1.0 terms allow redistribution
+and commercial use with credit, so the credit is shown in Settings and `THIRD_PARTY_NOTICES.md`.
+
+## ADR-015 Character state machine lives in main (2026-10-29)
+Decision: The pure transition table is in `src/shared/character.ts`. Main holds the current state and the
+transient timers and broadcasts the state in `AppState`. Chat and future voice/AI code send events, and the
+character renderer only animates. This gives one source of truth and no per-window drift.
+
+## ADR-016 Custom model bytes over IPC (2026-10-29)
+Context: The renderer is sandboxed with `connect-src 'self'`, and the dev page is on a different origin than app://.
+Decision: Main validates and copies the user's file, then returns its bytes over invoke to the character window
+only. There is no new protocol route and no file paths in the renderer.
+
+## ADR-017 Pixel-alpha hit testing (2026-10-29)
+Decision: `readPixels` of one pixel from a `preserveDrawingBuffer` canvas, instead of raycasting skinned meshes.
+It is exact to the drawn silhouette (hair, accessories) and costs one 1×1 GPU readback per mouse move.
+
+## ADR-018 Procedural animation for now (2026-10-29)
+Decision: Per-state poses blended in code, with no VRMA motion files, which avoids more asset licensing.
+Revisit with licensed VRMA clips for richer motion in Milestone 9.

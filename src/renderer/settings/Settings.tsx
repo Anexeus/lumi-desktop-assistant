@@ -1,8 +1,21 @@
+import { useState } from 'react'
 import { useAppState } from '../ui/useAppState'
 
 export function Settings(): React.JSX.Element {
   const state = useAppState()
+  const [modelError, setModelError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   if (!state) return <main className="settings" aria-busy="true" />
+
+  async function chooseModel(): Promise<void> {
+    setBusy(true)
+    setModelError(null)
+    const result = await window.assistant.model.choose()
+    if (!result.ok && !result.canceled) setModelError(result.message ?? 'Could not load that file.')
+    setBusy(false)
+  }
+
+  const { model } = state
 
   return (
     <main className="settings">
@@ -32,6 +45,40 @@ export function Settings(): React.JSX.Element {
             onChange={(e) => void window.assistant.setAlwaysOnTop(e.target.checked)}
           />
         </label>
+      </section>
+
+      <section aria-labelledby="model-heading">
+        <h2 id="model-heading">Character model</h2>
+        <div className="model">
+          <p className="model-name" aria-live="polite">
+            {model.name}
+            {model.authors.length > 0 && <small> by {model.authors.join(', ')}</small>}
+          </p>
+          {model.licenseUrl && (
+            <p className="model-license">
+              License: <span className="selectable">{model.licenseUrl}</span>
+            </p>
+          )}
+          {!model.custom && (
+            <p className="model-license">Default model. Seed-san © VirtualCast, Inc., VRM Public License 1.0.</p>
+          )}
+          <div className="model-actions">
+            <button type="button" onClick={() => void chooseModel()} disabled={busy}>
+              Choose a .vrm file…
+            </button>
+            {model.custom && (
+              <button type="button" className="secondary" onClick={() => void window.assistant.model.reset()}>
+                Use the default
+              </button>
+            )}
+          </div>
+          {modelError && (
+            <p className="warn" role="alert">
+              {modelError}
+            </p>
+          )}
+          <p className="model-license">Only use models whose license allows it. Your file is copied; the original is never changed.</p>
+        </div>
       </section>
 
       <section aria-labelledby="keys-heading">

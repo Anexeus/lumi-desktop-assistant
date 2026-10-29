@@ -146,9 +146,16 @@ const page = async (name: string): Promise<Page> => {
   await p.waitForLoadState('domcontentloaded')
   return p
 }
-const openPanel = async (name: 'chat' | 'settings'): Promise<Page> => {
+/** Chat and Settings share the chat window; "settings" switches its view (and picks a tab). */
+const openPanel = async (name: 'chat' | 'settings', tab?: string): Promise<Page> => {
   await (await page('character')).evaluate((n) => window.assistant.openWindow(n), name)
-  return page(name)
+  const p = await page('chat')
+  if (name === 'chat') await expect(p.getByRole('region', { name: 'Conversation' })).toBeVisible()
+  else {
+    await expect(p.getByRole('tablist', { name: 'Settings sections' })).toBeVisible()
+    if (tab) await p.getByRole('tab', { name: tab, exact: true }).click()
+  }
+  return p
 }
 const characterState = async (): Promise<string | null> => (await page('character')).locator('body').getAttribute('data-state')
 const winBounds = (name: string): Promise<Electron.Rectangle> =>
@@ -230,7 +237,7 @@ test('Stop cancels a streaming reply and keeps what arrived', async () => {
 })
 
 test('settings tests the connection and lists models', async () => {
-  const settings = await openPanel('settings')
+  const settings = await openPanel('settings', 'AI')
   await settings.getByRole('button', { name: 'Test connection' }).click()
   await expect(settings.getByRole('status')).toHaveText('Connected. 2 models available.')
 })
@@ -281,7 +288,7 @@ test('/remember saves a memory the AI then receives; secrets are refused', async
   await expect(chat.locator('.bubble.assistant').last()).toContainText('won’t save it')
   expect(requests.length).toBe(before) // commands never reach the AI
 
-  const settings = await openPanel('settings')
+  const settings = await openPanel('settings', 'Memory')
   await expect(settings.getByRole('region', { name: 'Memory' }).locator('.data-list').first()).toContainText('my cat is called Miso')
   await expect(settings.getByText('hunter2')).toHaveCount(0)
 
@@ -304,9 +311,8 @@ test('the chat and memories survive a restart', async () => {
 })
 
 test('history can be turned off, chats deleted, and everything wiped', async () => {
-  const settings = await openPanel('settings')
-  const chat = await openPanel('chat')
-  const chats = (): Promise<number> => settings.evaluate(async () => (await window.assistant.history.list()).length)
+  let chat = await openPanel('chat')
+  const chats = (): Promise<number> => chat.evaluate(async () => (await window.assistant.history.list()).length)
 
   // New chat keeps the old one in history.
   const count = await chats()
@@ -315,13 +321,16 @@ test('history can be turned off, chats deleted, and everything wiped', async () 
   await expect.poll(chats).toBe(count + 1)
 
   // Off: nothing more is saved.
+  let settings = await openPanel('settings', 'Memory')
   await settings.getByRole('checkbox', { name: /Save chats/ }).click()
   await expect(settings.getByRole('checkbox', { name: /Save chats/ })).not.toBeChecked()
+  chat = await openPanel('chat')
   await chat.evaluate(() => window.assistant.chat.send('not saved'))
   await expect(chat.locator('.bubble.user').last()).toHaveText('You: not saved')
   expect(await chats()).toBe(count + 1)
-  const titles = await settings.evaluate(async () => (await window.assistant.history.list()).map((c) => c.title))
+  const titles = await chat.evaluate(async () => (await window.assistant.history.list()).map((c) => c.title))
   expect(titles).not.toContain('not saved')
+  settings = await openPanel('settings', 'Memory')
   await settings.getByRole('checkbox', { name: /Save chats/ }).click()
 
   // Deleting everything empties history, memories and the chat on screen.
@@ -414,9 +423,9 @@ test('with voice input off, the microphone is refused', async () => {
   expect(video).toBe('denied')
 })
 
-test('only the character and settings windows may synthesize speech', async () => {
-  const chat = await openPanel('chat')
-  const outcome = await chat.evaluate(() => window.assistant.voice.synthesize('hi').then(() => 'accepted', () => 'rejected'))
+test('only the character and chat (Settings → Test voice) windows may synthesize speech', async () => {
+  const island = await page('island')
+  const outcome = await island.evaluate(() => window.assistant.voice.synthesize('hi').then(() => 'accepted', () => 'rejected'))
   expect(outcome).toBe('rejected')
 })
 

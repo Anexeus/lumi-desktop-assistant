@@ -169,7 +169,7 @@ export function desktopPlugin(helper: DesktopHelper, onControl: (active: boolean
       tool({
         name: 'screen_picture',
         description:
-          'Only when screen_look cannot read a window (games, images, canvases): send a screenshot of it to the cloud AI and ask a question about it. Needs the user’s permission setting.',
+          'See a window as an image and ask a question about it: for what screen_look cannot read (games, images, canvases, apps without controls). Uses the vision model.',
         parameters: { type: 'object', properties: { question: { type: 'string' }, window: { type: 'string' } }, required: ['question'] },
         input: target.extend({ question: z.string().trim().min(1).max(500) }),
         risk: 'act',

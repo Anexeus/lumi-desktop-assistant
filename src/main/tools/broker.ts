@@ -14,11 +14,13 @@ export class PermissionBroker {
 
   constructor(
     private readonly onChange: (requests: ApprovalRequest[]) => void,
-    private readonly timeoutMs = TIMEOUT_MS
+    private readonly timeoutMs = TIMEOUT_MS,
+    /** The user's "do what I ask without asking first" setting. */
+    private readonly autoApprove: () => boolean = () => false
   ) {}
 
   async approve(tool: Tool, title: string, detail: string, signal: AbortSignal): Promise<boolean> {
-    if (tool.risk === 'read' || this.grants.has(tool.name)) return true
+    if (tool.risk === 'read' || this.grants.has(tool.name) || (this.autoApprove() && !signal.aborted)) return true
     if (signal.aborted) return false
     const id = this.nextId++
     const request: ApprovalRequest = { id, tool: tool.name, title, detail: detail.slice(0, 600) }

@@ -97,6 +97,8 @@ export interface ToolsState {
   notifications: boolean
   /** The user allows sending a screenshot to a cloud vision model when Lumi can't read a window otherwise. */
   screenshots: boolean
+  /** Act-risk tools run without an approval card (the user's choice; the emergency stop still works). */
+  autoApprove: boolean
 }
 
 export interface ChatSnapshot {
@@ -225,6 +227,8 @@ export interface AppState {
   controlling: boolean
   /** The emergency-stop shortcut, e.g. Control+Alt+Shift+X. */
   stopShortcut: string
+  /** What the chat window shows: the conversation or Settings (Settings has no window of its own). */
+  panelView: 'chat' | 'settings'
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -277,6 +281,7 @@ export const Invoke = {
   toolsSetPlugin: 'tools:set-plugin',
   toolsSetNotifications: 'tools:set-notifications',
   toolsSetScreenshots: 'tools:set-screenshots',
+  toolsSetAutoApprove: 'tools:set-auto-approve',
   githubSetToken: 'github:set-token',
   mcpAdd: 'mcp:add',
   mcpRemove: 'mcp:remove',
@@ -382,6 +387,7 @@ export interface AssistantApi {
     setPluginEnabled(id: string, enabled: boolean): Promise<AppState>
     setNotifications(enabled: boolean): Promise<AppState>
     setScreenshots(enabled: boolean): Promise<AppState>
+    setAutoApprove(enabled: boolean): Promise<AppState>
   }
   integrations: {
     /** Stored encrypted; null removes it. Use a read-only fine-grained token. */

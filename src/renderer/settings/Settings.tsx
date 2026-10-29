@@ -1,7 +1,6 @@
 import type { Graphics } from '@shared/ipc'
 import { CHARACTERS } from '@shared/characters'
-import { useState } from 'react'
-import { TitleBar } from '../ui/TitleBar'
+import { useState, type KeyboardEvent } from 'react'
 import { useAppState } from '../ui/useAppState'
 import { AiSettings } from './AiSettings'
 import { MemorySettings } from './MemorySettings'
@@ -16,10 +15,16 @@ const GRAPHICS: { value: Graphics; label: string; hint: string }[] = [
   { value: 'high', label: 'High', hint: 'Full resolution, smooth 60 fps. Uses more GPU.' }
 ]
 
+const TABS = ['General', 'AI', 'Voice', 'Character', 'Tools', 'Integrations', 'Claude Code', 'Memory'] as const
+type Tab = (typeof TABS)[number]
+const tabId = (t: Tab): string => `settings-tab-${t.toLowerCase().replace(/\s+/g, '-')}`
+
+/** Settings, shown inside the chat window: a tab bar on top, one section group at a time. */
 export function Settings(): React.JSX.Element {
   const state = useAppState()
   const [modelError, setModelError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [tab, setTab] = useState<Tab>('General')
   if (!state) return <main className="settings" aria-busy="true" />
 
   async function chooseModel(): Promise<void> {
@@ -31,12 +36,56 @@ export function Settings(): React.JSX.Element {
   }
 
   const { model } = state
+  const keyboard = (      <section aria-labelledby="keys-heading">
+      <h2 id="keys-heading">Keyboard</h2>
+      <dl className="keys">
+        <dt>Show or hide the character</dt>
+        <dd>
+          <kbd>{state.shortcut.accelerator.replaceAll('+', ' + ')}</kbd>
+          {!state.shortcut.registered && <span className="warn"> (taken by another app)</span>}
+        </dd>
+        <dt>Open the island for a quick question</dt>
+        <dd>
+          <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' + ')}</kbd>
+          {!state.islandShortcut.registered && <span className="warn"> (taken by another app)</span>}
+        </dd>
+        <dt>With the character focused</dt>
+        <dd>
+          <kbd>Enter</kbd> chat · <kbd>Shift + F10</kbd> menu · <kbd>+</kbd> / <kbd>−</kbd> size
+        </dd>
+      </dl>
+    </section>
+  )
+  // Arrow keys move between tabs (the WAI-ARIA tabs pattern); Tab moves into the section.
+  const onTabKey = (e: KeyboardEvent): void => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+    if (!step) return
+    const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length]!
+    setTab(next)
+    document.getElementById(tabId(next))?.focus()
+  }
 
   return (
     <div className="settings-shell">
-      <TitleBar title={`${state.assistantName} · Settings`} />
-      <main className="settings">
-
+      <nav className="tabs" role="tablist" aria-label="Settings sections" onKeyDown={onTabKey}>
+        {TABS.map((t) => (
+          <button
+            key={t}
+            id={tabId(t)}
+            type="button"
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls="settings-panel"
+            tabIndex={tab === t ? 0 : -1}
+            onClick={() => setTab(t)}
+          >
+            {t}
+          </button>
+        ))}
+      </nav>
+      <main className="settings" role="tabpanel" id="settings-panel" aria-labelledby={tabId(tab)}>
+      {tab === 'General' && (
+      <>
       <section aria-labelledby="name-heading">
         <h2 id="name-heading">Assistant</h2>
         <label className="field">
@@ -53,10 +102,6 @@ export function Settings(): React.JSX.Element {
           />
         </label>
       </section>
-
-      <AiSettings ai={state.ai} local={state.local} />
-
-      <VoiceSettings voice={state.voice} local={state.local} />
 
       <section aria-labelledby="character-heading">
         <h2 id="character-heading">Character</h2>
@@ -94,7 +139,14 @@ export function Settings(): React.JSX.Element {
           />
         </label>
       </section>
+      {keyboard}
+      </>
+      )}
 
+      {tab === 'AI' && <AiSettings ai={state.ai} local={state.local} />}
+      {tab === 'Voice' && <VoiceSettings voice={state.voice} local={state.local} />}
+
+      {tab === 'Character' && (
       <section aria-labelledby="model-heading">
         <h2 id="model-heading">Character model</h2>
         <div className="model">
@@ -158,34 +210,13 @@ export function Settings(): React.JSX.Element {
           <p className="model-license">Only use models whose license allows it. Your file is copied; the original is never changed.</p>
         </div>
       </section>
+      )}
 
-      <ToolsSettings tools={state.tools} />
+      {tab === 'Tools' && <ToolsSettings tools={state.tools} />}
+      {tab === 'Integrations' && <IntegrationsSettings integrations={state.integrations} />}
+      {tab === 'Claude Code' && <ClaudeSettings claude={state.claude} />}
+      {tab === 'Memory' && <MemorySettings state={state} />}
 
-      <IntegrationsSettings integrations={state.integrations} />
-
-      <ClaudeSettings claude={state.claude} />
-
-      <MemorySettings state={state} />
-
-      <section aria-labelledby="keys-heading">
-        <h2 id="keys-heading">Keyboard</h2>
-        <dl className="keys">
-          <dt>Show or hide the character</dt>
-          <dd>
-            <kbd>{state.shortcut.accelerator.replaceAll('+', ' + ')}</kbd>
-            {!state.shortcut.registered && <span className="warn"> (taken by another app)</span>}
-          </dd>
-          <dt>Open the island for a quick question</dt>
-          <dd>
-            <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' + ')}</kbd>
-            {!state.islandShortcut.registered && <span className="warn"> (taken by another app)</span>}
-          </dd>
-          <dt>With the character focused</dt>
-          <dd>
-            <kbd>Enter</kbd> chat · <kbd>Shift + F10</kbd> menu · <kbd>+</kbd> / <kbd>−</kbd> size
-          </dd>
-        </dl>
-      </section>
 
       
       </main>

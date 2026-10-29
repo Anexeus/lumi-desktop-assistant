@@ -4,14 +4,16 @@ A Windows desktop AI companion: an animated VRM character in a transparent, alwa
 text, sees and operates your apps with your permission, helps with coding, and runs its AI locally (no Ollama needed) or
 through an online provider you choose.
 
+**New here (person or AI agent)?** Read [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) first.
+
 **Status:** see [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) and [docs/UPGRADE_PROGRESS.md](docs/UPGRADE_PROGRESS.md)
 (what is verified, and what is not).
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.2.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.3.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
-2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3 4B (2.5 GB, once).
+2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
 3. Your chats, settings and downloaded models live in `%APPDATA%\Desktop Assistant` and survive updates and uninstalling.
 
@@ -62,16 +64,17 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 
 ## Configure
 
+- **Settings** open inside the chat window (Settings button, tray, or the character's menu), with tabs on top.
 - **AI provider** (Settings → AI): Lumi built-in (Qwen3 on this PC, GPU when available), Ollama, Google Gemini, Groq,
   OpenAI, Anthropic, OpenRouter, or any OpenAI-compatible address. Paste a key under the provider; each service keeps its
   own key, encrypted by Windows (DPAPI) and never shown again; **Remove** deletes it.
-- **Local models** (Settings → AI → Lumi built-in): download, switch, remove. Qwen3 4B needs ~3.5 GB of GPU memory
-  (or ~5 GB RAM on CPU); Qwen3 1.7B is lighter.
+- **Local models** (Settings → AI → Lumi built-in): download, switch, remove. Qwen3-VL 4B Instruct (default: fast, can
+  see screenshots) needs ~4.5 GB of GPU memory (or ~6 GB RAM on CPU); Qwen3 4B and 1.7B are alternatives.
 - **Microphone and speech** (Settings → Voice): microphone, push-to-talk, Whisper or the AI service for speech-to-text,
   Windows or AI-service voice, optional "only respond when I say the name".
 - **Hands-free voice:** tap the island at the top of the screen ("Tap here to talk"); tap again to stop.
 - **Screen access and computer control** (Settings → Tools → plugins): turn the "Screen and desktop control" plugin off
-  to disable it entirely. While it acts, the island turns red. **Emergency stop: Ctrl+Alt+Shift+X**, the tray menu, or
+  to disable it entirely. "Do what I ask without asking first" removes the approval cards. While it acts, the island turns red. **Emergency stop: Ctrl+Alt+Shift+X**, the tray menu, or
   tapping the red island. Every action asks first ("Allow for this chat" stops repeats). "Let cloud AI see screenshots"
   is off by default.
 - **Projects** (Settings → Tools → folders): Lumi runs only the scripts in an approved project's `package.json`.

@@ -4,6 +4,7 @@ import { RichText } from '../ui/RichText'
 import { Approvals } from './Approvals'
 import { TasksPanel } from './TasksPanel'
 import { TitleBar } from '../ui/TitleBar'
+import { Settings } from '../settings/Settings'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 
@@ -40,6 +41,18 @@ export function Chat(): React.JSX.Element {
   }
 
   const ai = state?.ai
+  if (state?.panelView === 'settings') {
+    return (
+      <main className="chat">
+        <TitleBar title={`${state.assistantName} · Settings`}>
+          <button type="button" className="ghost" onClick={() => void window.assistant.openWindow('chat')}>
+            ← Chat
+          </button>
+        </TitleBar>
+        <Settings />
+      </main>
+    )
+  }
   return (
     <main className="chat">
       <TitleBar title={state?.assistantName ?? 'Lumi'}>

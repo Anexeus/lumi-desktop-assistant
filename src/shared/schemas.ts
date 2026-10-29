@@ -66,7 +66,8 @@ export const toolsSettingsSchema = z
     apps: z.array(z.object({ name: z.string().trim().min(1).max(120), path: pathSchema }).strict()).max(100),
     disabled: z.array(z.string().max(100)).max(100),
     notifications: z.boolean(),
-    screenshots: z.boolean().default(false)
+    screenshots: z.boolean().default(false),
+    autoApprove: z.boolean().default(false)
   })
   .strict()
 
@@ -139,6 +140,7 @@ export const invokeSchemas = {
   [Invoke.toolsSetPlugin]: z.object({ id: z.string().max(100), enabled: z.boolean() }).strict(),
   [Invoke.toolsSetNotifications]: z.object({ value: z.boolean() }).strict(),
   [Invoke.toolsSetScreenshots]: z.object({ value: z.boolean() }).strict(),
+  [Invoke.toolsSetAutoApprove]: z.object({ value: z.boolean() }).strict(),
   [Invoke.githubSetToken]: z.object({ token: z.string().trim().min(10).max(500).nullable() }).strict(),
   [Invoke.mcpAdd]: z.object({ name: z.string().trim().min(1).max(60), target: z.string().trim().min(1).max(1000) }).strict(),
   [Invoke.mcpRemove]: z.object({ id: z.string().max(40) }).strict(),

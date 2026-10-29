@@ -89,6 +89,10 @@ hints are not trusted for the confirmation decision unless the user marks the se
 
 ## Desktop control, project scripts, local engines
 
+- "Do what I ask without asking first" (Settings → Tools, off by default) skips approval cards for act tools. The
+  emergency stop, the red island and the plugin switches still apply.
+- Lumi's browser blocks ads and trackers (Ghostery engine, network level).
+
 - Desktop control (UI Automation, typing, clicks) runs in a fixed bundled script; requests are JSON data, never code.
   Every action asks first; the red island shows when Lumi is acting; Ctrl+Alt+Shift+X / tray / island stops everything
   (reply, approvals, helper). The whole plugin can be switched off. Elevation prompts are never automated.

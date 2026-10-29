@@ -59,7 +59,8 @@ const api: AssistantApi = {
     removeApp: (path) => ipcRenderer.invoke(Invoke.toolsRemoveApp, { path }),
     setPluginEnabled: (id, enabled) => ipcRenderer.invoke(Invoke.toolsSetPlugin, { id, enabled }),
     setNotifications: (value) => ipcRenderer.invoke(Invoke.toolsSetNotifications, { value }),
-    setScreenshots: (value) => ipcRenderer.invoke(Invoke.toolsSetScreenshots, { value })
+    setScreenshots: (value) => ipcRenderer.invoke(Invoke.toolsSetScreenshots, { value }),
+    setAutoApprove: (value) => ipcRenderer.invoke(Invoke.toolsSetAutoApprove, { value })
   },
   integrations: {
     setGithubToken: (token) => ipcRenderer.invoke(Invoke.githubSetToken, { token }),

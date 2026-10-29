@@ -166,3 +166,20 @@ describe('parseWrittenToolCall', () => {
     expect(parseWrittenToolCall('apps_open {broken', names)).toBeNull()
   })
 })
+
+describe('auto-approve', () => {
+  it('runs act tools without a card when the user turned it on, and not after a stop', async () => {
+    const { PermissionBroker } = await import('../../src/main/tools/broker')
+    let on = true
+    const asked: number[] = []
+    const broker = new PermissionBroker((r) => asked.push(r.length), 50, () => on)
+    const act = { name: 'apps_open', risk: 'act' } as never
+    expect(await broker.approve(act, 'Open Notepad', '{}', new AbortController().signal)).toBe(true)
+    expect(asked).toEqual([]) // no card shown
+    const stopped = new AbortController()
+    stopped.abort()
+    expect(await broker.approve(act, 'Open Notepad', '{}', stopped.signal)).toBe(false)
+    on = false
+    expect(await broker.approve(act, 'Open Notepad', '{}', new AbortController().signal)).toBe(false) // card, then timeout = no
+  })
+})

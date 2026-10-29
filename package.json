@@ -1,7 +1,7 @@
 {
   "name": "desktop-assistant",
   "productName": "Lumi",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "Windows desktop AI companion with a 3D character",
   "license": "MIT",
@@ -26,6 +26,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@ghostery/adblocker": "2.20.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@pixiv/three-vrm": "3.5.5",
     "@playwright/test": "1.64.1",

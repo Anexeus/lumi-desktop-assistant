@@ -13,6 +13,8 @@ export interface LocalModel {
   license: string
   /** Plain-language hardware note. */
   needs: string
+  /** Vision adapter (a second file) for models that can see images, e.g. screenshots. */
+  mmproj?: { file: string; urls: string[]; size: number; sha256: string }
 }
 
 const hf = (repo: string, file: string): string[] => [
@@ -22,9 +24,26 @@ const hf = (repo: string, file: string): string[] => [
 
 export const LOCAL_MODELS: readonly LocalModel[] = [
   {
+    id: 'qwen3-vl-4b',
+    kind: 'llm',
+    name: 'Qwen3-VL 4B Instruct (recommended: faster answers, follows instructions better, can see the screen)',
+    file: 'Qwen3VL-4B-Instruct-Q4_K_M.gguf',
+    urls: hf('Qwen/Qwen3-VL-4B-Instruct-GGUF', 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'),
+    size: 2_497_281_664,
+    sha256: '66358cb18bb6b3b1b6675aa412c7a88ef01d228f481184d13668e5201c730a0a',
+    license: 'Apache-2.0',
+    needs: 'About 4.5 GB of GPU memory with its vision part (or 6 GB of RAM on CPU, slower).',
+    mmproj: {
+      file: 'mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf',
+      urls: hf('Qwen/Qwen3-VL-4B-Instruct-GGUF', 'mmproj-Qwen3VL-4B-Instruct-Q8_0.gguf'),
+      size: 453_974_304,
+      sha256: '30ba2c7dd3127a4561b6cba9d13d0f711c91bdb38742e2f56d73c8cb596bd06d'
+    }
+  },
+  {
     id: 'qwen3-4b',
     kind: 'llm',
-    name: 'Qwen3 4B (recommended)',
+    name: 'Qwen3 4B (older; text only)',
     file: 'Qwen3-4B-Q4_K_M.gguf',
     urls: hf('Qwen/Qwen3-4B-GGUF', 'Qwen3-4B-Q4_K_M.gguf'),
     size: 2_497_280_256,

@@ -124,3 +124,20 @@ Automation helper like a person: typing in the chat box, clicking "Allow once").
 - **Verified in the installed app (built-in engine, Ollama stopped):** "What is 17 times 3?" → "17 times 3 is 51." (~6 s);
   "Open Notepad and type this text into it: Hello from Lumi" with real approvals → 3/3 runs, Notepad's document checked
   independently each time (9–11 s). Unit 144 pass, E2E 50/50.
+
+## 0.3.0: "too slow, nothing works, cmd windows" (fixed)
+Root causes found by testing on this PC, not guessed:
+1. **Console windows:** Lumi started Ollama detached, so each helper Ollama launched (GPU probe, device list, runners)
+   opened its own console window (seen in a process trace: a new `conhost.exe` per child). Ollama is now attached to
+   Lumi's hidden console.
+2. **Nothing working:** the database's indexes were damaged (after force-kills during testing), so startup failed and
+   the windows had no handlers. Repaired with REINDEX (all chats and settings kept, backup in
+   `%APPDATA%\Desktop Assistant\db-backup-before-repair`); the store now checks and repairs this at every start;
+   `Lumi.exe --quit` exits cleanly.
+3. **Slow / stuck:** the model repeated slightly wrong tool arguments ("YouTube", "1", `index`) until the step limit.
+   Arguments are now normalised, and errors show the expected shape. The built-in model is now Qwen3-VL 4B Instruct.
+   Measured: answer 3.6 s; "open Notepad and type" 5.1 s; "open YouTube and play a lofi song" 10.7 s, video playing.
+4. **Approval cards:** "Do what I ask without asking first" (on for the owner). **Settings** moved into the chat
+   window with tabs. **Ad blocker** in Lumi's browser (doubleclick and YouTube ad pings blocked; pages and video
+   streams allowed — checked against the real filter lists).
+5. New: `PROJECT_SUMMARY.md` (whole-project summary and handoff) and `AGENTS.md` (for any AI coding agent).

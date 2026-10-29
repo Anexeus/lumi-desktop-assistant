@@ -224,6 +224,32 @@ qwen3 is text-only, so "seeing" uses UI Automation and OCR locally. A screenshot
 only with Settings → Tools → "Let cloud AI see screenshots" (off by default), a vision-capable provider selected, and an
 approval naming the destination each time.
 
+## ADR-047 Qwen3-VL 4B Instruct as the default built-in model (2026-10-30)
+Same size and GPU budget as Qwen3 4B, but an instruction-tuned (non-thinking) model that follows tool instructions more
+reliably and can see images through its vision adapter (mmproj, 454 MB), which replaces Windows OCR where that is broken.
+Official Qwen GGUF, Apache-2.0, verified by SHA-256. Measured here: answers in ~3.6 s, "open Notepad and type" 5 s,
+"play a lofi song on YouTube" 11 s with the video playing. Context raised to 16k with an 8-bit KV cache.
+
+## ADR-048 Opt-in "do what I ask without asking first" (2026-10-30)
+The owner asked for no approval cards. Act tools then run immediately; the red island, the emergency stop
+(Ctrl+Alt+Shift+X) and per-plugin switches remain, and a stop still cancels anything in flight. Off by default for new
+installs. Risk accepted by the owner: a web page the model reads could steer it into an action without a prompt.
+
+## ADR-049 Settings is a view of the chat window, with tabs (2026-10-30)
+One window instead of two; a tab bar (General, AI, Voice, Character, Tools, Integrations, Claude Code, Memory) instead of
+one long page. `openWindow('settings')` switches the chat window's view, so the tray, menu and buttons all agree.
+
+## ADR-050 Network ad blocking with @ghostery/adblocker (2026-10-30)
+uBlock Origin can't run in Electron's extension support. Ghostery's MPL-2.0 engine (EasyList + EasyPrivacy, prebuilt,
+cached) blocks ads and trackers in Lumi's browser session through `webRequest`. Its Electron wrapper resolves a preload
+file at load time, which isn't shipped in the installer, so the core engine is used directly. Bundled by Vite
+(devDependency, pinned at 2.20.1, released three weeks earlier); `zod` stays the only runtime dependency.
+
+## ADR-051 Start Ollama attached, not detached (2026-10-30)
+A detached Ollama has no console, so every helper it starts (GPU probe, device listing, model runner) got its own
+visible console window — the "cmd windows keep opening" bug. Attached with `windowsHide`, they share Lumi's hidden
+console. Ollama now stops when Lumi quits, which the built-in engine makes moot.
+
 ## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
 Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
 nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.

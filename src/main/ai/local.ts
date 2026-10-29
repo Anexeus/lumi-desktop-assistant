@@ -126,13 +126,13 @@ export class LocalServer {
     private readonly onStatus: () => void
   ) {}
 
-  /** Starts (or reuses) the server for this model file and resolves to its OpenAI-style base URL (…/v1). */
-  ensure(modelPath: string): Promise<string> {
+  /** Starts (or reuses) the server for this model file (plus its vision adapter, if any); resolves to its …/v1 URL. */
+  ensure(modelPath: string, mmproj?: string): Promise<string> {
     if (this.url && this.model === modelPath && this.proc?.exitCode === null) return Promise.resolve(this.url)
     if (this.starting && this.model === modelPath) return this.starting
     this.stop()
     this.model = modelPath
-    this.starting = this.start(modelPath).finally(() => (this.starting = undefined))
+    this.starting = this.start(modelPath, mmproj).finally(() => (this.starting = undefined))
     return this.starting
   }
 
@@ -154,28 +154,30 @@ export class LocalServer {
     return new Error(message)
   }
 
-  private async start(modelPath: string): Promise<string> {
+  private async start(modelPath: string, mmproj?: string): Promise<string> {
     const exe = this.exe()
     if (!existsSync(exe)) throw this.fail('Lumi’s local AI engine is missing from this install. Reinstall Lumi (in development: npm run runtimes).')
     if (!existsSync(modelPath)) throw this.fail('The model is not downloaded yet. Download it in Settings → AI.')
     const device = this.kind === 'llm' ? pickDevice(await listDevices(exe)) : null
     try {
-      return await this.launch(exe, modelPath, device)
+      return await this.launch(exe, modelPath, device, mmproj)
     } catch (error) {
       if (!device) throw error
       // The GPU path failed (driver, memory): the CPU is slower but works everywhere.
-      return this.launch(exe, modelPath, null)
+      return this.launch(exe, modelPath, null, mmproj)
     }
   }
 
-  private async launch(exe: string, modelPath: string, device: { id: string; name: string } | null): Promise<string> {
+  private async launch(exe: string, modelPath: string, device: { id: string; name: string } | null, mmproj?: string): Promise<string> {
     const port = await freePort()
     const common = ['-m', modelPath, '--host', '127.0.0.1', '--port', String(port)]
     const args =
       this.kind === 'llm'
         ? // Thinking off (Qwen3's template switch): multi-step desktop tasks were ~5× slower with reasoning, for little gain.
           // Sampling is Qwen's recommendation for non-thinking mode; llama.cpp's defaults (temp 0.8) made tool calls flaky.
-          [...common, '-c', '8192', '--chat-template-kwargs', '{"enable_thinking":false}', '--temp', '0.7', '--top-p', '0.8', '--top-k', '20', '--min-p', '0',
+          // 16k context with an 8-bit cache: long multi-step tasks no longer overflow it, and it still fits a 6 GB GPU.
+          [...common, '-c', '16384', '--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0', '--chat-template-kwargs', '{"enable_thinking":false}',
+            '--temp', '0.7', '--top-p', '0.8', '--top-k', '20', '--min-p', '0', ...(mmproj ? ['--mmproj', mmproj] : []),
             ...(device ? ['--device', device.id] : ['--device', 'none'])]
         : [...common, '--inference-path', '/v1/audio/transcriptions', '-l', 'en', '-t', String(Math.min(8, availableParallelism())), '--prompt', VOCABULARY]
     this.set({ state: 'starting', device: device?.name ?? 'CPU', message: 'Loading the model…' })

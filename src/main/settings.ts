@@ -11,7 +11,7 @@ import type { Store } from './storage/store'
 // New installs use Lumi's own engine and the Windows voice: nothing else to install.
 export const DEFAULT_AI: AiSettings = { provider: 'builtin', baseUrl: '', model: 'qwen3' }
 export const DEFAULT_VOICE: VoiceSettings = { output: 'system', input: true, stt: 'builtin', wake: false, model: 'lfm3-audio', voice: '', speed: 1, micId: '' }
-export const DEFAULT_LOCAL = { llm: 'qwen3-4b', stt: 'whisper-small-en' }
+export const DEFAULT_LOCAL = { llm: 'qwen3-vl-4b', stt: 'whisper-small-en' }
 
 const path = (name: string): string => join(app.getPath('userData'), name)
 
@@ -46,8 +46,9 @@ export interface ToolsSettings {
   disabled: string[]
   notifications: boolean
   screenshots: boolean
+  autoApprove: boolean
 }
-export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true, screenshots: false }
+export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true, screenshots: false, autoApprove: false }
 
 export interface Settings {
   assistantName: string

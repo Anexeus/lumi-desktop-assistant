@@ -18,7 +18,7 @@ export function ToolsSettings({ tools }: { tools: ToolsState }): React.JSX.Eleme
   return (
     <section aria-labelledby="tools-heading">
       <h2 id="tools-heading">Tools</h2>
-      <p className="model-license">Lumi can only use what you allow here. Anything that changes something asks you first.</p>
+      <p className="model-license">Lumi can only use what you allow here. Anything that changes something asks you first, unless “Do what I ask without asking first” is on (below).</p>
 
       <h3>Folders Lumi may search (read-only)</h3>
       {tools.folders.length ? (
@@ -93,6 +93,16 @@ export function ToolsSettings({ tools }: { tools: ToolsState }): React.JSX.Eleme
           <small>When Lumi needs your OK, and when tasks finish.</small>
         </span>
         <input type="checkbox" checked={tools.notifications} onChange={(e) => void t.setNotifications(e.target.checked)} />
+      </label>
+      <label className="row">
+        <span>
+          Do what I ask without asking first
+          <small>
+            Lumi opens apps, clicks, types, writes files and downloads as soon as you ask, with no “Allow” card. The island turns red
+            while it acts; Ctrl+Alt+Shift+X stops it. Turn off to approve each action.
+          </small>
+        </span>
+        <input type="checkbox" checked={tools.autoApprove} onChange={(e) => void t.setAutoApprove(e.target.checked)} />
       </label>
       <label className="row">
         <span>

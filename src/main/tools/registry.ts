@@ -54,7 +54,9 @@ export async function runToolCall(registry: Registry, broker: PermissionBroker, 
   const parsed = tool.input.safeParse(raw)
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')
-    return { title: `${tool.name}: invalid arguments`, ok: false, result: `Invalid arguments (${issues}).` }
+    // Show the expected shape so the retry can be right (small models otherwise repeat the same mistake).
+    const expected = JSON.stringify((tool.parameters as { properties?: unknown }).properties ?? {})
+    return { title: `${tool.name}: invalid arguments`, ok: false, result: `Invalid arguments (${issues}). Expected arguments: ${expected}` }
   }
   const title = tool.describe(parsed.data)
   const refusal = tool.check?.(parsed.data)

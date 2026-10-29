@@ -163,10 +163,7 @@ test('opens the chat window beside the character', async () => {
 })
 
 test('settings toggle always-on-top and persist it', async () => {
-  const opened = app.waitForEvent('window')
-  await character.evaluate(() => window.assistant.openWindow('settings'))
-  const settings = await opened
-  await settings.waitForLoadState('domcontentloaded')
+  const settings = await panel('settings') // Settings opens inside the chat window, on the General tab
   const toggle = settings.getByRole('checkbox', { name: /Always on top/ })
   await expect(toggle).toBeChecked()
   // The checkbox mirrors main's state, so click and wait for the round trip instead of check()/uncheck().
@@ -243,10 +240,16 @@ test('character can be hidden and shown; shortcut state matches registration', a
   expect(state.shortcut.registered).toBe(registered)
 })
 
-const panel = async (name: 'chat' | 'settings'): Promise<Page> => {
+/** Chat and Settings share the chat window; "settings" switches its view (and picks a tab). */
+const panel = async (name: 'chat' | 'settings', tab?: string): Promise<Page> => {
   await character.evaluate((n) => window.assistant.openWindow(n), name)
-  await expect.poll(() => app.windows().some((w) => w.url().endsWith(`/${name}.html`))).toBe(true)
-  return app.windows().find((w) => w.url().endsWith(`/${name}.html`))!
+  await expect.poll(() => app.windows().some((w) => w.url().endsWith('/chat.html'))).toBe(true)
+  const p = app.windows().find((w) => w.url().endsWith('/chat.html'))!
+  if (name === 'settings') {
+    await expect(p.getByRole('tablist', { name: 'Settings sections' })).toBeVisible()
+    if (tab) await p.getByRole('tab', { name: tab, exact: true }).click()
+  }
+  return p
 }
 const characterState = (): Promise<string | null> => character.locator('body').getAttribute('data-state')
 
@@ -279,7 +282,7 @@ test('only the character window may read the model bytes', async () => {
 })
 
 test('settings credits the model, switches characters with a matching voice, loads a custom .vrm', async () => {
-  const settings = await panel('settings')
+  const settings = await panel('settings', 'Character')
   await expect(settings.getByText(/© VirtualCast, Inc. · VRM Public License 1.0/)).toBeVisible()
   const characters = settings.getByRole('radiogroup', { name: 'Characters' })
   await characters.getByRole('radio', { name: /Sendagaya Shino/ }).click()

@@ -49,6 +49,14 @@ export function openStore(file: string, now: () => number = Date.now): Store {
 
 function createStore(db: DatabaseSync, now: () => number) {
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+  // Damaged indexes (seen after the app was force-killed mid-write) make queries fail; the rows are fine and REINDEX
+  // rebuilds the indexes from them. Anything worse still throws, and openStore sets the file aside.
+  const check = (): string => Object.values(db.prepare('PRAGMA quick_check').get() as Record<string, string>)[0] ?? ''
+  if (check() !== 'ok') {
+    db.exec('REINDEX')
+    if (check() !== 'ok') throw new Error('The database is damaged beyond an index rebuild')
+    console.warn('Database indexes were damaged and have been rebuilt')
+  }
   const version = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
   if (version > MIGRATIONS.length) throw new Error(`Database is from a newer app version (schema ${version})`)
   for (let v = version; v < MIGRATIONS.length; v++) {

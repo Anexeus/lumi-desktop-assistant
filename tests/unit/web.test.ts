@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', () => ({ app: { on: () => {} }, BrowserWindow: class {}, session: {}, shell: {} }))
-const { downloadName, isPublicWebUrl, openTarget, unwrapResultUrl } = await import('../../src/main/tools/web')
+const { downloadName, isPublicWebUrl, lenientItem, lenientOpen, openTarget, unwrapResultUrl } = await import('../../src/main/tools/web')
 
 describe('isPublicWebUrl', () => {
   it('allows public http(s) pages', () => {
@@ -53,5 +53,17 @@ describe('downloadName', () => {
     expect(downloadName('https://x.com/get?id=1', 'attachment; filename="setup.exe"')).toBe('setup.exe')
     expect(downloadName('https://x.com/a/..%5C..%5Cevil.txt', null)).toBe('_.._evil.txt')
     expect(downloadName('https://x.com/', null)).toBe('download')
+  })
+})
+
+describe('lenient browser arguments', () => {
+  it('fixes the usual small-model slips instead of rejecting them', () => {
+    expect(lenientOpen({ site: 'YouTube', query: 'lofi' })).toEqual({ site: 'youtube', query: 'lofi' })
+    expect(lenientOpen({ site: 'youtube.com' })).toEqual({ site: 'youtube' })
+    expect(lenientOpen({ site: 'example.net' })).toEqual({ url: 'https://example.net' })
+    expect(lenientOpen({ url: 'www.wikipedia.org' })).toEqual({ url: 'https://www.wikipedia.org' })
+    expect(lenientOpen({ query: 'weather delhi' })).toEqual({ query: 'weather delhi', site: 'google' })
+    expect(lenientItem({ index: '3' })).toEqual({ index: '3', item: '3' })
+    expect(lenientItem({ item: 2 })).toEqual({ item: 2 })
   })
 })

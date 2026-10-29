@@ -32,7 +32,7 @@ export function LocalModels({ kind, local }: { kind: 'llm' | 'stt'; local: AppSt
             <li key={m.id} className={`local-model${m.id === selected && installed ? ' in-use' : ''}`}>
               <div className="local-model-head">
                 <strong>{m.name}</strong>
-                <span className="badge">{installed ? (m.id === selected ? 'In use' : 'Downloaded') : gb(m.size)}</span>
+                <span className="badge">{installed ? (m.id === selected ? 'In use' : 'Downloaded') : gb(m.size + (m.mmproj?.size ?? 0))}</span>
               </div>
               <small>
                 {m.needs} License: {m.license}.
@@ -51,7 +51,7 @@ export function LocalModels({ kind, local }: { kind: 'llm' | 'stt'; local: AppSt
                 <div className="model-actions">
                   {!installed && (
                     <button type="button" className="small" disabled={!!local.download} onClick={() => void api.download(m.id)}>
-                      Download ({gb(m.size)})
+                      Download ({gb(m.size + (m.mmproj?.size ?? 0))})
                     </button>
                   )}
                   {installed && m.id !== selected && (

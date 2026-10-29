@@ -192,7 +192,8 @@ test('a disabled plugin is never offered to the model', async () => {
 
 test('settings lists folders, apps and plugins with their permissions', async () => {
   await (await page('character')).evaluate(() => window.assistant.openWindow('settings'))
-  const s = await page('settings')
+  const s = await page('chat') // Settings is a view of the chat window
+  await s.getByRole('tab', { name: 'Tools', exact: true }).click()
   await expect(s.getByRole('region', { name: 'Tools' }).getByText(folder, { exact: true })).toBeVisible()
   const tools = s.getByRole('region', { name: 'Tools' })
   await expect(tools.locator('.data-list li', { hasText: 'Test App' })).toBeVisible()
@@ -249,7 +250,8 @@ test('the model can hand a task to Claude Code only after approval', async () =>
 test('hooks install with a backup, report Claude Code events, and uninstall cleanly', async () => {
   const c = await chat()
   await c.evaluate(() => window.assistant.openWindow('settings'))
-  const s = await page('settings')
+  const s = await page('chat') // Settings is a view of the chat window
+  await s.getByRole('tab', { name: 'Claude Code', exact: true }).click()
   const section = s.getByRole('region', { name: 'Claude Code' })
   await section.getByRole('checkbox').click()
   await expect(section.getByRole('checkbox')).toBeChecked()

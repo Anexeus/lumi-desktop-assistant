@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { z } from 'zod'
 import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent, type CharacterState } from '@shared/character'
-import { Events, Invoke, Send, type AppState, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
+import { Events, Invoke, Send, type AppState, type WindowName, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
 import { runCommand, saveMemory } from './ai/commands'
 import { Conversation } from './ai/conversation'
 import { downloadModel, LocalServer } from './ai/local'
@@ -57,9 +57,12 @@ if (app.isPackaged && DEBUG_SWITCHES.some((s) => app.commandLine.hasSwitch(s))) 
 app.enableSandbox()
 registerAppScheme()
 
-if (!app.requestSingleInstanceLock()) {
+// Asking for the lock also hands this launch's arguments to a copy that is already running (second-instance below).
+const locked = app.requestSingleInstanceLock()
+if (!locked || process.argv.includes('--quit')) {
   // Without this line, a second launch (e.g. `npm run dev` while the installed Lumi runs) seems to do nothing.
-  console.error('Lumi is already running (look for its tray icon). That copy was brought to the front; quit it from the tray to start this one.')
+  if (!locked && !process.argv.includes('--quit'))
+    console.error('Lumi is already running (look for its tray icon). That copy was brought to the front; quit it from the tray to start this one.')
   app.quit()
 } else {
   app.on('window-all-closed', () => {
@@ -102,7 +105,12 @@ async function start(): Promise<void> {
   const runtimesDir = app.isPackaged ? join(process.resourcesPath, 'runtimes') : join(app.getAppPath(), 'resources', 'runtimes')
   const modelsDir = join(app.getPath('userData'), 'models', 'local')
   const modelPath = (id: string): string => join(modelsDir, findLocalModel(id)!.file)
-  const installedModels = (): string[] => LOCAL_MODELS.filter((m) => existsSync(join(modelsDir, m.file))).map((m) => m.id)
+  const installedModels = (): string[] =>
+    LOCAL_MODELS.filter((m) => existsSync(join(modelsDir, m.file)) && (!m.mmproj || existsSync(join(modelsDir, m.mmproj.file)))).map((m) => m.id)
+  const mmprojPath = (id: string): string | undefined => {
+    const m = findLocalModel(id)?.mmproj
+    return m && join(modelsDir, m.file)
+  }
   let download: AppState['local']['download'] = null
   let downloadError: string | null = null
   let downloadAbort: AbortController | undefined
@@ -122,7 +130,7 @@ async function start(): Promise<void> {
   async function localUrl(server: LocalServer, id: string, what: string): Promise<string> {
     if (!installedModels().includes(id)) throw new ProviderError('model', `Download ${what} first: Settings → AI → Lumi built-in.`)
     try {
-      return await server.ensure(modelPath(id))
+      return await server.ensure(modelPath(id), mmprojPath(id))
     } catch (error) {
       throw new ProviderError('unreachable', error instanceof Error ? error.message : String(error))
     }
@@ -163,13 +171,14 @@ async function start(): Promise<void> {
     ai: aiStatus(),
     historyEnabled: settings.historyEnabled,
     voice: settings.voice,
-    tools: { plugins: [], folders: settings.tools.folders, apps: settings.tools.apps, notifications: settings.tools.notifications, screenshots: settings.tools.screenshots },
+    tools: { plugins: [], folders: settings.tools.folders, apps: settings.tools.apps, notifications: settings.tools.notifications, screenshots: settings.tools.screenshots, autoApprove: settings.tools.autoApprove },
     approvals: [],
     integrations: { githubToken: hasSecret(GITHUB_TOKEN), mcp: [] },
     claude: { path: null, hooksInstalled: false, hookServer: false, tasks: [], events: [] },
     graphics: settings.graphics,
     controlling: false,
     stopShortcut: STOP_SHORTCUT,
+    panelView: 'chat',
     local: { runtime: false, llm: '', stt: '', installed: [], download: null, downloadError: null, servers: { llm: { state: 'stopped', device: null, message: '' }, stt: { state: 'stopped', device: null, message: '' } } }
   }
   state.local = localState()
@@ -187,12 +196,17 @@ async function start(): Promise<void> {
   const actions: TrayActions = {
     toggleCharacter: () => setState({ characterVisible: !state.characterVisible }),
     setAlwaysOnTop: (value) => setState({ alwaysOnTop: value }),
-    openChat: () => windows.openPanel('chat'),
-    openSettings: () => windows.openPanel('settings'),
+    openChat: () => showPanel('chat'),
+    openSettings: () => showPanel('settings'),
     stop: () => emergencyStop(),
     quit: () => app.quit()
   }
   const tray = createTray(actions)
+  /** Chat and Settings share one window; "settings" switches its view instead of opening another window. */
+  function showPanel(name: WindowName): void {
+    setState({ panelView: name === 'settings' ? 'settings' : 'chat' })
+    windows.openPanel('chat')
+  }
 
   function setState(patch: Partial<AppState>): AppState {
     const prev = state
@@ -239,9 +253,9 @@ async function start(): Promise<void> {
   const broker = new PermissionBroker((approvals) => {
     setState({ approvals })
     if (!approvals.length) return
-    windows.openPanel('chat')
+    showPanel('chat')
     notify(`${settings.assistantName} needs your OK`, approvals.at(-1)!.title)
-  })
+  }, undefined, () => settings.tools.autoApprove)
   const mcp = new McpManager(
     () => settings.mcp,
     () => setState({ integrations: integrationsState(), tools: toolsState() })
@@ -345,12 +359,16 @@ async function start(): Promise<void> {
     desktopPlugin(desktop, (controlling) => setState({ controlling }), {
       // A screenshot leaves the PC only with the user's switch on and a cloud model that can see images.
       unavailable: () =>
-        !settings.tools.screenshots
-          ? 'Screenshots to cloud AI are off (Settings → Tools). Use screen_look instead.'
-          : !findProvider(settings.ai.provider).vision
-            ? `${findProvider(settings.ai.provider).name} can't see images. Choose Gemini, OpenAI or Claude in Settings → AI for this.`
-            : null,
-      where: () => findProvider(settings.ai.provider).name,
+        settings.ai.provider === 'builtin'
+          ? mmprojPath(settings.local.llm)
+            ? null // seen on this PC: nothing leaves it
+            : 'The built-in model in use can’t see images. Choose Qwen3-VL 4B in Settings → AI.'
+          : !settings.tools.screenshots
+            ? 'Screenshots to cloud AI are off (Settings → Tools). Use screen_look instead.'
+            : !findProvider(settings.ai.provider).vision
+              ? `${findProvider(settings.ai.provider).name} can't see images. Choose Gemini, OpenAI or Claude in Settings → AI for this.`
+              : null,
+      where: () => (settings.ai.provider === 'builtin' ? 'Lumi’s built-in model (on this PC)' : findProvider(settings.ai.provider).name),
       describe: async (png, question) => describeImage(await aiConfig(), png, question)
     }),
     projectsPlugin(() => settings.tools.folders)
@@ -368,7 +386,8 @@ async function start(): Promise<void> {
     folders: settings.tools.folders,
     apps: settings.tools.apps,
     notifications: settings.tools.notifications,
-    screenshots: settings.tools.screenshots
+    screenshots: settings.tools.screenshots,
+    autoApprove: settings.tools.autoApprove
   })
   const saveTools = (patch: Partial<typeof settings.tools>): AppState => {
     settings.tools = { ...settings.tools, ...patch }
@@ -378,12 +397,12 @@ async function start(): Promise<void> {
   function notify(title: string, body: string): void {
     if (!settings.tools.notifications || !Notification.isSupported()) return
     const n = new Notification({ title, body: body.slice(0, 200) })
-    n.on('click', () => windows.openPanel('chat'))
+    n.on('click', () => showPanel('chat'))
     n.show()
   }
 
   // Ollama stops when its window is closed. If the local AI is unreachable, start its server hidden (fixed known path only;
-  // no window to close by accident, and it keeps running after Lumi quits) and retry once.
+  // no window to close by accident; it stops when Lumi quits) and retry once.
   const OLLAMA_EXE = join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'Ollama', 'ollama.exe')
   const ollamaUp = (): Promise<boolean> => fetch('http://127.0.0.1:11434/api/version', { signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false)
   let ollamaStarting: Promise<boolean> | undefined
@@ -391,7 +410,9 @@ async function start(): Promise<void> {
     if (settings.ai.provider !== 'ollama' || !/^http:\/\/(127\.0\.0\.1|localhost):11434\b/.test(settings.ai.baseUrl) || !existsSync(OLLAMA_EXE)) return false
     ollamaStarting ??= (async () => {
       if (await ollamaUp()) return true
-      spawn(OLLAMA_EXE, ['serve'], { detached: true, stdio: 'ignore', windowsHide: true }).on('error', () => {}).unref()
+      // Not detached: a detached Ollama has no console, so each helper it starts (GPU probe, model runner) opened its own
+      // visible console window. Attached, they share Lumi's hidden one. (It now stops when Lumi quits.)
+      spawn(OLLAMA_EXE, ['serve'], { stdio: 'ignore', windowsHide: true }).on('error', () => {})
       for (let i = 0; i < 40; i++) {
         await new Promise((r) => setTimeout(r, 500))
         if (await ollamaUp()) return true
@@ -470,7 +491,7 @@ async function start(): Promise<void> {
     return setState({ assistantName: name })
   })
   handle(Invoke.setCharacterVisible, ({ value }) => setState({ characterVisible: value }))
-  handle(Invoke.openWindow, ({ name }) => windows.openPanel(name))
+  handle(Invoke.openWindow, ({ name }) => showPanel(name))
   handle(Invoke.windowControl, ({ action }, e) => {
     if (!windows.isPanel(e.sender, 'chat') && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected window:control')
     const win = BrowserWindow.fromWebContents(e.sender)!
@@ -533,16 +554,21 @@ async function start(): Promise<void> {
     if (download) throw new Error('Rejected local:download: another download is running')
     const model = findLocalModel(id)!
     downloadAbort = new AbortController()
-    download = { id, received: 0, total: model.size }
+    const total = model.size + (model.mmproj?.size ?? 0)
+    download = { id, received: 0, total }
     downloadError = null
     let shown = 0
-    void downloadModel(model, modelsDir, (received) => {
-      download = { id, received, total: model.size }
+    const progress = (offset: number) => (received: number) => {
+      download = { id, received: offset + received, total }
       if (Date.now() - shown > 250) {
         shown = Date.now()
         pushLocal()
       }
-    }, downloadAbort.signal)
+    }
+    const signal = downloadAbort.signal
+    // The vision adapter first (small), then the model; each file resumes and is checksum-verified on its own.
+    void (model.mmproj ? downloadModel({ ...model, ...model.mmproj }, modelsDir, progress(0), signal) : Promise.resolve(''))
+      .then(() => downloadModel(model, modelsDir, progress(model.mmproj?.size ?? 0), signal))
       .then(() => {
         // The first model of its kind becomes the one in use.
         if (!installedModels().includes(settings.local[model.kind]) || settings.local[model.kind] === id) {
@@ -566,8 +592,10 @@ async function start(): Promise<void> {
   handle(Invoke.localRemove, async ({ id }) => {
     const model = findLocalModel(id)!
     ;(model.kind === 'llm' ? llmServer : sttServer).stop()
-    await rm(modelPath(id), { force: true })
-    await rm(`${modelPath(id)}.part`, { force: true })
+    for (const file of [modelPath(id), mmprojPath(id)].filter((f): f is string => !!f)) {
+      await rm(file, { force: true })
+      await rm(`${file}.part`, { force: true })
+    }
     return setState({ local: localState() })
   })
   handle(Invoke.localSelect, ({ kind, id }) => {
@@ -605,6 +633,7 @@ async function start(): Promise<void> {
   )
   handle(Invoke.toolsSetNotifications, ({ value }) => saveTools({ notifications: value }))
   handle(Invoke.toolsSetScreenshots, ({ value }) => saveTools({ screenshots: value }))
+  handle(Invoke.toolsSetAutoApprove, ({ value }) => saveTools({ autoApprove: value }))
   handle(Invoke.claudeStart, ({ prompt, project, mode }) => {
     const folder = approvedProject(project)
     if (!folder) throw new Error('Rejected claude:start: not an approved folder')
@@ -700,7 +729,7 @@ async function start(): Promise<void> {
   })
   handle(Invoke.voiceSynthesize, async ({ text }, e) => {
     // The character speaks replies; Settings plays the "Test voice" sample.
-    if (!fromCharacter(e.sender) && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected voice:synthesize: not allowed from this window')
+    if (!fromCharacter(e.sender) && !windows.isPanel(e.sender, 'chat')) throw new Error('Rejected voice:synthesize: not allowed from this window')
     if (settings.ai.provider === 'builtin') return { ok: false as const, message: 'Lumi’s built-in AI has no voice of its own; using the Windows voice.' }
     try {
       const audio = await withOllama(async () => synthesize({ ...(await voiceConfig()), voice: settings.voice.voice, speed: settings.voice.speed }, text))
@@ -817,9 +846,10 @@ async function start(): Promise<void> {
     })
   }
 
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
+    if (argv.includes('--quit')) return app.quit() // `Lumi.exe --quit`: a clean exit for scripts and updates (a kill can damage the database)
     setState({ characterVisible: true })
-    windows.openPanel('chat')
+    showPanel('chat')
   })
   app.on('before-quit', () => {
     conversation.cancel()

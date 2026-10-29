@@ -1,6 +1,7 @@
-import { app, BrowserWindow, session, shell } from 'electron'
+import { FiltersEngine, Request } from '@ghostery/adblocker'
+import { app, BrowserWindow, session, shell, type Session } from 'electron'
 import { createWriteStream, existsSync } from 'node:fs'
-import { rename, rm } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { once } from 'node:events'
 import { extname, join } from 'node:path'
 import { z } from 'zod'
@@ -39,12 +40,33 @@ export function isPublicWebUrl(raw: string): boolean {
 }
 
 let win: BrowserWindow | undefined
+let adblock = false
+
+/** Ads and trackers are blocked in Lumi's browser (EasyList + EasyPrivacy, prebuilt by Ghostery; cached after the first load). */
+function blockAds(ses: Session): void {
+  if (adblock) return
+  adblock = true
+  const cache = join(app.getPath('userData'), 'adblock-engine.bin')
+  FiltersEngine.fromPrebuiltAdsAndTracking(fetch, { path: cache, read: readFile, write: writeFile })
+    .then((engine) => {
+      ses.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
+        const request = Request.fromRawDetails({ url: details.url, type: details.resourceType as never, sourceUrl: details.referrer || details.frame?.url })
+        const { match, redirect } = engine.match(request)
+        callback(redirect ? { redirectURL: redirect.dataUrl } : { cancel: match })
+      })
+    })
+    .catch((error) => {
+      adblock = false // try again next time the browser opens
+      console.warn('Ad blocker unavailable (filter lists could not be loaded)', error)
+    })
+}
 let quitting = false
 app.on('before-quit', () => (quitting = true))
 
 function browser(): BrowserWindow {
   if (win && !win.isDestroyed()) return win
   const ses = session.fromPartition(PARTITION) // not "persist:": nothing survives a restart
+  blockAds(ses)
   ses.setPermissionRequestHandler((_c, _p, cb) => cb(false))
   ses.setPermissionCheckHandler(() => false)
   ses.on('will-download', (event) => event.preventDefault())
@@ -180,6 +202,34 @@ export const SITE_SEARCH = {
 } as const
 type Site = keyof typeof SITE_SEARCH
 
+/**
+ * Small models get argument details slightly wrong ("YouTube", "youtube.com", only a query, "1" for 1, `index` for
+ * `item`). Normalise those before validation instead of rejecting them and letting the model loop.
+ */
+export function lenientOpen(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw
+  const r = { ...(raw as Record<string, unknown>) }
+  if (typeof r['site'] === 'string') {
+    const site = r['site'].trim().toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\.(com|org)\/?$/, '')
+    r['site'] = site === 'yt' ? 'youtube' : site
+    if (!(r['site'] as string in SITE_SEARCH)) {
+      // An unknown "site" that looks like a domain is really a url.
+      if (!r['url'] && /\./.test(r['site'] as string)) r['url'] = r['site']
+      delete r['site']
+    }
+  }
+  if (typeof r['url'] === 'string' && !/^https?:\/\//i.test(r['url'].trim())) r['url'] = `https://${r['url'].trim()}`
+  if (!r['url'] && !r['site'] && typeof r['query'] === 'string') r['site'] = 'google'
+  return r
+}
+
+export function lenientItem(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw
+  const r = { ...(raw as Record<string, unknown>) }
+  r['item'] ??= r['index'] ?? r['n'] ?? r['number'] ?? r['element'] ?? r['id']
+  return r
+}
+
 const openInput = z
   .object({
     url: z.url().max(2000).refine(isPublicWebUrl, 'Only public http(s) web addresses.').optional(),
@@ -187,6 +237,7 @@ const openInput = z
     query: z.string().trim().min(1).max(300).optional()
   })
   .refine((i) => i.url || i.site, 'Give a url, or a site (with an optional query).')
+const openArgs = z.preprocess(lenientOpen, openInput)
 
 /** Where web_open goes: the url, a site's search page, or the site's home page. */
 export function openTarget({ url, site, query }: z.infer<typeof openInput>): string {
@@ -230,7 +281,7 @@ export function webPlugin(notify: (title: string, body: string) => void = () => 
             url: { type: 'string', description: 'A full https address, instead of site' }
           }
         },
-        input: openInput,
+        input: openArgs,
         risk: 'act',
         describe: (i) => (i.url ? `Open ${new URL(i.url).host} in your browser` : `Open ${i.site}${i.query ? ` and search for “${i.query}”` : ''} in your browser`),
         async run(i) {
@@ -250,7 +301,7 @@ export function webPlugin(notify: (title: string, body: string) => void = () => 
             url: { type: 'string' }
           }
         },
-        input: openInput,
+        input: openArgs,
         risk: 'act',
         describe: (i) => (i.url ? `Open ${new URL(i.url).host} in Lumi’s browser` : `Open ${i.site}${i.query ? ` and search for “${i.query}”` : ''} in Lumi’s browser`),
         async run(i, signal) {
@@ -263,7 +314,7 @@ export function webPlugin(notify: (title: string, body: string) => void = () => 
         name: 'browser_click',
         description: 'Click item number n from the latest browser_open/browser_click list (a video, link or button) in Lumi’s browser.',
         parameters: { type: 'object', properties: { item: { type: 'integer', minimum: 1 } }, required: ['item'] },
-        input: z.object({ item: z.number().int().min(1).max(40) }),
+        input: z.preprocess(lenientItem, z.object({ item: z.coerce.number().int().min(1).max(40) })),
         risk: 'act',
         describe: ({ item }) => `Click item ${item} in Lumi’s browser`,
         async run({ item }) {
@@ -282,7 +333,7 @@ export function webPlugin(notify: (title: string, body: string) => void = () => 
           properties: { item: { type: 'integer', minimum: 1 }, text: { type: 'string' }, enter: { type: 'boolean' } },
           required: ['item', 'text']
         },
-        input: z.object({ item: z.number().int().min(1).max(40), text: z.string().max(2000), enter: z.boolean().default(true) }),
+        input: z.preprocess(lenientItem, z.object({ item: z.coerce.number().int().min(1).max(40), text: z.string().max(2000), enter: z.boolean().default(true) })),
         risk: 'act',
         describe: ({ item, text }) => `Type “${text.slice(0, 60)}” into field ${item} in Lumi’s browser`,
         async run({ item, text, enter }) {

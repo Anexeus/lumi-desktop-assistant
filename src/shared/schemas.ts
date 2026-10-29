@@ -30,8 +30,41 @@ export const voiceSettingsSchema = z
   })
   .strict()
 
+export const assistantNameSchema = z.string().trim().min(1).max(40)
+
+const pathSchema = z.string().min(3).max(1000)
+
+export const mcpServerSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+    name: z.string().trim().min(1).max(60),
+    command: z.string().max(1000),
+    args: z.array(z.string().max(1000)).max(50),
+    url: z.url().max(1000).refine((u) => /^https?:/.test(u), 'http(s) only').optional(),
+    trusted: z.boolean(),
+    enabled: z.boolean()
+  })
+  .strict()
+export const toolsSettingsSchema = z
+  .object({
+    folders: z.array(pathSchema).max(50),
+    apps: z.array(z.object({ name: z.string().trim().min(1).max(120), path: pathSchema }).strict()).max(100),
+    disabled: z.array(z.string().max(100)).max(100),
+    notifications: z.boolean()
+  })
+  .strict()
+
 export const settingsFileSchema = z
-  .object({ ai: aiSettingsSchema, islandVisible: z.boolean(), historyEnabled: z.boolean(), voice: voiceSettingsSchema })
+  .object({
+    assistantName: assistantNameSchema,
+    ai: aiSettingsSchema,
+    islandVisible: z.boolean(),
+    historyEnabled: z.boolean(),
+    voice: voiceSettingsSchema,
+    tools: toolsSettingsSchema,
+    mcp: z.array(mcpServerSchema).max(30),
+    claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict()
+  })
   .partial()
   .strict()
 
@@ -68,7 +101,28 @@ export const invokeSchemas = {
   [Invoke.voiceSetSettings]: voiceSettingsSchema,
   // ~25 MB is several minutes of 16 kHz mono; recordings stop at 60 s anyway.
   [Invoke.voiceTranscribe]: z.object({ wav: z.instanceof(Uint8Array).refine((b) => b.byteLength >= 44 && b.byteLength <= 25 * 1024 * 1024) }).strict(),
-  [Invoke.voiceSynthesize]: z.object({ text: z.string().trim().min(1).max(1000) }).strict()
+  [Invoke.voiceSynthesize]: z.object({ text: z.string().trim().min(1).max(1000) }).strict(),
+  [Invoke.setAssistantName]: z.object({ name: assistantNameSchema }).strict(),
+  [Invoke.windowControl]: z.object({ action: z.enum(['minimize', 'close']) }).strict(),
+  [Invoke.approvalRespond]: z.object({ id: z.number().int().positive(), decision: z.enum(['once', 'chat', 'deny']) }).strict(),
+  [Invoke.toolsAddFolder]: none,
+  [Invoke.toolsRemoveFolder]: z.object({ path: pathSchema }).strict(),
+  [Invoke.toolsAddApp]: z.object({ kind: z.enum(['app', 'folder']) }).strict(),
+  [Invoke.toolsRemoveApp]: z.object({ path: pathSchema }).strict(),
+  [Invoke.toolsSetPlugin]: z.object({ id: z.string().max(100), enabled: z.boolean() }).strict(),
+  [Invoke.toolsSetNotifications]: z.object({ value: z.boolean() }).strict(),
+  [Invoke.githubSetToken]: z.object({ token: z.string().trim().min(10).max(500).nullable() }).strict(),
+  [Invoke.mcpAdd]: z.object({ name: z.string().trim().min(1).max(60), target: z.string().trim().min(1).max(1000) }).strict(),
+  [Invoke.mcpRemove]: z.object({ id: z.string().max(40) }).strict(),
+  [Invoke.mcpUpdate]: z.object({ id: z.string().max(40), patch: z.object({ enabled: z.boolean().optional(), trusted: z.boolean().optional() }).strict() }).strict(),
+  [Invoke.mcpRestart]: z.object({ id: z.string().max(40) }).strict(),
+  [Invoke.claudeStart]: z
+    .object({ prompt: z.string().trim().min(1).max(8000), project: z.string().min(3).max(1000), mode: z.enum(['plan', 'manual', 'acceptEdits']) })
+    .strict(),
+  [Invoke.claudeCancel]: z.object({ id: z.string().max(40) }).strict(),
+  [Invoke.claudeChoosePath]: none,
+  [Invoke.claudeInstallHooks]: none,
+  [Invoke.claudeUninstallHooks]: none
 } as const
 
 export const sendSchemas = {

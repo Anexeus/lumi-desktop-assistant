@@ -79,10 +79,21 @@ hints are not trusted for the confirmation decision unless the user marks the se
 - Use only documented interfaces: hooks and `claude -p`. Never automate claude.ai and never read
   credential files.
 - Never pass `--permission-mode bypassPermissions` or `--dangerously-skip-permissions`.
-  Default to Manual with prompts bridged to the user.
+  Default to `plan` (read-only). `manual` denies anything that needs approval and reports it; `acceptEdits` must be
+  picked explicitly. A task the model starts (`claude_task`) always asks the user first.
+- Installing hooks edits `~/.claude/settings.json` only after the user turns it on, writes a timestamped backup first,
+  and uninstall removes only entries marked `lumi-desktop-assistant`.
 - `claude -p` runs a project's hooks and `.mcp.json` **without a trust prompt**. Only run tasks in
   folders the user explicitly approved, and show that warning when a folder is added.
 - The hook ingress binds `127.0.0.1` only, requires a per-install token, rate-limits requests, and validates payloads.
+
+## Release hardening
+
+- A packaged build exits when started with `--remote-debugging-port`, `--remote-debugging-pipe` or `--inspect*`
+  (Electron fuses already disable Node's inspect arguments, RunAsNode and NODE_OPTIONS).
+- A crashed renderer reloads at most 3 times; Lumi's web-reading window is never auto-reloaded.
+- Chat Markdown is parsed to data and rendered as React text nodes. No `innerHTML`, no links, no images.
+- The installer is not code-signed yet.
 
 ## Development-tool risks (this repo)
 

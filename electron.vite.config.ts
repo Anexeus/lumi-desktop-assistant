@@ -15,6 +15,7 @@ export default defineConfig({
     resolve: { alias: shared },
     plugins: [react()],
     build: {
+      minify: true,
       rolldownOptions: {
         input: {
           character: resolve('src/renderer/character.html'),

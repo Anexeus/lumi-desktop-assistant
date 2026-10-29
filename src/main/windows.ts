@@ -1,4 +1,5 @@
-import { app, BrowserWindow, nativeTheme, screen, type BrowserWindowConstructorOptions } from 'electron'
+import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron'
+import { release } from 'node:os'
 import { join } from 'node:path'
 import type { WindowName } from '@shared/ipc'
 import { devServerUrl } from './env'
@@ -21,9 +22,12 @@ const secureWebPreferences: BrowserWindowConstructorOptions['webPreferences'] = 
 }
 
 const panelSpecs: Record<WindowName, { title: string; width: number; height: number }> = {
-  chat: { title: 'Assistant — Chat', width: 400, height: 560 },
-  settings: { title: 'Assistant — Settings', width: 520, height: 560 }
+  chat: { title: 'Chat', width: 420, height: 620 },
+  settings: { title: 'Settings', width: 560, height: 680 }
 }
+
+/** Windows 11 22H2 (build 22621) and later can draw Acrylic behind a transparent window. */
+export const glassSupported = process.platform === 'win32' && Number(release().split('.')[2] ?? 0) >= 22621
 
 function loadPage(win: BrowserWindow, page: Page): Promise<void> {
   const url = devServerUrl ? `${devServerUrl}/${page}.html` : `${APP_SCHEME}://${APP_HOST}/${page}.html`
@@ -52,7 +56,7 @@ export class WindowManager {
     const { all, primary } = workAreas()
     this.character = new BrowserWindow({
       ...fitToDisplays(saved, all, primary),
-      title: 'Desktop Assistant',
+      title: 'Lumi',
       show: false,
       frame: false,
       transparent: true,
@@ -81,7 +85,7 @@ export class WindowManager {
 
     this.island = new BrowserWindow({
       ...this.islandBounds(false),
-      title: 'Desktop Assistant — Island',
+      title: 'Lumi — Island',
       show: false,
       frame: false,
       transparent: true,
@@ -224,15 +228,21 @@ export class WindowManager {
 
   private createPanel(name: WindowName): BrowserWindow {
     const spec = panelSpecs[name]
+    // Frosted glass: a frameless transparent window with the OS Acrylic material behind it. The page
+    // draws its own title bar (native title buttons turn Acrylic off). Transparent windows can't be
+    // resized on Windows, hence fixed sizes.
     const win = new BrowserWindow({
       title: spec.title,
       width: spec.width,
       height: spec.height,
-      minWidth: 320,
-      minHeight: 360,
       show: false,
-      autoHideMenuBar: true,
-      backgroundColor: nativeTheme.shouldUseDarkColors ? '#17161c' : '#f6f5f2',
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      ...(glassSupported ? { backgroundMaterial: 'acrylic' as const } : {}),
+      resizable: false,
+      maximizable: false,
+      fullscreenable: false,
       webPreferences: secureWebPreferences
     })
     win.on('close', (event) => {

@@ -1,7 +1,23 @@
 # Installation
 
-The application does not exist yet. This page covers the **development environment** as
-set up on 2026-10-29. End-user install steps arrive in Milestone 9.
+## Install Lumi (end users)
+
+1. Build the installer with `npm run package` (or take `Lumi Setup 0.1.0.exe` from a release). It is not code-signed yet, so
+   Windows SmartScreen asks: "More info" → "Run anyway". It installs per user; no admin rights needed.
+2. Install Ollama and the models (below). Lumi starts Ollama by itself if it is installed but not running.
+3. Optional: Settings → Tools to approve folders and apps, Settings → Integrations for GitHub and MCP servers,
+   Settings → Claude Code for task notifications.
+
+Uninstall from Windows Settings → Apps. Your chats, memories and settings stay in `%APPDATA%\Desktop Assistant`;
+delete that folder to remove them (or use Settings → Memory → "Delete all my data…" first).
+
+### Troubleshooting (app)
+- "Can't reach the AI": install Ollama, or start it from the Start menu.
+- Claude Code tasks fail with "not logged in": open a terminal, run `claude`, type /login.
+- "The notification port is busy": another program uses port 47821; restart Lumi after closing it.
+- Lumi refuses to start with `--remote-debugging-port`: that is intentional in installed builds.
+
+## Development environment (set up on 2026-10-29)
 
 ## Prerequisites
 

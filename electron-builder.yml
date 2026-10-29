@@ -1,5 +1,5 @@
 appId: dev.desktop-assistant.app
-productName: Desktop Assistant
+productName: Lumi
 directories:
   output: release
 files:
@@ -17,6 +17,7 @@ electronFuses:
   onlyLoadAppFromAsar: true
 win:
   target: nsis
+  icon: build/icon.ico
 nsis:
   oneClick: false
   perMachine: false

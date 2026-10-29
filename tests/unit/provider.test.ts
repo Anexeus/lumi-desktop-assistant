@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createThinkFilter, listModels, ProviderError, streamChat, type ProviderConfig } from '../../src/main/ai/provider'
+import { createThinkFilter, listModels, ProviderError, streamChat, type ProviderConfig, type StreamEvent } from '../../src/main/ai/provider'
 
 const cfg: ProviderConfig = { baseUrl: 'http://127.0.0.1:11434/v1/', model: 'qwen3:4b' }
 
@@ -29,9 +29,9 @@ function sseFetch(chunks: (string | { wait: number })[], init: { status?: number
 
 const data = (content: string): string => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\n\n`
 
-async function collect(gen: AsyncGenerator<string>): Promise<string> {
+async function collect(gen: AsyncGenerator<StreamEvent>): Promise<string> {
   let out = ''
-  for await (const t of gen) out += t
+  for await (const t of gen) if (typeof t === 'string') out += t
   return out
 }
 
@@ -120,6 +120,32 @@ describe('streamChat', () => {
 
     const stall = sseFetch([data('a'), { wait: 300 }, data('b')])
     expect((await errorOf(collect(streamChat(cfg, [], { fetchImpl: stall.impl, idleTimeoutMs: 50 })))).kind).toBe('timeout')
+  })
+
+  it('assembles tool calls sent in fragments and reports them at the end', async () => {
+    const part = (delta: unknown): string => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`
+    const { impl, calls } = sseFetch([
+      part({ content: 'Checking. ' }),
+      part({ tool_calls: [{ index: 0, id: 'call_1', function: { name: 'files_', arguments: '' } }] }),
+      part({ tool_calls: [{ index: 0, function: { name: 'search', arguments: '{"que' } }] }),
+      part({ tool_calls: [{ index: 0, function: { arguments: 'ry":"cv"}' } }] }),
+      part({ tool_calls: [{ index: 1, id: 'call_2', function: { name: 'notify_user', arguments: '{}' } }] }),
+      'data: [DONE]\n\n'
+    ])
+    const events: StreamEvent[] = []
+    const tools = [{ type: 'function' as const, function: { name: 'files_search', description: 'd', parameters: {} } }]
+    for await (const e of streamChat(cfg, [], { fetchImpl: impl, tools })) events.push(e)
+    expect(events).toEqual([
+      'Checking. ',
+      {
+        type: 'tool_calls',
+        calls: [
+          { id: 'call_1', name: 'files_search', arguments: '{"query":"cv"}' },
+          { id: 'call_2', name: 'notify_user', arguments: '{}' }
+        ]
+      }
+    ])
+    expect(JSON.parse(calls[0]!.init.body as string).tools).toEqual(tools)
   })
 
   it('surfaces an error event inside the stream', async () => {

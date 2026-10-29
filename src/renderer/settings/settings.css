@@ -1,30 +1,40 @@
-.settings {
-  max-width: 560px;
-  margin: 0 auto;
-  padding: 20px 24px 32px;
+.settings-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.settings h1 {
-  margin: 0 0 16px;
-  font-size: 20px;
-  font-weight: 650;
+.settings {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px 28px;
 }
 
 .settings section {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  padding: 6px 16px 10px;
+  background: var(--sheen), var(--glass);
+  border: 1px solid var(--rim);
   border-radius: var(--radius);
-  padding: 4px 16px;
-  margin-bottom: 16px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 40%),
+    0 6px 18px var(--shade);
+  backdrop-filter: blur(14px) saturate(170%);
 }
 
 .settings h2 {
-  margin: 12px 0 4px;
-  font-size: 12px;
-  font-weight: 650;
+  margin: 10px 0 4px;
+  font-size: 11.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+.settings h3 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .row {
@@ -32,15 +42,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 0;
+  padding: 11px 0;
   cursor: pointer;
 }
 
 .row + .row {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rim);
 }
 
-.row small {
+.row small,
+.field small {
   display: block;
   color: var(--muted);
   font-size: 12.5px;
@@ -49,86 +60,12 @@
 .row input {
   width: 18px;
   height: 18px;
-  accent-color: var(--accent);
-}
-
-.keys {
-  margin: 8px 0 12px;
-}
-
-.keys dt {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.keys dd {
-  margin: 2px 0 10px;
-}
-
-kbd {
-  font: 12px/1 var(--font);
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: 6px;
-  background: var(--surface-2);
-}
-
-.warn {
-  color: #c2410c;
-}
-
-.note {
-  color: var(--muted);
-  font-size: 12.5px;
-}
-
-.model {
-  padding: 8px 0 14px;
-}
-
-.model p {
-  margin: 4px 0;
-}
-
-.model-name {
-  font-weight: 600;
-}
-
-.model-name small,
-.model-license {
-  color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 400;
-}
-
-.model-actions {
-  display: flex;
-  gap: 8px;
-  margin: 10px 0 6px;
-}
-
-.secondary {
-  background: var(--surface-2);
-  color: var(--text);
-}
-
-.selectable {
-  user-select: text;
-  overflow-wrap: anywhere;
-}
-
-.ai {
-  padding: 6px 0 10px;
-}
-
-.presets {
-  margin: 6px 0 4px;
+  flex: none;
 }
 
 .field {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   margin: 10px 0;
   font-size: 13px;
 }
@@ -142,21 +79,72 @@ kbd {
   gap: 8px;
 }
 
-.field input {
+.inline > input,
+.field > input,
+.field > select {
   flex: 1;
   min-width: 0;
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 10px;
 }
 
-.settings h3 {
-  margin: 12px 0 4px;
+.keys {
+  margin: 8px 0 12px;
+}
+
+.keys dt {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.keys dd {
+  margin: 3px 0 10px;
+}
+
+.warn {
+  color: var(--warn);
   font-size: 13px;
+}
+
+.note,
+.model-license {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.model {
+  padding: 6px 0 12px;
+}
+
+.model p {
+  margin: 4px 0;
+}
+
+.model-name {
   font-weight: 600;
+}
+
+.model-name small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+
+.selectable {
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.ai {
+  padding: 4px 0 8px;
+}
+
+.presets {
+  margin: 6px 0 4px;
 }
 
 .data-list {
@@ -171,7 +159,7 @@ kbd {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--rim);
 }
 
 .data-list li > span {
@@ -185,28 +173,8 @@ kbd {
   font-size: 12px;
 }
 
-button.small {
-  padding: 4px 10px;
-  font-size: 12.5px;
-}
-
-button.danger {
-  background: #dc2626;
-  color: #fff;
-}
-
 .add-memory {
   margin: 12px 0 4px;
-}
-
-.add-memory select,
-.add-memory input {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 10px;
 }
 
 .add-memory input {
@@ -214,25 +182,10 @@ button.danger {
   min-width: 0;
 }
 
-.field select,
-.field input[type='range'] {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 7px 10px;
-}
-
-.field input[type='range'] {
-  padding: 0;
-  accent-color: var(--accent);
-}
-
 .meter {
   height: 8px;
   border-radius: 4px;
-  background: var(--surface-2);
+  background: var(--glass-strong);
   overflow: hidden;
   margin: 6px 0;
 }
@@ -240,6 +193,27 @@ button.danger {
 .meter span {
   display: block;
   height: 100%;
-  background: #16a34a;
+  background: linear-gradient(90deg, #22c55e, #84cc16);
   transition: width 60ms linear;
+}
+
+.plugins li input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.mcp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 12.5px;
+}
+
+.mcp-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
 }

@@ -22,8 +22,9 @@ const table: Record<CharacterState, Partial<Record<CharacterEvent, Target>>> = {
   IDLE: { listen: 'LISTENING', think: 'THINKING', speak: 'SPEAKING', work: 'WORKING', notify: 'NOTIFICATION', error: 'ERROR' },
   LISTENING: { think: 'THINKING', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
   THINKING: { speak: 'SPEAKING', work: 'WORKING', listen: 'LISTENING', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
-  SPEAKING: { listen: 'LISTENING', think: 'THINKING', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
-  WORKING: { speak: 'SPEAKING', notify: 'NOTIFICATION', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
+  SPEAKING: { listen: 'LISTENING', think: 'THINKING', work: 'WORKING', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
+  // After a tool runs, the model thinks again before answering.
+  WORKING: { speak: 'SPEAKING', think: 'THINKING', notify: 'NOTIFICATION', done: 'IDLE', cancel: 'IDLE', error: 'ERROR' },
   NOTIFICATION: {
     timeout: 'RESUME',
     cancel: 'RESUME',

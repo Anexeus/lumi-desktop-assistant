@@ -11,10 +11,10 @@ Each milestone ends with: tests run (results recorded in `CURRENT_STATE.md`), do
 | 3 | AI conversation | Provider interface, OpenAI-compatible adapter (Ollama default; Anthropic native adapter deferred), encrypted keys, streaming chat, cancel, timeouts, error states, **island quick-ask bar**. **Done 2026-10-29** |
 | 4 | Voice | Push-to-talk, mic selection, STT adapter, TTS (OS voices + cloud), interruption, lip sync. **Done 2026-10-29** (local via Ollama lfm3-audio, Windows-voice fallback, audio-driven mouth) |
 | 5 | Memory | SQLite, settings persistence, explicit notes and memories, optional history, data viewer + delete. **Done 2026-10-29** (project-specific context moves to Milestone 6 with approved folders) |
-| 6 | Tools | Plugin registry, PermissionBroker, fs search (approved roots, read-only), launcher allow-list, notifications |
-| 7 | External integrations | MCP client (approved servers), docs search, browser automation (visible, on request), GitHub (least privilege) |
-| 8 | Claude Code | Hook ingress + notifications, task runner (`claude -p` stream-json), progress, cancel, permission bridge |
-| 9 | Release | Animation polish, idle-performance budget, error recovery, full test pass, NSIS installer, install/troubleshooting docs |
+| 6 | Tools | Plugin registry, PermissionBroker, fs search (approved roots, read-only), launcher allow-list, notifications. **Done 2026-10-29** (plus web search/read in an isolated visible window) |
+| 7 | External integrations | MCP client (approved servers), docs search, browser automation (visible, on request), GitHub (least privilege). **Done 2026-10-29** (docs search and browser automation via the Context7 and Playwright MCP presets; real servers not run here) |
+| 8 | Claude Code | Hook ingress + notifications, task runner (`claude -p` stream-json), progress, cancel, permission bridge. **Done 2026-10-29** (permission bridge = plan/manual/acceptEdits modes with blocked actions reported, never bypass; real CLI not logged in here) |
+| 9 | Release | Animation polish, idle-performance budget, error recovery, full test pass, NSIS installer, install/troubleshooting docs. **Done 2026-10-29** (installer built, not run; unsigned) |
 
 ## Milestone 1 plan (implemented 2026-10-29; kept for reference)
 

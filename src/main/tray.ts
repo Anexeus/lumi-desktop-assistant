@@ -40,7 +40,7 @@ export function menuTemplate(state: AppState, actions: TrayActions): MenuItemCon
     { label: 'Open chat', click: actions.openChat },
     { label: 'Settings…', click: actions.openSettings },
     { type: 'separator' },
-    { label: 'Quit Desktop Assistant', click: actions.quit }
+    { label: `Quit ${state.assistantName}`, click: actions.quit }
   ]
 }
 
@@ -50,7 +50,7 @@ export function createTray(actions: TrayActions): { update(state: AppState): voi
   return {
     update(state) {
       const hint = state.shortcut.registered ? ` (${state.shortcut.accelerator} to show/hide)` : ''
-      tray.setToolTip(`Desktop Assistant${hint}`)
+      tray.setToolTip(`${state.assistantName}${hint}`)
       tray.setContextMenu(Menu.buildFromTemplate(menuTemplate(state, actions)))
     }
   }

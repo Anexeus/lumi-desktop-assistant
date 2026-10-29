@@ -5,8 +5,10 @@ import { Events, Invoke, Send, type AppState, type AssistantApi, type ChatEvent 
 const api: AssistantApi = {
   getState: () => ipcRenderer.invoke(Invoke.getState),
   setAlwaysOnTop: (value) => ipcRenderer.invoke(Invoke.setAlwaysOnTop, { value }),
+  setAssistantName: (name) => ipcRenderer.invoke(Invoke.setAssistantName, { name }),
   setCharacterVisible: (value) => ipcRenderer.invoke(Invoke.setCharacterVisible, { value }),
   openWindow: (name) => ipcRenderer.invoke(Invoke.openWindow, { name }),
+  windowControl: (action) => ipcRenderer.invoke(Invoke.windowControl, { action }),
   characterEvent: (event) => ipcRenderer.invoke(Invoke.characterEvent, { event }),
   onState(listener) {
     const handler = (_event: IpcRendererEvent, state: AppState): void => listener(state)
@@ -48,6 +50,29 @@ const api: AssistantApi = {
     setSettings: (settings) => ipcRenderer.invoke(Invoke.voiceSetSettings, settings),
     transcribe: (wav) => ipcRenderer.invoke(Invoke.voiceTranscribe, { wav }),
     synthesize: (text) => ipcRenderer.invoke(Invoke.voiceSynthesize, { text })
+  },
+  approve: (id, decision) => ipcRenderer.invoke(Invoke.approvalRespond, { id, decision }),
+  tools: {
+    addFolder: () => ipcRenderer.invoke(Invoke.toolsAddFolder),
+    removeFolder: (path) => ipcRenderer.invoke(Invoke.toolsRemoveFolder, { path }),
+    addApp: (kind) => ipcRenderer.invoke(Invoke.toolsAddApp, { kind }),
+    removeApp: (path) => ipcRenderer.invoke(Invoke.toolsRemoveApp, { path }),
+    setPluginEnabled: (id, enabled) => ipcRenderer.invoke(Invoke.toolsSetPlugin, { id, enabled }),
+    setNotifications: (value) => ipcRenderer.invoke(Invoke.toolsSetNotifications, { value })
+  },
+  integrations: {
+    setGithubToken: (token) => ipcRenderer.invoke(Invoke.githubSetToken, { token }),
+    addMcp: (name, target) => ipcRenderer.invoke(Invoke.mcpAdd, { name, target }),
+    removeMcp: (id) => ipcRenderer.invoke(Invoke.mcpRemove, { id }),
+    updateMcp: (id, patch) => ipcRenderer.invoke(Invoke.mcpUpdate, { id, patch }),
+    restartMcp: (id) => ipcRenderer.invoke(Invoke.mcpRestart, { id })
+  },
+  claude: {
+    start: (prompt, project, mode) => ipcRenderer.invoke(Invoke.claudeStart, { prompt, project, mode }),
+    cancel: (id) => ipcRenderer.invoke(Invoke.claudeCancel, { id }),
+    choosePath: () => ipcRenderer.invoke(Invoke.claudeChoosePath),
+    installHooks: () => ipcRenderer.invoke(Invoke.claudeInstallHooks),
+    uninstallHooks: () => ipcRenderer.invoke(Invoke.claudeUninstallHooks)
   },
   deleteAllData: () => ipcRenderer.invoke(Invoke.dataDeleteAll),
   onDataChanged(listener) {

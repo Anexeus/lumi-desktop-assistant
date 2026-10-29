@@ -13,6 +13,11 @@ describe('character state machine', () => {
     expect(run('listen', 'think', 'speak', 'done').state).toBe('IDLE')
   })
 
+  it('runs a tool turn: think, work, think again, speak', () => {
+    expect(run('think', 'work', 'think', 'speak', 'done').state).toBe('IDLE')
+    expect(run('think', 'speak', 'work').state).toBe('WORKING') // talked, then used a tool
+  })
+
   it('lets the user interrupt speech by talking', () => {
     expect(run('think', 'speak', 'listen').state).toBe('LISTENING')
   })

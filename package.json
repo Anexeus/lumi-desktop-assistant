@@ -1,6 +1,6 @@
 {
   "name": "desktop-assistant",
-  "productName": "Desktop Assistant",
+  "productName": "Lumi",
   "version": "0.1.0",
   "private": true,
   "description": "Windows desktop AI companion with a 3D character",
@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@pixiv/three-vrm": "3.5.5",
     "@playwright/test": "1.64.1",
     "@types/node": "24.19.2",

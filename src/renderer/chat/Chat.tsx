@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MicButton } from '../ui/MicButton'
+import { RichText } from '../ui/RichText'
+import { Approvals } from './Approvals'
+import { TasksPanel } from './TasksPanel'
+import { TitleBar } from '../ui/TitleBar'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 
@@ -8,9 +12,13 @@ export function Chat(): React.JSX.Element {
   const { items, status } = useConversation()
   const [draft, setDraft] = useState('')
   const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [showTasks, setShowTasks] = useState(false)
   const listEnd = useRef<HTMLDivElement>(null)
   // Busy while the text streams, and also while she is still saying it.
   const busy = status !== 'idle' || state?.character === 'SPEAKING'
+  useEffect(() => {
+    if (state) document.title = `${state.assistantName} — Chat`
+  }, [state])
 
   // Block body on purpose: newer Chromium returns a Promise from scrollIntoView, and React
   // would treat that return value as the effect's cleanup function.
@@ -34,35 +42,48 @@ export function Chat(): React.JSX.Element {
   const ai = state?.ai
   return (
     <main className="chat">
-      <header className="chat-header">
-        <h1>Assistant</h1>
-        <div className="header-actions">
-          {ai && (
-            <span className={`badge ${ai.local ? 'local' : 'cloud'}`} title={ai.baseUrl}>
-              {ai.model} · {ai.local ? 'on this PC' : 'cloud'}
-            </span>
-          )}
-          <button type="button" className="ghost" onClick={() => void window.assistant.chat.clear()} disabled={!items.length}>
-            New chat
-          </button>
-          <button type="button" className="ghost" onClick={() => void window.assistant.openWindow('settings')}>
-            Settings
-          </button>
-        </div>
-      </header>
+      <TitleBar title={state?.assistantName ?? 'Lumi'}>
+        {ai && (
+          <span className={`badge dot ${ai.local ? 'local' : 'cloud'}`} title={`${ai.model}: ${ai.local ? 'runs on this PC' : `cloud (${ai.baseUrl})`}`}>
+            <span className="visually-hidden">{ai.model}{ai.local ? ', on this PC' : ', cloud'}</span>
+          </span>
+        )}
+        <button type="button" className="ghost" onClick={() => setShowTasks((v) => !v)} aria-pressed={showTasks}>
+          Tasks{state?.claude.tasks.some((t) => t.status === 'running') ? ' •' : ''}
+        </button>
+        <button type="button" className="ghost" onClick={() => void window.assistant.chat.clear()} disabled={!items.length}>
+          New chat
+        </button>
+        <button type="button" className="ghost" onClick={() => void window.assistant.openWindow('settings')}>
+          Settings
+        </button>
+      </TitleBar>
 
+      {showTasks && state && <TasksPanel state={state} />}
       <section className="messages" aria-label="Conversation" aria-live="polite">
-        {items.length === 0 && <p className="empty">Ask me anything. Type /help for commands.</p>}
-        {items.map((m) => (
-          <p key={m.id} className={`bubble ${m.role}`}>
-            <span className="visually-hidden">{m.role === 'user' ? 'You: ' : m.role === 'error' ? 'Error: ' : 'Assistant: '}</span>
-            {m.text}
+        {items.length === 0 && (
+          <p className="empty">
+            <strong>Hi, I’m {state?.assistantName ?? 'Lumi'}</strong>
+            Ask me anything, or click the mic and talk. Type /help for commands.
           </p>
-        ))}
+        )}
+        {items.map((m) =>
+          m.role === 'tool' ? (
+            <p key={m.id} className="activity">
+              <span aria-hidden="true">◆</span> {m.text}
+            </p>
+          ) : (
+          <div key={m.id} className={`bubble ${m.role}`}>
+            <span className="visually-hidden">{m.role === 'user' ? 'You: ' : m.role === 'error' ? 'Error: ' : 'Assistant: '}</span>
+            {m.role === 'assistant' ? <RichText text={m.text} /> : m.text}
+          </div>
+          )
+        )}
         {status === 'thinking' && <p className="bubble assistant typing" aria-label="Assistant is thinking">…</p>}
         <div ref={listEnd} />
       </section>
 
+      {state && <Approvals requests={state.approvals} />}
       {voiceError && (
         <p className="cloud-note" role="alert">
           {voiceError}

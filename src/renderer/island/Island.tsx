@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MicButton } from '../ui/MicButton'
+import { RichText } from '../ui/RichText'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 
@@ -16,7 +17,7 @@ export function Island(): React.JSX.Element {
   const busy = status !== 'idle' || state?.character === 'SPEAKING'
 
   const lastUser = [...items].reverse().find((i) => i.role === 'user')
-  const lastReply = lastUser ? items.find((i) => i.id > lastUser.id && i.role !== 'user') : undefined
+  const lastReply = lastUser ? [...items].reverse().find((i) => i.id > lastUser.id && (i.role === 'assistant' || i.role === 'error')) : undefined
 
   useEffect(() => {
     if (expanded) input.current?.focus()
@@ -46,11 +47,11 @@ export function Island(): React.JSX.Element {
       ? 'Thinking…'
       : status === 'streaming' && lastReply
         ? tail(lastReply.text, 46)
-        : 'Ask your assistant…'
+        : `Ask ${state?.assistantName ?? 'Lumi'}…`
 
   if (!expanded) {
     return (
-      <button type="button" className="pill" onClick={() => setExpanded(true)} aria-label={`Assistant: ${label}. Open quick ask.`}>
+      <button type="button" className={`pill liquid ${status}`} onClick={() => setExpanded(true)} aria-label={`Assistant: ${label}. Open quick ask.`}>
         <span className={`dot ${status}`} aria-hidden="true" />
         <span className="pill-text">{label}</span>
         {state?.islandShortcut.registered && <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' ')}</kbd>}
@@ -59,10 +60,10 @@ export function Island(): React.JSX.Element {
   }
 
   return (
-    <section className="panel" aria-label="Quick ask" onKeyDown={onKeyDown}>
+    <section className="panel liquid" aria-label="Quick ask" onKeyDown={onKeyDown}>
       <header>
         <span className={`dot ${status}`} aria-hidden="true" />
-        <span className="panel-title">{state ? `${state.ai.model}${state.ai.local ? '' : ' · cloud'}` : 'Assistant'}</span>
+        <span className="panel-title">{state ? `${state.assistantName} · ${state.ai.model}${state.ai.local ? '' : ' · cloud'}` : 'Lumi'}</span>
         <button type="button" className="link" onClick={() => void window.assistant.openWindow('chat')}>
           Open chat
         </button>
@@ -76,7 +77,9 @@ export function Island(): React.JSX.Element {
           <>
             <p className="you">{lastUser.text}</p>
             {lastReply ? (
-              <p className={lastReply.role === 'error' ? 'reply error' : 'reply'}>{lastReply.text}</p>
+              <div className={lastReply.role === 'error' ? 'reply error' : 'reply'}>
+                {lastReply.role === 'assistant' ? <RichText text={lastReply.text} /> : lastReply.text}
+              </div>
             ) : (
               <p className="reply muted">{busy ? 'Thinking…' : ''}</p>
             )}

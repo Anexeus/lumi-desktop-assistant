@@ -1,10 +1,28 @@
 // OpenAI-compatible chat streaming (Ollama, LM Studio, Groq, Gemini, OpenRouter, OpenAI…).
 // Pure apart from `fetch`, which is injectable for tests.
 
-export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
+export interface ToolCall {
+  id: string
+  name: string
+  /** Raw JSON text from the model; parse and validate before use. */
+  arguments: string
 }
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string
+  tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[]
+  tool_call_id?: string
+}
+
+/** OpenAI "function" tool description sent to the model. */
+export interface ToolSpec {
+  type: 'function'
+  function: { name: string; description: string; parameters: Record<string, unknown> }
+}
+
+/** A streamed reply: text chunks, then (if the model wants tools) one tool_calls event at the end. */
+export type StreamEvent = string | { type: 'tool_calls'; calls: ToolCall[] }
 
 export interface ProviderConfig {
   baseUrl: string // e.g. http://127.0.0.1:11434/v1
@@ -30,6 +48,7 @@ export interface StreamOptions {
   firstTokenTimeoutMs?: number
   /** Longest silence allowed between chunks once streaming. */
   idleTimeoutMs?: number
+  tools?: ToolSpec[]
 }
 
 const headers = (cfg: ProviderConfig): Record<string, string> => ({
@@ -89,9 +108,9 @@ async function describeHttpError(res: Response, cfg: ProviderConfig): Promise<Pr
   return new ProviderError('http', `The AI service returned an error (${res.status})${detail ? `: ${detail}` : '.'}`)
 }
 
-/** Streams the assistant's reply as text chunks. Throws ProviderError. */
-export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], opts: StreamOptions = {}): AsyncGenerator<string> {
-  const { signal, fetchImpl = fetch, firstTokenTimeoutMs = 120_000, idleTimeoutMs = 60_000 } = opts
+/** Streams the assistant's reply as text chunks, then any tool calls. Throws ProviderError. */
+export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], opts: StreamOptions = {}): AsyncGenerator<StreamEvent> {
+  const { signal, fetchImpl = fetch, firstTokenTimeoutMs = 120_000, idleTimeoutMs = 60_000, tools } = opts
   const controller = new AbortController()
   let timedOut = false
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -120,7 +139,7 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
       res = await fetchImpl(endpoint(cfg, '/chat/completions'), {
         method: 'POST',
         headers: headers(cfg),
-        body: JSON.stringify({ model: cfg.model, messages, stream: true }),
+        body: JSON.stringify({ model: cfg.model, messages, stream: true, ...(tools?.length ? { tools } : {}) }),
         signal: controller.signal
       })
     } catch (error) {
@@ -132,6 +151,10 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     const filter = createThinkFilter()
+    // Tool calls arrive in fragments keyed by index (name first, arguments in pieces).
+    const calls = new Map<number, ToolCall>()
+    const finishCalls = (): StreamEvent | undefined =>
+      calls.size ? { type: 'tool_calls', calls: [...calls.values()].filter((c) => c.name) } : undefined
     let buffer = ''
     for (;;) {
       let chunk: Awaited<ReturnType<typeof reader.read>>
@@ -140,7 +163,11 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
       } catch (error) {
         throw fail(error)
       }
-      if (chunk.done) break
+      if (chunk.done) {
+        const tail = finishCalls()
+        if (tail) yield tail
+        return
+      }
       buffer += decoder.decode(chunk.value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
@@ -148,14 +175,35 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
         const line = raw.trim()
         if (!line.startsWith('data:')) continue
         const data = line.slice(5).trim()
-        if (data === '[DONE]') return
-        let json: { choices?: { delta?: { content?: string | null } }[]; error?: { message?: string } }
+        if (data === '[DONE]') {
+          const tail = finishCalls()
+          if (tail) yield tail
+          return
+        }
+        let json: {
+          choices?: {
+            delta?: {
+              content?: string | null
+              tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[]
+            }
+          }[]
+          error?: { message?: string }
+        }
         try {
           json = JSON.parse(data)
         } catch {
           continue // tolerate keep-alive or vendor-specific lines
         }
         if (json.error) throw new ProviderError('http', json.error.message?.slice(0, 300) ?? 'The AI service reported an error.')
+        for (const part of json.choices?.[0]?.delta?.tool_calls ?? []) {
+          const i = part.index ?? 0
+          const call = calls.get(i) ?? { id: '', name: '', arguments: '' }
+          if (part.id) call.id = part.id
+          if (part.function?.name) call.name += part.function.name
+          if (part.function?.arguments) call.arguments += part.function.arguments
+          calls.set(i, call)
+          arm(idleTimeoutMs)
+        }
         // Reasoning fields (delta.reasoning / reasoning_content) are deliberately ignored.
         const text = filter(json.choices?.[0]?.delta?.content ?? '')
         if (!text) continue

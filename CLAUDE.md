@@ -33,7 +33,10 @@ model: `ai.spec.ts` uses an in-test fake server. Live Ollama check: `OLLAMA_TEST
 AI requests, the conversation and API keys live in main (`src/main/ai/`, `settings.ts`); renderers never see a key.
 Storage is `node:sqlite` in `src/main/storage/` (no native deps). Voice uses the AI server's `/audio/*` endpoints (`src/main/ai/voice.ts`);
 the character window speaks replies (`speaker.ts`) and sends "done" itself while voice output is on.
-Pure renderer helpers that unit tests import (gestures, speech, wav) must be listed in `tsconfig.node.json`.
+Pure renderer helpers that unit tests import (gestures, speech, wav, markdown) must be listed in `tsconfig.node.json`.
+Tools live in `src/main/tools/` (every act-risk tool goes through `PermissionBroker`); Claude Code in `src/main/claude/`.
+E2E fakes the Claude CLI and hook config with `DESKTOP_ASSISTANT_FAKE_CLAUDE`, `_NODE`, `_CLAUDE_SETTINGS`, `_HOOK_PORT`
+(unpackaged only): never point tests at the real `~/.claude/settings.json`.
 
 ## Assets and licenses
 No third-party models, motions, or audio without a license that allows redistribution. YUI is

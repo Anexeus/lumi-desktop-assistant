@@ -1,6 +1,6 @@
 # Architecture
 
-Status: **proposal** (Milestone 0). Nothing below is implemented yet. See `CURRENT_STATE.md`.
+Status: implemented through Milestone 9. `CURRENT_STATE.md` says what was verified and how; where this page and the code differ, the code and ADRs win.
 
 ## Shape
 

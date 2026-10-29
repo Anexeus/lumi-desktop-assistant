@@ -125,3 +125,37 @@ No background listening. The mic opens on click and closes on click, Esc or 60 s
 ## ADR-027 Procedural gestures, one at a time, over the state pose (2026-10-29)
 Wave, nod, stretch, look-around and tilt are pure offset functions with a smooth envelope (tested to start and end at rest),
 plus talking hands weighted by the SPEAKING state. They need no motion files, so there's no asset licensing.
+
+## ADR-028 Lumi name, with `userData` pinned to the old folder (2026-10-29)
+The product is called Lumi (user-renameable). Electron derives `userData` from `productName`, so renaming would have
+silently "lost" everyone's chats and settings. `userData` is pinned to `%APPDATA%\Desktop Assistant`.
+
+## ADR-029 Liquid glass = Windows acrylic + CSS layers, no library (2026-10-29)
+Chat and settings use `backgroundMaterial: 'acrylic'` on frameless transparent windows (Windows 11 22621+), with CSS
+tint, rim light and sheen on top and a custom title bar (native buttons look wrong on acrylic). No glass library: the
+ones we looked at are web-only shaders or React wrappers around `backdrop-filter`, which this already is. Older Windows
+gets an opaque fallback.
+
+## ADR-030 One PermissionBroker; read runs, act asks (2026-10-29)
+Every tool declares `risk: 'read' | 'act'`. Read tools run without asking, act tools wait for the user (once / this chat /
+deny, 2 min → deny). Decisions live in main and reset on New chat. Tool results are wrapped as untrusted data. The model
+never gets a shell, arguments for apps, or paths outside approved folders.
+
+## ADR-031 MCP SDK bundled as a devDependency (2026-10-29)
+`@modelcontextprotocol/sdk` is the reference client and handles stdio, Streamable HTTP and the protocol versions.
+electron-vite bundles it into main, so it is a devDependency and `zod` stays the only runtime dependency (ADR-013).
+Shortcut: SSE-only (legacy) servers are not supported; add if someone needs one.
+
+## ADR-032 Web reading in a visible, isolated window (2026-10-29)
+`web_read` loads public pages in a normal, visible BrowserWindow on its own `lumi-web` session partition (no shared
+cookies, downloads blocked, private and local addresses refused, sandboxed) and extracts text. Visible on purpose: the
+user sees what Lumi reads. Search uses DuckDuckGo's HTML page (no API key).
+
+## ADR-033 Claude Code bridge: plan by default, fake CLI in tests (2026-10-29)
+Tasks run the user's own `claude -p` with `stream-json` and an explicit permission mode (default `plan`), never bypass,
+`shell: false`, only in approved folders. Hooks are optional, backed up, and token-authenticated. Tests swap the CLI
+for `tests/fixtures/fake-claude.mjs` via env vars that packaged builds ignore, so no test needs a Claude login.
+
+## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
+Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
+nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.

@@ -2,6 +2,7 @@ import { app, net, protocol, session } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { devOrigin } from './env'
 import { APP_HOST, APP_SCHEME, PROD_CSP, devCsp, isTrustedUrl, resolveBundlePath } from './policy'
+import { browserContents, isPublicWebUrl } from './tools/web'
 
 /** Must run before `app.whenReady()`. */
 export function registerAppScheme(): void {
@@ -54,7 +55,9 @@ export function hardenSession(allowMic: (contents: Electron.WebContents) => bool
 export function hardenWebContents(): void {
   app.on('web-contents-created', (_event, contents) => {
     const block = (event: { preventDefault(): void }, url: string): void => {
-      if (!isTrustedUrl(url, devOrigin)) {
+      // The app's own pages never navigate away; Lumi's browser window may go to public web pages only.
+      const allowed = browserContents.has(contents) ? isPublicWebUrl(url) : isTrustedUrl(url, devOrigin)
+      if (!allowed) {
         event.preventDefault()
         console.warn(`Blocked navigation to ${url}`)
       }
@@ -63,5 +66,12 @@ export function hardenWebContents(): void {
     contents.on('will-redirect', block)
     contents.on('will-attach-webview', (event) => event.preventDefault())
     contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    let crashes = 0
+    contents.on('render-process-gone', (_e, details) => {
+      // Recover our own windows from a renderer crash; give up after a few so a crash loop can't spin.
+      if (details.reason === 'clean-exit' || browserContents.has(contents) || ++crashes > 3) return
+      console.warn(`Renderer ${details.reason}; reloading`)
+      contents.reload()
+    })
   })
 }

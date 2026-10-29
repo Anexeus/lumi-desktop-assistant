@@ -1,8 +1,9 @@
 import { app, safeStorage } from 'electron'
+import { randomBytes } from 'node:crypto'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
-import type { AiSettings, VoiceSettings } from '@shared/ipc'
+import type { AiSettings, ApprovedApp, McpServerConfig, VoiceSettings } from '@shared/ipc'
 import type { Store } from './storage/store'
 
 export const DEFAULT_AI: AiSettings = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:4b' }
@@ -33,11 +34,25 @@ export function importLegacyJson(store: Store, file: string, key: string): void 
   rmSync(path(file), { force: true })
 }
 
+export const DEFAULT_NAME = 'Lumi'
+
+export interface ToolsSettings {
+  folders: string[]
+  apps: ApprovedApp[]
+  disabled: string[]
+  notifications: boolean
+}
+export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true }
+
 export interface Settings {
+  assistantName: string
   ai: AiSettings
   islandVisible: boolean
   historyEnabled: boolean
   voice: VoiceSettings
+  tools: ToolsSettings
+  mcp: McpServerConfig[]
+  claude: { path: string; hookToken: string }
 }
 
 export function loadSettings(store: Store): Settings {
@@ -45,10 +60,14 @@ export function loadSettings(store: Store): Settings {
   const parsed = settingsFileSchema.safeParse(store.getJson('settings'))
   const file: SettingsFile = parsed.success ? parsed.data : {}
   return {
+    assistantName: file.assistantName ?? DEFAULT_NAME,
     ai: file.ai ?? DEFAULT_AI,
     islandVisible: file.islandVisible ?? true,
     historyEnabled: file.historyEnabled ?? true,
-    voice: file.voice ?? DEFAULT_VOICE
+    voice: file.voice ?? DEFAULT_VOICE,
+    tools: file.tools ?? DEFAULT_TOOLS,
+    mcp: file.mcp ?? [],
+    claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') }
   }
 }
 

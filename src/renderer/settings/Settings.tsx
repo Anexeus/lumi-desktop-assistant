@@ -1,7 +1,11 @@
 import { useState } from 'react'
+import { TitleBar } from '../ui/TitleBar'
 import { useAppState } from '../ui/useAppState'
 import { AiSettings } from './AiSettings'
 import { MemorySettings } from './MemorySettings'
+import { ClaudeSettings } from './ClaudeSettings'
+import { IntegrationsSettings } from './IntegrationsSettings'
+import { ToolsSettings } from './ToolsSettings'
 import { VoiceSettings } from './VoiceSettings'
 
 export function Settings(): React.JSX.Element {
@@ -21,8 +25,26 @@ export function Settings(): React.JSX.Element {
   const { model } = state
 
   return (
-    <main className="settings">
-      <h1>Settings</h1>
+    <div className="settings-shell">
+      <TitleBar title={`${state.assistantName} · Settings`} />
+      <main className="settings">
+
+      <section aria-labelledby="name-heading">
+        <h2 id="name-heading">Assistant</h2>
+        <label className="field">
+          <span>Name</span>
+          <input
+            defaultValue={state.assistantName}
+            maxLength={40}
+            onBlur={(e) => {
+              const name = e.target.value.trim()
+              if (name && name !== state.assistantName) void window.assistant.setAssistantName(name)
+              else e.target.value = state.assistantName
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          />
+        </label>
+      </section>
 
       <AiSettings ai={state.ai} />
 
@@ -99,6 +121,12 @@ export function Settings(): React.JSX.Element {
         </div>
       </section>
 
+      <ToolsSettings tools={state.tools} />
+
+      <IntegrationsSettings integrations={state.integrations} />
+
+      <ClaudeSettings claude={state.claude} />
+
       <MemorySettings state={state} />
 
       <section aria-labelledby="keys-heading">
@@ -121,7 +149,8 @@ export function Settings(): React.JSX.Element {
         </dl>
       </section>
 
-      <p className="note">Tools (files, apps) and the Claude Code bridge are added in later milestones.</p>
-    </main>
+      
+      </main>
+    </div>
   )
 }

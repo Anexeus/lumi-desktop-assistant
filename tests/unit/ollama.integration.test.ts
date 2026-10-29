@@ -18,6 +18,7 @@ describe.skipIf(!process.env['OLLAMA_TEST'])('Ollama (live)', () => {
       { role: 'system', content: 'Answer in one short sentence.' },
       { role: 'user', content: 'Say hello and tell me what 2 + 2 is.' }
     ])) {
+      if (typeof t !== 'string') continue
       if (!firstAt) firstAt = Date.now()
       text += t
       chunks++

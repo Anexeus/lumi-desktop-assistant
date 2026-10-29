@@ -74,7 +74,7 @@ test.beforeAll(async () => {
         res.on('close', () => clearInterval(timer))
         return
       }
-      const parts = ['<think>private reasoning</think>', 'Hello', ' from', ' fake']
+      const parts = ['<think>private reasoning</think>', '(test)', ' fake', ' reply'] // obviously not a real model
       // A short pause before the first token, like a real model "thinking".
       parts.forEach((p, i) => setTimeout(() => res.write(chunk(p)), 400 + 60 * i))
       setTimeout(() => res.end('data: [DONE]\n\n'), 400 + 60 * parts.length)
@@ -136,7 +136,7 @@ test('chat streams a reply, hides reasoning and animates the character', async (
   })
   await chat.getByRole('textbox', { name: 'Message' }).fill('hi there')
   await chat.keyboard.press('Enter')
-  await expect(chat.locator('.bubble.assistant')).toHaveText('Assistant: Hello from fake')
+  await expect(chat.locator('.bubble.assistant')).toHaveText('Assistant: (test) fake reply')
   await expect.poll(characterState).toBe('IDLE')
   expect(await character.evaluate(() => (window as unknown as { __states: string[] }).__states)).toEqual(['THINKING', 'SPEAKING', 'IDLE'])
   await expect(chat.getByText('private reasoning')).toHaveCount(0)
@@ -145,7 +145,7 @@ test('chat streams a reply, hides reasoning and animates the character', async (
   expect(last.model).toBe('fake-model')
   expect(last.messages[0]!.role).toBe('system')
   expect(last.messages.at(-1)).toEqual({ role: 'user', content: 'hi there' })
-  await expect(chat.locator('.badge')).toHaveText('fake-model · on this PC')
+  await expect(chat.locator('.badge')).toHaveText('fake-model, on this PC')
 })
 
 test('the island sits at the top centre, expands, answers and shares the conversation', async () => {
@@ -167,7 +167,7 @@ test('the island sits at the top centre, expands, answers and shares the convers
 
   await island.getByRole('textbox', { name: 'Message' }).fill('from the island')
   await island.keyboard.press('Enter')
-  await expect(island.locator('.reply')).toHaveText('Hello from fake')
+  await expect(island.locator('.reply')).toHaveText('(test) fake reply')
 
   // Escape cancels while a reply streams, so wait for the turn to finish before folding the island.
   await expect(island.getByRole('button', { name: 'Send' })).toBeVisible()
@@ -254,7 +254,7 @@ test('/remember saves a memory the AI then receives; secrets are refused', async
   expect(requests.length).toBe(before) // commands never reach the AI
 
   const settings = await openPanel('settings')
-  await expect(settings.locator('.data-list').first()).toContainText('my cat is called Miso')
+  await expect(settings.getByRole('region', { name: 'Memory' }).locator('.data-list').first()).toContainText('my cat is called Miso')
   await expect(settings.getByText('hunter2')).toHaveCount(0)
 
   await chat.evaluate(() => window.assistant.chat.send('what is my cat called?'))
@@ -265,13 +265,13 @@ test('/remember saves a memory the AI then receives; secrets are refused', async
 test('the chat and memories survive a restart', async () => {
   const chat = await openPanel('chat')
   await chat.evaluate(() => window.assistant.chat.send('remember this chat'))
-  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: Hello from fake')
+  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
   await app.close()
   await launch()
 
   const again = await openPanel('chat')
   await expect(again.locator('.bubble.user').last()).toHaveText('You: remember this chat')
-  await expect(again.locator('.bubble.assistant').last()).toHaveText('Assistant: Hello from fake')
+  await expect(again.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
   expect((await again.evaluate(() => window.assistant.memory.list())).map((m) => m.text)).toContain('my cat is called Miso')
 })
 
@@ -315,9 +315,9 @@ test('replies are spoken: she stays SPEAKING until the audio ends', async () => 
   const before = speech.length
   await chat.evaluate(() => window.assistant.chat.send('say something'))
   await expect.poll(() => speech.length).toBe(before + 1)
-  expect(speech.at(-1)).toBe('Hello from fake') // the reasoning was never spoken
+  expect(speech.at(-1)).toBe('(test) fake reply') // the reasoning was never spoken
   // The text is done long before the 1.2 s clip, but she keeps talking until it ends.
-  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: Hello from fake')
+  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
   expect(await characterState()).toBe('SPEAKING')
   await expect(chat.getByRole('button', { name: 'Stop' })).toBeVisible()
   await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
@@ -330,7 +330,7 @@ test('Stop silences her mid-sentence', async () => {
   const chat = await openPanel('chat')
   await chat.evaluate(() => window.assistant.chat.send('talk for a while'))
   await expect.poll(characterState).toBe('SPEAKING')
-  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: Hello from fake')
+  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
   await chat.getByRole('button', { name: 'Stop' }).click()
   await expect.poll(characterState, { timeout: 2000 }).toBe('IDLE')
   speechSeconds = 0.3
@@ -347,7 +347,7 @@ test('push to talk: the mic records, is transcribed, and is sent as a message', 
   await chat.getByRole('button', { name: 'Stop and send voice message' }).click()
   await expect.poll(() => transcriptions).toBe(before + 1)
   await expect(chat.locator('.bubble.user').last()).toHaveText('You: hello from the mic')
-  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: Hello from fake')
+  await expect(chat.locator('.bubble.assistant').last()).toHaveText('Assistant: (test) fake reply')
   await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
 })
 

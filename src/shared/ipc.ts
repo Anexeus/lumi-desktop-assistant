@@ -6,8 +6,94 @@ export type WindowName = 'chat' | 'settings'
 
 export interface ChatItem {
   id: number
-  role: 'user' | 'assistant' | 'error'
+  /** "tool" items are activity lines ("Searched your folders for …"), not messages. */
+  role: 'user' | 'assistant' | 'error' | 'tool'
   text: string
+}
+
+export type ApprovalDecision = 'once' | 'chat' | 'deny'
+
+/** An action waiting for the user's OK. */
+export interface ApprovalRequest {
+  id: number
+  tool: string
+  title: string
+  detail: string
+}
+
+export interface ApprovedApp {
+  name: string
+  path: string
+}
+
+export interface PluginInfo {
+  id: string
+  name: string
+  version: string
+  description: string
+  permissions: string[]
+  tools: string[]
+  enabled: boolean
+}
+
+export interface McpServerConfig {
+  id: string
+  name: string
+  /** For a local (stdio) server. */
+  command: string
+  args: string[]
+  /** For a remote (HTTP) server instead of a command. */
+  url?: string
+  /** Lets the server's read-only tools run without asking. */
+  trusted: boolean
+  enabled: boolean
+}
+
+export interface McpServerInfo extends McpServerConfig {
+  status: 'off' | 'connecting' | 'ready' | 'error'
+  error?: string
+  tools: string[]
+}
+
+export interface IntegrationsState {
+  githubToken: boolean
+  mcp: McpServerInfo[]
+}
+
+/** plan = read-only planning; manual = anything needing approval is denied and reported; acceptEdits = may edit files. */
+export type ClaudeMode = 'plan' | 'manual' | 'acceptEdits'
+
+export interface ClaudeTask {
+  id: string
+  prompt: string
+  project: string
+  mode: ClaudeMode
+  status: 'running' | 'done' | 'failed' | 'canceled'
+  progress: string[]
+  result?: string
+  cost?: number
+  /** Actions Claude Code wanted but was not allowed in this mode. */
+  denials?: number
+  startedAt: number
+  endedAt?: number
+}
+
+export interface ClaudeState {
+  /** The CLI Lumi will run, or null if none was found. */
+  path: string | null
+  hooksInstalled: boolean
+  /** False if the hook port was taken. */
+  hookServer: boolean
+  tasks: ClaudeTask[]
+  /** Recent events from Claude Code hooks (newest first). */
+  events: { at: number; text: string }[]
+}
+
+export interface ToolsState {
+  plugins: PluginInfo[]
+  folders: string[]
+  apps: ApprovedApp[]
+  notifications: boolean
 }
 
 export interface ChatSnapshot {
@@ -77,6 +163,10 @@ export interface ModelInfo {
 }
 
 export interface AppState {
+  /** True when the OS draws frosted glass (Windows 11 22H2+ Acrylic) behind the panels. */
+  glass: boolean
+  /** What the assistant is called (default "Lumi"). */
+  assistantName: string
   characterVisible: boolean
   alwaysOnTop: boolean
   shortcut: { accelerator: string; registered: boolean }
@@ -89,6 +179,10 @@ export interface AppState {
   /** Save chats so they survive restarts. Turning it off keeps what is saved until deleted. */
   historyEnabled: boolean
   voice: VoiceSettings
+  tools: ToolsState
+  approvals: ApprovalRequest[]
+  integrations: IntegrationsState
+  claude: ClaudeState
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -124,7 +218,26 @@ export const Invoke = {
   dataDeleteAll: 'data:delete-all',
   voiceSetSettings: 'voice:set-settings',
   voiceTranscribe: 'voice:transcribe',
-  voiceSynthesize: 'voice:synthesize'
+  voiceSynthesize: 'voice:synthesize',
+  setAssistantName: 'app:set-assistant-name',
+  windowControl: 'window:control',
+  approvalRespond: 'approval:respond',
+  toolsAddFolder: 'tools:add-folder',
+  toolsRemoveFolder: 'tools:remove-folder',
+  toolsAddApp: 'tools:add-app',
+  toolsRemoveApp: 'tools:remove-app',
+  toolsSetPlugin: 'tools:set-plugin',
+  toolsSetNotifications: 'tools:set-notifications',
+  githubSetToken: 'github:set-token',
+  mcpAdd: 'mcp:add',
+  mcpRemove: 'mcp:remove',
+  mcpUpdate: 'mcp:update',
+  mcpRestart: 'mcp:restart',
+  claudeStart: 'claude:start',
+  claudeCancel: 'claude:cancel',
+  claudeChoosePath: 'claude:choose-path',
+  claudeInstallHooks: 'claude:install-hooks',
+  claudeUninstallHooks: 'claude:uninstall-hooks'
 } as const
 
 /** Renderer → main, fire-and-forget (ipcRenderer.send). Character window only. */
@@ -151,8 +264,11 @@ export const Events = {
 export interface AssistantApi {
   getState(): Promise<AppState>
   setAlwaysOnTop(value: boolean): Promise<AppState>
+  setAssistantName(name: string): Promise<AppState>
   setCharacterVisible(value: boolean): Promise<AppState>
   openWindow(name: WindowName): Promise<void>
+  /** Chat and Settings only (they draw their own glass title bar). */
+  windowControl(action: 'minimize' | 'close'): Promise<void>
   /** Feeds the character state machine. Events that don't apply in the current state are ignored. */
   characterEvent(event: CharacterEvent): Promise<AppState>
   /** Returns state updates. Call the returned function to unsubscribe. */
@@ -194,6 +310,36 @@ export interface AssistantApi {
     transcribe(wav: Uint8Array): Promise<TranscribeResult>
     /** Character and Settings windows only: text → WAV audio. */
     synthesize(text: string): Promise<SpeechResult>
+  }
+  /** Answer a pending action request (Allow once / Allow for this chat / Deny). */
+  approve(id: number, decision: ApprovalDecision): Promise<void>
+  tools: {
+    /** Opens a folder picker; the chosen folder becomes searchable (read-only). */
+    addFolder(): Promise<AppState>
+    removeFolder(path: string): Promise<AppState>
+    /** Opens a file picker for an app (.exe/.lnk) or a folder kind 'folder'. */
+    addApp(kind: 'app' | 'folder'): Promise<AppState>
+    removeApp(path: string): Promise<AppState>
+    setPluginEnabled(id: string, enabled: boolean): Promise<AppState>
+    setNotifications(enabled: boolean): Promise<AppState>
+  }
+  integrations: {
+    /** Stored encrypted; null removes it. Use a read-only fine-grained token. */
+    setGithubToken(token: string | null): Promise<AppState>
+    /** A command line (local server) or an https URL (remote server). */
+    addMcp(name: string, target: string): Promise<AppState>
+    removeMcp(id: string): Promise<AppState>
+    updateMcp(id: string, patch: { enabled?: boolean; trusted?: boolean }): Promise<AppState>
+    restartMcp(id: string): Promise<AppState>
+  }
+  claude: {
+    /** Runs a task with the user's own Claude Code CLI, in an approved folder. Never bypasses permissions. */
+    start(prompt: string, project: string, mode: ClaudeMode): Promise<AppState>
+    cancel(id: string): Promise<AppState>
+    choosePath(): Promise<AppState>
+    /** Adds Lumi's hooks to ~/.claude/settings.json (backed up first). */
+    installHooks(): Promise<{ ok: true; backup: string | null } | { ok: false; message: string }>
+    uninstallHooks(): Promise<AppState>
   }
   /** Deletes all saved chats, memories and notes (not settings or the API key). */
   deleteAllData(): Promise<void>

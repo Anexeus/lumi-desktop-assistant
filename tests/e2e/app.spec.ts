@@ -85,12 +85,15 @@ test('renderer has no Node access and only the typed API', async () => {
   expect(result.process).toBe('undefined')
   expect(result.api).toEqual([
     'ai',
+    'approve',
     'character',
     'characterEvent',
     'chat',
+    'claude',
     'deleteAllData',
     'getState',
     'history',
+    'integrations',
     'island',
     'memory',
     'model',
@@ -98,9 +101,12 @@ test('renderer has no Node access and only the typed API', async () => {
     'onState',
     'openWindow',
     'setAlwaysOnTop',
+    'setAssistantName',
     'setCharacterVisible',
     'setIslandVisible',
-    'voice'
+    'tools',
+    'voice',
+    'windowControl'
   ])
 })
 
@@ -283,6 +289,20 @@ test('navigation away from the app is blocked', async () => {
   await character.waitForTimeout(500)
   expect(character.url()).toBe('app://bundle/character.html')
   expect(await character.evaluate(() => typeof window.assistant)).toBe('object')
+})
+
+test('a crashed window reloads itself', async () => {
+  await panel('chat')
+  const chatContents = (fn: string) =>
+    app.evaluate(async ({ BrowserWindow }, code) => {
+      const wc = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith('/chat.html'))!.webContents
+      if (code === 'crash') return wc.forcefullyCrashRenderer(), null
+      return wc.isCrashed() || wc.isLoading() ? null : await wc.executeJavaScript(code)
+    }, fn)
+  await chatContents("document.body.dataset.beforeCrash = '1'")
+  await chatContents('crash')
+  // Playwright loses its handle to a crashed page, so check the reload through main.
+  await expect.poll(() => chatContents("typeof window.assistant + ':' + ('beforeCrash' in document.body.dataset)").catch(() => null)).toBe('object:false')
 })
 
 test('no uncaught renderer errors', () => {

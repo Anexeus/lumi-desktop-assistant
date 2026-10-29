@@ -19,8 +19,19 @@ export const aiSettingsSchema = z
   .object({ baseUrl: baseUrlSchema, model: z.string().trim().min(1).max(200) })
   .strict()
 
+export const voiceSettingsSchema = z
+  .object({
+    output: z.enum(['local', 'system', 'off']),
+    input: z.boolean(),
+    model: z.string().trim().min(1).max(200),
+    voice: z.string().trim().max(200),
+    speed: z.number().min(0.5).max(2),
+    micId: z.string().max(500)
+  })
+  .strict()
+
 export const settingsFileSchema = z
-  .object({ ai: aiSettingsSchema, islandVisible: z.boolean() })
+  .object({ ai: aiSettingsSchema, islandVisible: z.boolean(), historyEnabled: z.boolean(), voice: voiceSettingsSchema })
   .partial()
   .strict()
 
@@ -45,7 +56,19 @@ export const invokeSchemas = {
   [Invoke.chatClear]: none,
   [Invoke.aiSetSettings]: aiSettingsSchema,
   [Invoke.aiSetApiKey]: z.object({ key: z.string().trim().min(1).max(1000).nullable() }).strict(),
-  [Invoke.aiListModels]: z.object({ baseUrl: baseUrlSchema.optional() }).strict()
+  [Invoke.aiListModels]: z.object({ baseUrl: baseUrlSchema.optional() }).strict(),
+  [Invoke.memoryList]: none,
+  [Invoke.memoryAdd]: z.object({ kind: z.enum(['memory', 'note']), text: z.string().max(2000) }).strict(),
+  [Invoke.memoryDelete]: z.object({ id: z.number().int().positive() }).strict(),
+  [Invoke.historyList]: none,
+  [Invoke.historyDelete]: z.object({ id: z.number().int().positive() }).strict(),
+  [Invoke.historyDeleteAll]: none,
+  [Invoke.historySetEnabled]: z.object({ value: z.boolean() }).strict(),
+  [Invoke.dataDeleteAll]: none,
+  [Invoke.voiceSetSettings]: voiceSettingsSchema,
+  // ~25 MB is several minutes of 16 kHz mono; recordings stop at 60 s anyway.
+  [Invoke.voiceTranscribe]: z.object({ wav: z.instanceof(Uint8Array).refine((b) => b.byteLength >= 44 && b.byteLength <= 25 * 1024 * 1024) }).strict(),
+  [Invoke.voiceSynthesize]: z.object({ text: z.string().trim().min(1).max(1000) }).strict()
 } as const
 
 export const sendSchemas = {

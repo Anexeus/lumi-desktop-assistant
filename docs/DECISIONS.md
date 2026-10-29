@@ -34,9 +34,9 @@ auth for third-party products.
 Decision: Status comes from hooks into a loopback ingress. Tasks run through the user's own `claude -p` in Manual
 permission mode with prompts bridged to the app. Agent SDK + API key is an optional later adapter.
 
-## ADR-007 SQLite driver (pending, Milestone 5)
-Options: `node:sqlite` (no native build) vs better-sqlite3 13 (needs an Electron rebuild).
-Decide after checking Electron 45's bundled Node for `node:sqlite` stability.
+## ADR-007 SQLite driver: `node:sqlite` (decided 2026-10-29)
+Checked: Electron 45 bundles Node 24.22.1 with SQLite 3.53.4; `node:sqlite` works with no flags or warnings, in the app and
+in Vitest (Node 24). Decision: use it. No new dependency and no native module to rebuild or ship.
 
 ## ADR-008 Agent-skills subset instead of full plugin (2026-10-29)
 Decision: 10 skills, project scope, per `DEVELOPMENT_TOOLS.md` §D. This saves always-on context and
@@ -107,3 +107,21 @@ address never sends the saved key. A key can therefore never leak to another ser
 ## ADR-023 Keep qwen3's default reasoning and filter it (2026-10-29)
 Measured: `reasoning_effort: "none"` → reasoning in the visible answer, 10 s. Default → clean answer, 1.2 s.
 Decision: Send no reasoning options. Strip `<think>` and ignore reasoning fields.
+
+## ADR-024 Voice through Ollama's OpenAI-compatible audio endpoints (2026-10-29)
+Context: Chromium's speech recognition does not work in Electron (Google-backed). The goal is free and local.
+Ollama 0.40 exposes `/v1/audio/transcriptions` and `/v1/audio/speech`, and the official `lfm3-audio` (2B) does both directions.
+Decision: Use them through the same AI address, with the Windows voice (`speechSynthesis`) as the fallback. Any
+OpenAI-compatible service (OpenAI, Groq for STT) works by changing the address. No speech code or model ships with the app.
+
+## ADR-025 The character window ends SPEAKING when voice is on (2026-10-29)
+Spoken audio outlasts the streamed text. Main suppresses the conversation's "done" while voice output is on; the character
+window sends it after the last sentence. Any other way out of SPEAKING (Stop, new message, error) stops the audio.
+
+## ADR-026 Push to talk only, recorded as 16 kHz WAV in the renderer (2026-10-29)
+No background listening. The mic opens on click and closes on click, Esc or 60 s. The renderer downsamples and encodes WAV
+(STT models expect it) and main forwards it. Shortcut: ScriptProcessorNode (deprecated) instead of an AudioWorklet.
+
+## ADR-027 Procedural gestures, one at a time, over the state pose (2026-10-29)
+Wave, nod, stretch, look-around and tilt are pure offset functions with a smooth envelope (tested to start and end at rest),
+plus talking hands weighted by the SPEAKING state. They need no motion files, so there's no asset licensing.

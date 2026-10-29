@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAppState } from '../ui/useAppState'
 import { AiSettings } from './AiSettings'
+import { MemorySettings } from './MemorySettings'
+import { VoiceSettings } from './VoiceSettings'
 
 export function Settings(): React.JSX.Element {
   const state = useAppState()
@@ -23,6 +25,8 @@ export function Settings(): React.JSX.Element {
       <h1>Settings</h1>
 
       <AiSettings ai={state.ai} />
+
+      <VoiceSettings voice={state.voice} />
 
       <section aria-labelledby="character-heading">
         <h2 id="character-heading">Character</h2>
@@ -95,6 +99,8 @@ export function Settings(): React.JSX.Element {
         </div>
       </section>
 
+      <MemorySettings state={state} />
+
       <section aria-labelledby="keys-heading">
         <h2 id="keys-heading">Keyboard</h2>
         <dl className="keys">
@@ -115,7 +121,7 @@ export function Settings(): React.JSX.Element {
         </dl>
       </section>
 
-      <p className="note">Voice, memory and tools are added in later milestones.</p>
+      <p className="note">Tools (files, apps) and the Claude Code bridge are added in later milestones.</p>
     </main>
   )
 }

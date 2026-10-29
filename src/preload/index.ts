@@ -33,6 +33,28 @@ const api: AssistantApi = {
     setApiKey: (key) => ipcRenderer.invoke(Invoke.aiSetApiKey, { key }),
     listModels: (baseUrl) => ipcRenderer.invoke(Invoke.aiListModels, baseUrl ? { baseUrl } : {})
   },
+  memory: {
+    list: () => ipcRenderer.invoke(Invoke.memoryList),
+    add: (kind, text) => ipcRenderer.invoke(Invoke.memoryAdd, { kind, text }),
+    delete: (id) => ipcRenderer.invoke(Invoke.memoryDelete, { id })
+  },
+  history: {
+    list: () => ipcRenderer.invoke(Invoke.historyList),
+    delete: (id) => ipcRenderer.invoke(Invoke.historyDelete, { id }),
+    deleteAll: () => ipcRenderer.invoke(Invoke.historyDeleteAll),
+    setEnabled: (value) => ipcRenderer.invoke(Invoke.historySetEnabled, { value })
+  },
+  voice: {
+    setSettings: (settings) => ipcRenderer.invoke(Invoke.voiceSetSettings, settings),
+    transcribe: (wav) => ipcRenderer.invoke(Invoke.voiceTranscribe, { wav }),
+    synthesize: (text) => ipcRenderer.invoke(Invoke.voiceSynthesize, { text })
+  },
+  deleteAllData: () => ipcRenderer.invoke(Invoke.dataDeleteAll),
+  onDataChanged(listener) {
+    const handler = (): void => listener()
+    ipcRenderer.on(Events.dataChanged, handler)
+    return () => ipcRenderer.removeListener(Events.dataChanged, handler)
+  },
   model: {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),

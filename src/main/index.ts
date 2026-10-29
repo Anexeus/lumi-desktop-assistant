@@ -2,12 +2,15 @@ import { app, BrowserWindow, dialog, globalShortcut, Menu, screen, type MenuItem
 import { join } from 'node:path'
 import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent, type CharacterState } from '@shared/character'
 import { Events, Invoke, Send, type AppState, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
+import { runCommand, saveMemory } from './ai/commands'
 import { Conversation } from './ai/conversation'
 import { listModels, ProviderError, streamChat } from './ai/provider'
+import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
 import { DEFAULT_MODEL, importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
-import { getSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
+import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
+import { openStore } from './storage/store'
 import { menuTemplate, createTray, type TrayActions } from './tray'
 import type { VrmMeta } from './vrm-meta'
 import { loadWindowState, saveWindowState } from './window-state'
@@ -37,15 +40,22 @@ if (!app.requestSingleInstanceLock()) {
 async function start(): Promise<void> {
   app.setAppUserModelId('dev.desktop-assistant.app')
   Menu.setApplicationMenu(null)
-  hardenSession()
+  // Push-to-talk: the microphone, audio only, for the chat and island windows while voice input is on.
+  // Settings may also open it, to test the mic and read device names.
+  hardenSession(
+    (contents) =>
+      settings.voice.input &&
+      (windows.isPanel(contents, 'chat') || windows.isPanel(contents, 'settings') || contents === windows.island.webContents)
+  )
   hardenWebContents()
   serveBundle(join(__dirname, '../renderer'))
 
-  const saved = loadWindowState()
-  const settings = loadSettings()
+  const store = openStore(join(app.getPath('userData'), 'assistant.db'))
+  const saved = loadWindowState(store)
+  const settings = loadSettings(store)
   const aiStatus = (): AppState['ai'] => ({
     ...settings.ai,
-    hasApiKey: !!getSecret(API_KEY),
+    hasApiKey: hasSecret(API_KEY),
     local: isLocalUrl(settings.ai.baseUrl)
   })
   const custom = await readCustomModel()
@@ -66,10 +76,12 @@ async function start(): Promise<void> {
     islandVisible: settings.islandVisible,
     islandExpanded: false,
     islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: false },
-    ai: aiStatus()
+    ai: aiStatus(),
+    historyEnabled: settings.historyEnabled,
+    voice: settings.voice
   }
 
-  const persist = (): void => saveWindowState({ character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
+  const persist = (): void => saveWindowState(store, { character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
 
   const windows = new WindowManager(
     saved.character,
@@ -98,8 +110,8 @@ async function start(): Promise<void> {
     }
     if (state.islandVisible !== prev.islandVisible) {
       windows.setIslandVisible(state.islandVisible)
-      saveSettings({ ...settings, islandVisible: state.islandVisible })
       settings.islandVisible = state.islandVisible
+      saveSettings(store, settings)
     }
     tray.update(state)
     for (const win of windows.allWindows()) win.webContents.send(Events.state, state)
@@ -129,12 +141,42 @@ async function start(): Promise<void> {
   const broadcastChat = (event: ChatEvent): void => {
     for (const win of windows.allWindows()) win.webContents.send(Events.chat, event)
   }
+  const notifyData = (): void => {
+    for (const win of windows.allWindows()) win.webContents.send(Events.dataChanged)
+  }
+  // The row for the chat on screen is created on its first saved message; "New chat" starts another.
+  let conversationId: number | undefined
   const conversation = new Conversation({
-    stream: (messages, signal) => streamChat({ ...settings.ai, apiKey: getSecret(API_KEY) }, messages, { signal }),
+    async *stream(messages, signal) {
+      yield* streamChat({ ...settings.ai, apiKey: await getSecret(API_KEY) }, messages, { signal })
+    },
     onSnapshot: (snapshot) => broadcastChat({ type: 'snapshot', snapshot }),
     onDelta: (id, text) => broadcastChat({ type: 'delta', id, text }),
-    onCharacter: (event) => fire(event)
+    // With voice on, the character window says when speaking is over (the audio outlasts the text stream).
+    onCharacter: (event) => (event === 'done' && settings.voice.output !== 'off' ? undefined : fire(event)),
+    memories: () => store.listMemories().filter((m) => m.kind === 'memory').map((m) => m.text),
+    onPersist(message) {
+      if (!settings.historyEnabled) return
+      conversationId ??= store.createConversation()
+      store.addMessage(conversationId, message)
+      notifyData()
+    }
   })
+  if (settings.historyEnabled) {
+    const last = store.latestConversation()
+    if (last) {
+      conversationId = last.id
+      conversation.restore(last.messages)
+    }
+  }
+  const newChat = (): void => {
+    conversation.clear()
+    conversationId = undefined
+  }
+  const addMemory = (kind: 'memory' | 'note', text: string): void => {
+    store.addMemory(kind, text)
+    notifyData()
+  }
 
   const fromCharacter = (sender: Electron.WebContents): boolean => sender === windows.character.webContents
 
@@ -173,26 +215,85 @@ async function start(): Promise<void> {
   })
   handle(Invoke.chatGet, () => conversation.snapshot())
   handle(Invoke.chatSend, ({ text }) => {
+    const reply = runCommand(text, addMemory)
+    if (reply !== null) return conversation.addLocal(text, reply)
     void conversation.send(text) // replies stream back as chat events
   })
-  handle(Invoke.chatCancel, () => conversation.cancel())
-  handle(Invoke.chatClear, () => conversation.clear())
-  handle(Invoke.aiSetSettings, (next) => {
+  handle(Invoke.chatCancel, () => {
+    conversation.cancel()
+    fire('cancel') // also stops her talking if the text already finished but the voice has not
+  })
+  handle(Invoke.chatClear, () => newChat())
+  handle(Invoke.aiSetSettings, async (next) => {
     // A key belongs to one service: never send it to a different host after the address changes.
-    if (new URL(next.baseUrl).origin !== new URL(settings.ai.baseUrl).origin) setSecret(API_KEY, null)
+    if (new URL(next.baseUrl).origin !== new URL(settings.ai.baseUrl).origin) await setSecret(API_KEY, null)
     settings.ai = next
-    saveSettings(settings)
+    saveSettings(store, settings)
     return setState({ ai: aiStatus() })
   })
-  handle(Invoke.aiSetApiKey, ({ key }) => {
-    setSecret(API_KEY, key)
+  handle(Invoke.aiSetApiKey, async ({ key }) => {
+    await setSecret(API_KEY, key)
     return setState({ ai: aiStatus() })
+  })
+  handle(Invoke.memoryList, () => store.listMemories())
+  handle(Invoke.memoryAdd, ({ kind, text }) => saveMemory(addMemory, kind, text))
+  handle(Invoke.memoryDelete, ({ id }) => {
+    store.deleteMemory(id)
+    notifyData()
+  })
+  handle(Invoke.historyList, () => store.listConversations())
+  handle(Invoke.historyDelete, ({ id }) => {
+    store.deleteConversation(id)
+    if (id === conversationId) newChat() // the chat on screen was just deleted
+    notifyData()
+  })
+  handle(Invoke.historyDeleteAll, () => {
+    store.deleteAllConversations()
+    newChat()
+    notifyData()
+  })
+  handle(Invoke.historySetEnabled, ({ value }) => {
+    settings.historyEnabled = value
+    saveSettings(store, settings)
+    if (!value) conversationId = undefined // turning it back on starts a fresh saved chat
+    return setState({ historyEnabled: value })
+  })
+  handle(Invoke.voiceSetSettings, (voice) => {
+    settings.voice = voice
+    saveSettings(store, settings)
+    return setState({ voice })
+  })
+  const voiceConfig = async () => ({ baseUrl: settings.ai.baseUrl, model: settings.voice.model, apiKey: await getSecret(API_KEY) })
+  handle(Invoke.voiceTranscribe, async ({ wav }, e) => {
+    const allowed = settings.voice.input && (windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)
+    if (!allowed) throw new Error('Rejected voice:transcribe: voice input is off or not allowed from this window')
+    try {
+      return { ok: true as const, text: await transcribe(await voiceConfig(), wav) }
+    } catch (error) {
+      return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not understand the recording.' }
+    }
+  })
+  handle(Invoke.voiceSynthesize, async ({ text }, e) => {
+    // The character speaks replies; Settings plays the "Test voice" sample.
+    if (!fromCharacter(e.sender) && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected voice:synthesize: not allowed from this window')
+    try {
+      const audio = await synthesize({ ...(await voiceConfig()), voice: settings.voice.voice, speed: settings.voice.speed }, text)
+      return { ok: true as const, audio }
+    } catch (error) {
+      return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not speak.' }
+    }
+  })
+  handle(Invoke.dataDeleteAll, () => {
+    store.deleteAllConversations()
+    store.deleteAllMemories()
+    newChat()
+    notifyData()
   })
   handle(Invoke.aiListModels, async ({ baseUrl }): Promise<ListModelsResult> => {
     const url = baseUrl ?? settings.ai.baseUrl
     const sameService = new URL(url).origin === new URL(settings.ai.baseUrl).origin
     try {
-      const models = await listModels({ baseUrl: url, model: settings.ai.model, apiKey: sameService ? getSecret(API_KEY) : undefined })
+      const models = await listModels({ baseUrl: url, model: settings.ai.model, apiKey: sameService ? await getSecret(API_KEY) : undefined })
       return { ok: true, models }
     } catch (error) {
       return { ok: false, message: error instanceof ProviderError ? error.message : 'Could not list models.' }
@@ -269,5 +370,8 @@ async function start(): Promise<void> {
     persist()
     windows.markQuitting()
   })
-  app.on('will-quit', () => globalShortcut.unregisterAll())
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll()
+    store.close()
+  })
 }

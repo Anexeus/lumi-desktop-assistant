@@ -1,5 +1,6 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -87,14 +88,19 @@ test('renderer has no Node access and only the typed API', async () => {
     'character',
     'characterEvent',
     'chat',
+    'deleteAllData',
     'getState',
+    'history',
     'island',
+    'memory',
     'model',
+    'onDataChanged',
     'onState',
     'openWindow',
     'setAlwaysOnTop',
     'setCharacterVisible',
-    'setIslandVisible'
+    'setIslandVisible',
+    'voice'
   ])
 })
 
@@ -160,8 +166,11 @@ test('settings toggle always-on-top and persist it', async () => {
   await expect(toggle).not.toBeChecked()
 
   await expect.poll(() => characterWindow((w) => w.isAlwaysOnTop())).toBe(false)
-  const saved = JSON.parse(readFileSync(join(userData, 'window-state.json'), 'utf8'))
-  expect(saved.alwaysOnTop).toBe(false)
+  // Settings live in SQLite now; read the committed row straight from the database file.
+  const db = new DatabaseSync(join(userData, 'assistant.db'), { readOnly: true })
+  const row = db.prepare("SELECT value FROM kv WHERE key = 'windowState'").get() as { value: string }
+  db.close()
+  expect(JSON.parse(row.value).alwaysOnTop).toBe(false)
 
   await toggle.click()
   await expect(toggle).toBeChecked()

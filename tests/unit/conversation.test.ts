@@ -6,11 +6,12 @@ import { ProviderError, type ChatMessage } from '../../src/main/ai/provider'
 
 type Script = (messages: ChatMessage[], signal: AbortSignal) => AsyncGenerator<string>
 
-function setup(script: Script) {
+function setup(script: Script, memories: string[] = []) {
   const events: CharacterEvent[] = []
   const snapshots: ChatSnapshot[] = []
   const deltas: string[] = []
   const sent: ChatMessage[][] = []
+  const saved: string[] = []
   const conv = new Conversation({
     stream: (m, s) => {
       sent.push(m)
@@ -18,9 +19,11 @@ function setup(script: Script) {
     },
     onSnapshot: (s) => snapshots.push(s),
     onDelta: (_id, t) => deltas.push(t),
-    onCharacter: (e) => events.push(e)
+    onCharacter: (e) => events.push(e),
+    memories: () => memories,
+    onPersist: (m) => saved.push(`${m.role}:${m.text}`)
   })
-  return { conv, events, snapshots, deltas, sent }
+  return { conv, events, snapshots, deltas, sent, saved }
 }
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
@@ -118,6 +121,70 @@ describe('Conversation', () => {
     conv.clear()
     await p
     expect(conv.snapshot()).toEqual({ items: [], status: 'idle' })
+    expect(events).toEqual(['think', 'speak', 'cancel'])
+  })
+
+  it('saves each finished message once, in order, including interrupted and cancelled replies', async () => {
+    let n = 0
+    const { conv, saved } = setup((_m, s) => (n++ === 0 ? slow(s) : reply('second answer')))
+    const first = conv.send('first')
+    await wait(20)
+    await conv.send('second')
+    await first
+    expect(saved).toEqual(['user:first', 'assistant:first ', 'user:second', 'assistant:second answer'])
+  })
+
+  it('does not save a reply that was running when the chat was cleared', async () => {
+    const { conv, saved } = setup((_m, s) => slow(s))
+    const p = conv.send('hi')
+    await wait(20)
+    conv.clear()
+    await p
+    expect(saved).toEqual(['user:hi'])
+  })
+
+  it('does not save errors', async () => {
+    const { conv, saved } = setup(() => fails(new ProviderError('http', 'boom')))
+    await conv.send('hi')
+    expect(saved).toEqual(['user:hi'])
+  })
+
+  it('restores saved messages and continues the same history', async () => {
+    const { conv, sent } = setup(() => reply('ok'))
+    conv.restore([
+      { role: 'user', text: 'earlier question' },
+      { role: 'assistant', text: 'earlier answer' }
+    ])
+    expect(conv.snapshot().items.map((i) => i.text)).toEqual(['earlier question', 'earlier answer'])
+    await conv.send('next')
+    expect(sent[0]!.slice(1).map((m) => m.content)).toEqual(['earlier question', 'earlier answer', 'next'])
+  })
+
+  it('adds local exchanges without calling the AI', async () => {
+    const { conv, sent, saved, events } = setup(() => reply('never'))
+    conv.addLocal('/remember I like tea', 'Got it.')
+    expect(sent).toEqual([])
+    expect(events).toEqual([])
+    expect(saved).toEqual(['user:/remember I like tea', 'assistant:Got it.'])
+  })
+
+  it('puts memories in the system prompt, capped in size', async () => {
+    const { conv, sent } = setup(() => reply('ok'), ['I like tea', 'x'.repeat(3000)])
+    await conv.send('hi')
+    const system = sent[0]![0]!.content
+    expect(system).toContain('- I like tea')
+    expect(system).not.toContain('x'.repeat(3000))
+  })
+
+  it('a command while a reply streams stops that reply and keeps the order', async () => {
+    const { conv, events, saved } = setup((_m, s) => slow(s))
+    const p = conv.send('long question')
+    await wait(20)
+    conv.addLocal('/remember tea', 'Got it.')
+    await p
+    expect(conv.snapshot().status).toBe('idle')
+    expect(conv.snapshot().items.map((i) => i.text)).toEqual(['long question', 'first ', '/remember tea', 'Got it.'])
+    expect(saved).toEqual(['user:long question', 'assistant:first ', 'user:/remember tea', 'assistant:Got it.'])
     expect(events).toEqual(['think', 'speak', 'cancel'])
   })
 })

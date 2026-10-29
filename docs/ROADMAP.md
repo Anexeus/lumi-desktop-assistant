@@ -9,8 +9,8 @@ Each milestone ends with: tests run (results recorded in `CURRENT_STATE.md`), do
 | 1 | Desktop shell | Transparent always-on-top character window, chat + settings windows, tray, secure IPC skeleton, dev + production build verified, E2E smoke test. **Done 2026-10-29** (manual tray/shortcut/real-mouse check pending; see `CURRENT_STATE.md`) |
 | 2 | Character | VRM loads (user-provided or verified-license sample), idle, blink, gaze, expressions, state machine with tests, drag/resize, click-through hit-test. **Done 2026-10-29** (looks-in-motion check pending) |
 | 3 | AI conversation | Provider interface, OpenAI-compatible adapter (Ollama default; Anthropic native adapter deferred), encrypted keys, streaming chat, cancel, timeouts, error states, **island quick-ask bar**. **Done 2026-10-29** |
-| 4 | Voice | Push-to-talk, mic selection, STT adapter, TTS (OS voices + cloud), interruption, lip sync |
-| 5 | Memory | SQLite, settings persistence, explicit notes and memories, optional history, data viewer + delete |
+| 4 | Voice | Push-to-talk, mic selection, STT adapter, TTS (OS voices + cloud), interruption, lip sync. **Done 2026-10-29** (local via Ollama lfm3-audio, Windows-voice fallback, audio-driven mouth) |
+| 5 | Memory | SQLite, settings persistence, explicit notes and memories, optional history, data viewer + delete. **Done 2026-10-29** (project-specific context moves to Milestone 6 with approved folders) |
 | 6 | Tools | Plugin registry, PermissionBroker, fs search (approved roots, read-only), launcher allow-list, notifications |
 | 7 | External integrations | MCP client (approved servers), docs search, browser automation (visible, on request), GitHub (least privilege) |
 | 8 | Claude Code | Hook ingress + notifications, task runner (`claude -p` stream-json), progress, cancel, permission bridge |

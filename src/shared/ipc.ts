@@ -18,6 +18,43 @@ export interface ChatSnapshot {
 /** Snapshots on structural changes; deltas append streamed text to one item. */
 export type ChatEvent = { type: 'snapshot'; snapshot: ChatSnapshot } | { type: 'delta'; id: number; text: string }
 
+export type MemoryKind = 'memory' | 'note'
+
+/** "memory" items are given to the AI with every message; "note" items are only kept for the user. */
+export interface MemoryItem {
+  id: number
+  kind: MemoryKind
+  text: string
+  createdAt: number
+}
+
+export interface ConversationSummary {
+  id: number
+  title: string
+  startedAt: number
+  updatedAt: number
+  messages: number
+}
+
+export type SaveResult = { ok: true } | { ok: false; message: string }
+
+export interface VoiceSettings {
+  /** How replies are spoken: Ollama's speech model, the built-in Windows voice, or not at all. */
+  output: 'local' | 'system' | 'off'
+  /** Push-to-talk microphone buttons. The mic is only ever open while recording. */
+  input: boolean
+  /** Speech model on the AI server (both directions), e.g. lfm3-audio. */
+  model: string
+  /** Voice name: for the Ollama model, or a Windows voice name. Empty = default. */
+  voice: string
+  speed: number
+  /** Microphone deviceId; empty = system default. */
+  micId: string
+}
+
+export type TranscribeResult = { ok: true; text: string } | { ok: false; message: string }
+export type SpeechResult = { ok: true; audio: Uint8Array } | { ok: false; message: string }
+
 export interface AiSettings {
   baseUrl: string
   model: string
@@ -49,6 +86,9 @@ export interface AppState {
   islandExpanded: boolean
   islandShortcut: { accelerator: string; registered: boolean }
   ai: AiStatus
+  /** Save chats so they survive restarts. Turning it off keeps what is saved until deleted. */
+  historyEnabled: boolean
+  voice: VoiceSettings
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -73,7 +113,18 @@ export const Invoke = {
   chatClear: 'chat:clear',
   aiSetSettings: 'ai:set-settings',
   aiSetApiKey: 'ai:set-api-key',
-  aiListModels: 'ai:list-models'
+  aiListModels: 'ai:list-models',
+  memoryList: 'memory:list',
+  memoryAdd: 'memory:add',
+  memoryDelete: 'memory:delete',
+  historyList: 'history:list',
+  historyDelete: 'history:delete',
+  historyDeleteAll: 'history:delete-all',
+  historySetEnabled: 'history:set-enabled',
+  dataDeleteAll: 'data:delete-all',
+  voiceSetSettings: 'voice:set-settings',
+  voiceTranscribe: 'voice:transcribe',
+  voiceSynthesize: 'voice:synthesize'
 } as const
 
 /** Renderer → main, fire-and-forget (ipcRenderer.send). Character window only. */
@@ -92,7 +143,9 @@ export const Events = {
   state: 'app:state',
   /** Cursor position relative to the character window's top-left, in DIPs. Character window only. */
   cursor: 'character:cursor',
-  chat: 'chat:event'
+  chat: 'chat:event',
+  /** Saved memories, notes or history changed; listeners re-fetch what they show. */
+  dataChanged: 'data:changed'
 } as const
 
 export interface AssistantApi {
@@ -123,6 +176,28 @@ export interface AssistantApi {
     /** Lists models at baseUrl (default: the saved one); doubles as a connection test. */
     listModels(baseUrl?: string): Promise<ListModelsResult>
   }
+  memory: {
+    list(): Promise<MemoryItem[]>
+    /** Refuses empty, over-long or secret-looking text with a readable message. */
+    add(kind: MemoryKind, text: string): Promise<SaveResult>
+    delete(id: number): Promise<void>
+  }
+  history: {
+    list(): Promise<ConversationSummary[]>
+    delete(id: number): Promise<void>
+    deleteAll(): Promise<void>
+    setEnabled(value: boolean): Promise<AppState>
+  }
+  voice: {
+    setSettings(settings: VoiceSettings): Promise<AppState>
+    /** A 16 kHz mono WAV recording → text. */
+    transcribe(wav: Uint8Array): Promise<TranscribeResult>
+    /** Character and Settings windows only: text → WAV audio. */
+    synthesize(text: string): Promise<SpeechResult>
+  }
+  /** Deletes all saved chats, memories and notes (not settings or the API key). */
+  deleteAllData(): Promise<void>
+  onDataChanged(listener: () => void): () => void
   model: {
     /** The user's model bytes, or null to use the bundled default. Character window only. */
     get(): Promise<Uint8Array | null>

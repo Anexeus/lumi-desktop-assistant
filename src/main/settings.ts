@@ -1,12 +1,12 @@
 import { app, safeStorage } from 'electron'
-import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
-import type { AiSettings } from '@shared/ipc'
-
-// shortcut: JSON files in userData, until Milestone 5 moves settings into SQLite.
+import type { AiSettings, VoiceSettings } from '@shared/ipc'
+import type { Store } from './storage/store'
 
 export const DEFAULT_AI: AiSettings = { baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen3:4b' }
+export const DEFAULT_VOICE: VoiceSettings = { output: 'local', input: true, model: 'lfm3-audio', voice: '', speed: 1, micId: '' }
 
 const path = (name: string): string => join(app.getPath('userData'), name)
 
@@ -24,19 +24,36 @@ function writeJson(name: string, value: unknown): void {
   renameSync(tmp, path(name))
 }
 
+/** One-time import of a pre-SQLite JSON file (Milestones 1–3) into the store, then removes the file. */
+export function importLegacyJson(store: Store, file: string, key: string): void {
+  if (store.getJson(key) !== undefined) return
+  const raw = readJson(file)
+  if (raw === undefined) return
+  store.setJson(key, raw)
+  rmSync(path(file), { force: true })
+}
+
 export interface Settings {
   ai: AiSettings
   islandVisible: boolean
+  historyEnabled: boolean
+  voice: VoiceSettings
 }
 
-export function loadSettings(): Settings {
-  const parsed = settingsFileSchema.safeParse(readJson('settings.json'))
+export function loadSettings(store: Store): Settings {
+  importLegacyJson(store, 'settings.json', 'settings')
+  const parsed = settingsFileSchema.safeParse(store.getJson('settings'))
   const file: SettingsFile = parsed.success ? parsed.data : {}
-  return { ai: file.ai ?? DEFAULT_AI, islandVisible: file.islandVisible ?? true }
+  return {
+    ai: file.ai ?? DEFAULT_AI,
+    islandVisible: file.islandVisible ?? true,
+    historyEnabled: file.historyEnabled ?? true,
+    voice: file.voice ?? DEFAULT_VOICE
+  }
 }
 
-export function saveSettings(settings: Settings): void {
-  writeJson('settings.json', settings)
+export function saveSettings(store: Store, settings: Settings): void {
+  store.setJson('settings', settings)
 }
 
 export function isLocalUrl(url: string): boolean {
@@ -51,21 +68,27 @@ function readSecrets(): Record<string, string> {
   return raw && typeof raw === 'object' ? (raw as Record<string, string>) : {}
 }
 
-export function setSecret(name: string, value: string | null): void {
+export function hasSecret(name: string): boolean {
+  return !!readSecrets()[name]
+}
+
+export async function setSecret(name: string, value: string | null): Promise<void> {
   const secrets = readSecrets()
   if (value === null) delete secrets[name]
   else {
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure storage is not available on this system.')
-    secrets[name] = safeStorage.encryptString(value).toString('base64')
+    if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error('Secure storage is not available on this system.')
+    secrets[name] = (await safeStorage.encryptStringAsync(value)).toString('base64')
   }
   writeJson(SECRETS, secrets)
 }
 
-export function getSecret(name: string): string | undefined {
+export async function getSecret(name: string): Promise<string | undefined> {
   const value = readSecrets()[name]
   if (!value) return undefined
   try {
-    return safeStorage.decryptString(Buffer.from(value, 'base64'))
+    const { result, shouldReEncrypt } = await safeStorage.decryptStringAsync(Buffer.from(value, 'base64'))
+    if (shouldReEncrypt) await setSecret(name, result) // the OS rotated the key
+    return result
   } catch {
     return undefined // e.g. copied from another machine or user: unreadable by design
   }

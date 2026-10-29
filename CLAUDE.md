@@ -31,6 +31,9 @@ Character window geometry uses **content bounds** only (window bounds drift on s
 E2E tests set `DESKTOP_ASSISTANT_USER_DATA` to isolate the profile (packaged builds ignore it) and must never need a real
 model: `ai.spec.ts` uses an in-test fake server. Live Ollama check: `OLLAMA_TEST=1 npx vitest run tests/unit/ollama.integration.test.ts`.
 AI requests, the conversation and API keys live in main (`src/main/ai/`, `settings.ts`); renderers never see a key.
+Storage is `node:sqlite` in `src/main/storage/` (no native deps). Voice uses the AI server's `/audio/*` endpoints (`src/main/ai/voice.ts`);
+the character window speaks replies (`speaker.ts`) and sends "done" itself while voice output is on.
+Pure renderer helpers that unit tests import (gestures, speech, wav) must be listed in `tsconfig.node.json`.
 
 ## Assets and licenses
 No third-party models, motions, or audio without a license that allows redistribution. YUI is

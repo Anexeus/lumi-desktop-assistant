@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { MicButton } from '../ui/MicButton'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 
@@ -8,10 +9,11 @@ export function Island(): React.JSX.Element {
   const state = useAppState()
   const { items, status } = useConversation()
   const [draft, setDraft] = useState('')
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
   const replyEnd = useRef<HTMLDivElement>(null)
   const expanded = state?.islandExpanded ?? false
-  const busy = status !== 'idle'
+  const busy = status !== 'idle' || state?.character === 'SPEAKING'
 
   const lastUser = [...items].reverse().find((i) => i.role === 'user')
   const lastReply = lastUser ? items.find((i) => i.id > lastUser.id && i.role !== 'user') : undefined
@@ -82,6 +84,11 @@ export function Island(): React.JSX.Element {
         ) : (
           <p className="reply muted">Ask a quick question. The full conversation is in the chat window.</p>
         )}
+        {voiceError && (
+          <p className="reply error" role="alert">
+            {voiceError}
+          </p>
+        )}
         <div ref={replyEnd} />
       </div>
 
@@ -98,6 +105,7 @@ export function Island(): React.JSX.Element {
           maxLength={8000}
           autoComplete="off"
         />
+        {state?.voice.input && <MicButton micId={state.voice.micId} onError={setVoiceError} />}
         {busy ? (
           <button type="button" onClick={() => void window.assistant.chat.cancel()}>
             Stop

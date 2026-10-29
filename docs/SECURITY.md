@@ -28,6 +28,18 @@ copied into userData, and their bytes are sent only to the character window. Unt
 Open item: a packaged exe still honors Chromium's `--remote-debugging-port` switch. Fuses don't cover it.
 Mitigate in Milestone 9 (e.g. refuse to start when the switch is present in a packaged build).
 
+## Microphone and voice (Milestone 4)
+
+Permission requests are denied except **audio-only** media for the chat, island and settings windows while voice input is on;
+video is always denied. The mic opens only while push-to-talk records. Transcription is accepted only from those windows,
+synthesis only from the character and settings windows. Audio goes only to the configured AI address (local by default).
+
+## Stored data (Milestone 5)
+
+Chats, memories, notes and settings are in `userData/assistant.db`, on this computer only. Memories and notes that look like
+passwords, keys, tokens or card numbers are refused (best effort). Chat history cannot be filtered that way, so it can be
+turned off and deleted per chat or all at once.
+
 ## Secrets
 
 Implemented (Milestone 3): keys go to `safeStorage` (DPAPI) in `userData/secrets.json`, renderers only ever see

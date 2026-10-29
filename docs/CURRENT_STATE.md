@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-10-29. Milestone 3 (AI conversation + island) implemented and verified; not committed yet. Milestones 1–2: `88ba70b`, `4bdeefd`._
+_Last updated: 2026-10-29. Milestones 4 (voice) and 5 (memory) and a livelier character are implemented and verified; not committed yet. Milestones 1–3: `88ba70b`, `4bdeefd`, `60e4209`._
 
 ## What exists
 - Electron 45 + electron-vite 6 + React 19 + TypeScript app (`src/main`, `src/preload`, `src/renderer`, `src/shared`).
@@ -22,7 +22,44 @@ _Last updated: 2026-10-29. Milestone 3 (AI conversation + island) implemented an
   with zod plus a sender-origin check, and character-only channels also check the sender window. Packaged fuses:
   RunAsNode off, NODE_OPTIONS off, inspect args off, ASAR integrity on, app loads only from asar.
 
-## Milestone 3: AI conversation + island (new)
+## Milestone 5: memory (new)
+- **SQLite** via Node's built-in `node:sqlite` (Electron 45 ships Node 24.22.1 / SQLite 3.53.4; no native module).
+  The file is `userData/assistant.db` (WAL mode, schema version 1). A file that can't be opened is renamed `*.unreadable-<time>`
+  (never deleted) and a fresh database is started.
+- **Settings and window positions** moved from JSON files into the database. Old `settings.json` and `window-state.json` are
+  imported once, then removed. API keys stay in their DPAPI-encrypted file, now using Electron 45's async `safeStorage` API.
+- **Chat history:** each chat is saved as it goes, and the last chat comes back after a restart. "New chat" keeps the old one.
+  It can be turned off in Settings (nothing more is saved; existing chats are kept until deleted).
+- **Memories and notes:** `/remember …` (given to the AI with every message, newest first, capped at 2,000 characters) and
+  `/note …` (only for you). `/help` lists the commands. Commands never reach the AI. Anything that looks like a password, key,
+  token or card number is refused.
+- **Settings → Memory / Chat history:** list, add and delete memories and notes; list and delete chats; delete all chats;
+  "Delete all my data…" (with confirmation) wipes chats, memories and notes, but keeps settings and the API key.
+
+## Milestone 4: voice (new)
+- **Free and local through Ollama:** Ollama 0.40's OpenAI-compatible `/v1/audio/transcriptions` and `/v1/audio/speech` endpoints,
+  with the official `lfm3-audio` model (1.7 GB, LFM Open License v1.0). Measured warm: transcription 0.2–1.3 s, a spoken
+  sentence ~0.4 s. qwen3:4b and lfm3-audio fit on the GPU together (3.2 + 1.4 GB). Cold loads take 12–23 s.
+- **Spoken replies:** the character window speaks each sentence as soon as it streams in, fetching the next sentence's audio
+  while the current one plays. Markdown, code, URLs and emoji are not read out. Her **mouth follows the real audio
+  loudness**. She stays SPEAKING until the audio ends, because with voice on the character window (not the text stream)
+  sends "done". Stop, a new message or the mic cuts her off instantly. If the Ollama voice fails, a **Windows voice**
+  takes over (word-boundary mouth movement).
+- **Push to talk:** a mic button in the chat window and the island. Click, talk (the character LISTENs), click again: the
+  recording is resampled to 16 kHz mono WAV, transcribed, and sent as your message. Esc cancels, and it auto-stops at 60 s.
+  A red ring grows with your voice level while the mic is open. The mic is opened only while recording.
+- **Permissions:** microphone (audio only, never video) is allowed only for the chat, island and settings windows, and only
+  while voice input is on. Transcription is accepted only from those windows, speech synthesis only from the character
+  and settings windows.
+- **Settings → Voice:** speak with the Ollama voice / a Windows voice / not at all, voice model and name, speed, voice input
+  on/off, microphone choice, Test voice, Test microphone (with level meter).
+
+## Livelier character (new)
+- Gestures layered on top of the state poses, never fighting over bones: **wave** (when she first appears, when you click
+  her, and when you greet her: "hi", "hello", "hey"…), **talking hands** while speaking, and idle actions every 12–25 s
+  (**look around, head tilt, stretch, nod, wave**). They were verified visually from screenshots (wave, stretch, talking).
+
+## Milestone 3: AI conversation + island
 - **Local AI by default:** Ollama 0.40.13 on this PC with `qwen3:4b` (2.5 GB, Apache-2.0, tool-capable). It runs 100% on the
   RTX 4050 (~3.2 GB of VRAM). Measured: the first reply after app start took 3.9 s (including model load), later replies 1.2–2.6 s.
 - **One OpenAI-compatible adapter** (`src/main/ai/provider.ts`) covers Ollama, LM Studio, Groq, Gemini, OpenRouter, OpenAI etc.
@@ -66,17 +103,20 @@ _Last updated: 2026-10-29. Milestone 3 (AI conversation + island) implemented an
 |---|---|
 | `npm run typecheck` (node, web, e2e configs) | pass |
 | `npm run lint` | pass |
-| `npm test` (Vitest) | 51 pass + 2 opt-in skipped. Milestone 3 adds: SSE streaming (split lines), think-tag filter (split tags), HTTP error mapping, unreachable, cancel, first-token and idle timeouts, in-stream errors, model listing, conversation turns, cancel, replace-while-streaming, empty reply, clear. Earlier: 33 tests: geometry, URL trust, bundle path traversal, CSP, IPC schemas, state machine (incl. 5,000 random events), VRM metadata validation |
-| `npm run test:e2e` (Playwright `_electron`, production build) | 20/20 pass on 2 consecutive runs (`ai.spec.ts` uses an in-test fake OpenAI-compatible server; `app.spec.ts` points at a closed port, so neither needs a real model). Milestone 3 adds: streamed reply with hidden reasoning + character states, island placement/expand/answer/shared conversation/Esc/blur-collapse/shortcut state, Stop keeps partial text, Test connection lists models, API key encrypted at rest + sent as Bearer + dropped on origin change, unsafe URLs and empty messages rejected, unreachable AI shows an error + ERROR state. Milestone 2: 14 tests, Milestone 2 adds: VRM renders (opaque-pixel share), chat drives THINKING→SPEAKING→IDLE, NOTIFICATION times out, `timeout` from a renderer is rejected, only the character window can read model bytes, non-VRM import refused with a message, custom VRM import + reset (stubbed file dialog), console errors fail the suite. From Milestone 1: real pixel-alpha transparency, on-top, secure webPreferences, no Node in renderer, CSP blocks inline script, navigation + popups blocked, invalid IPC rejected, chat beside character, settings toggle persists, resize clamps, drag keeps size, hide/show, shortcut state, no uncaught page errors |
+| `npm test` (Vitest) | 84 pass + 2 opt-in skipped. Milestones 4–5 add: store (settings, chats, memories, reopen, unreadable file set aside), secret detection, chat commands, history order/restore/clear/commands-while-streaming, gestures, sentence splitting (no text lost around "3.14"), speakable text, WAV encode/downsample/size repair, audio endpoints. Earlier: 51 tests, Milestone 3 adds: SSE streaming (split lines), think-tag filter (split tags), HTTP error mapping, unreachable, cancel, first-token and idle timeouts, in-stream errors, model listing, conversation turns, cancel, replace-while-streaming, empty reply, clear. Earlier: 33 tests: geometry, URL trust, bundle path traversal, CSP, IPC schemas, state machine (incl. 5,000 random events), VRM metadata validation |
+| `npm run test:e2e` (Playwright `_electron`, production build) | 29/29 pass on 2 consecutive runs. Milestones 4–5 add: legacy settings imported, /remember reaches the AI prompt and secrets are refused, chat + memories survive a real restart, history off/New chat/delete all, spoken replies keep SPEAKING until the audio ends, Stop silences her, push-to-talk with a fake mic device → transcription → reply, mic refused when voice input is off and video always refused, synthesis restricted by window. Milestone 3: 20/20 (`ai.spec.ts` uses an in-test fake OpenAI-compatible server; `app.spec.ts` points at a closed port, so neither needs a real model). Milestone 3 adds: streamed reply with hidden reasoning + character states, island placement/expand/answer/shared conversation/Esc/blur-collapse/shortcut state, Stop keeps partial text, Test connection lists models, API key encrypted at rest + sent as Bearer + dropped on origin change, unsafe URLs and empty messages rejected, unreachable AI shows an error + ERROR state. Milestone 2: 14 tests, Milestone 2 adds: VRM renders (opaque-pixel share), chat drives THINKING→SPEAKING→IDLE, NOTIFICATION times out, `timeout` from a renderer is rejected, only the character window can read model bytes, non-VRM import refused with a message, custom VRM import + reset (stubbed file dialog), console errors fail the suite. From Milestone 1: real pixel-alpha transparency, on-top, secure webPreferences, no Node in renderer, CSP blocks inline script, navigation + popups blocked, invalid IPC rejected, chat beside character, settings toggle persists, resize clamps, drag keeps size, hide/show, shortcut state, no uncaught page errors |
 | `npm run dev` | windows load from the Vite dev server under the dev CSP; IPC works; chat sends; 0 console/page errors (checked over CDP) |
 | `npm run package:dir` | `release/win-unpacked/Desktop Assistant.exe` (asar 7.5 MB); fuses confirmed with `@electron/fuses read`; exe boots, serves app:// pages with CSP, a traversal URL returns 404, no page errors |
 | `npm audit --omit=dev` | 0 vulnerabilities |
 | Live Ollama (`OLLAMA_TEST=1 npx vitest run tests/unit/ollama.integration.test.ts`) | 2/2 pass: lists `qwen3:4b`; streams "Hello! 2 + 2 equals 4." (first token 2.6 s, ~61 chunks/s), no reasoning leaked |
+| Live voice, production build + real Ollama | reply spoken with lfm3-audio (SPEAKING 8.6 s, then IDLE; no console errors or warnings); app transcription of real speech in 1.3 s, word for word; packaged build read settings from SQLite and spoke a reply |
 | Live app, production build + real Ollama | island question answered (first text 3.9 s incl. model load); packaged `release/win-unpacked` answered "ready" in 2.6 s; Settings → Test connection: "Connected. 1 model available."; no console errors |
 | Idle cost (production build, 10 s sample after load) | renderer 0.27 % CPU, GPU process 0.3 %, main 0.01 %; working sets: renderer ~204 MB, GPU ~323 MB, main ~131 MB |
 | Milestone 2 dev + packaged | Seed-san loads in `npm run dev` and in `release/win-unpacked` (asar 19 MB), with no console errors |
 
 ## Not verified (needs a person at the screen)
+- Talking into a **real** microphone (E2E used Chromium's fake audio device; live STT was fed a generated WAV).
+- How the voice and gestures feel over a longer conversation.
 - Pressing Alt+Shift+Space physically, and how the island feels over full-screen apps.
 - A real cloud provider (only the fake server and local Ollama were used; no cloud key was entered).
 - How the character *looks* in motion (only still screenshots were reviewed) and whether the eyes track the cursor naturally.
@@ -86,6 +126,16 @@ _Last updated: 2026-10-29. Milestone 3 (AI conversation + island) implemented an
 - Real mouse behavior: click-through over empty space, hover hit-test, drag and grip resize with a real mouse
   (the same code paths were only driven through the preload API in E2E).
 - Mixed-DPI multi-monitor dragging (only a single 125% display was available).
+
+## Findings while testing (Milestones 4–5)
+- Ollama's speech WAVs have 0xFFFFFFFF "unknown length" sizes. The app rewrites them before decoding.
+- The first sentence splitter dropped words before a decimal point ("Pi is 3." vanished). Rewritten to split only at
+  terminators followed by whitespace.
+- A chat command typed while a reply streamed landed before that reply. Commands now stop the reply in progress.
+- An unreadable database file could not be set aside on Windows while still open. It is now closed first.
+- A new message while a reply streamed saved history out of order. The interrupted reply is now saved first.
+- Ollama stopped after its window was closed. It starts again at sign-in (Startup shortcut). If it isn't running,
+  chat shows "make sure it is running".
 
 ## Findings while testing (Milestone 3)
 - `reasoning_effort: "none"` on Ollama makes qwen3 *worse*: reasoning leaks into the answer and the reply takes 10 s instead of 1.2 s.
@@ -114,7 +164,6 @@ _Last updated: 2026-10-29. Milestone 3 (AI conversation + island) implemented an
 - A packaged exe still honors `--remote-debugging-port` (a Chromium switch, not covered by fuses). Address in Milestone 9.
 - Renderer bundles are unminified (electron-vite default). Consider for the Milestone 9 performance pass.
 - No app icon yet (default Electron icon). No code signing.
-- `window-state.json` is a stopgap until SQLite (Milestone 5).
 
 ## Pending from Milestone 0
 - Context7 needs authentication (`/mcp`). OmniRoute is intentionally not installed.

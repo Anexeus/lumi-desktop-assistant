@@ -211,3 +211,29 @@ kbd {
     animation: none !important;
   }
 }
+
+.panel .mic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.panel .mic.recording {
+  background: #dc2626;
+  color: #fff;
+  /* The ring grows with the live mic level, so it is obvious the mic is open. */
+  box-shadow: 0 0 0 calc(2px + var(--level, 0) * 8px) rgb(220 38 38 / 35%);
+}
+
+.mic-live {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.panel .mic {
+  background: rgb(255 255 255 / 10%);
+  color: var(--island-text);
+  padding: 8px 10px;
+}

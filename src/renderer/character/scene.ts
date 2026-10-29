@@ -1,6 +1,7 @@
 import { DirectionalLight, AmbientLight, PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three'
 import type { CharacterState } from '@shared/character'
 import { loadAvatar, type Avatar } from './avatar'
+import type { Gesture } from './gestures'
 
 const FRAME_MS = 1000 / 30 // idle budget: 30 fps is plenty for a desktop character
 const DEFAULT_MODEL_URL = './models/Seed-san.vrm'
@@ -11,6 +12,9 @@ export interface CharacterScene {
   /** Loads the user's model bytes, or the bundled default when null. Falls back to the default on failure. */
   setModel(bytes: ArrayBuffer | null): Promise<'custom' | 'default'>
   setState(state: CharacterState): void
+  play(gesture: Gesture): void
+  /** Mouth openness 0..1 from speech audio, or null for placeholder movement. */
+  setMouth(level: number | null): void
   /** Cursor position relative to the window's top-left, in CSS pixels (may be outside the window). */
   lookAtCursor(x: number, y: number): void
   dispose(): void
@@ -32,6 +36,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   let avatar: Avatar | null = null
   let state: CharacterState = 'IDLE'
   let cursor: { x: number; y: number } | null = null
+  let mouth: number | null = null
   let loadToken = 0
 
   const frame = (): void => {
@@ -79,6 +84,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     }
     avatar = next
     avatar.setState(state)
+    avatar.setMouth(mouth)
     scene.add(avatar.vrm.scene)
     frame()
     applyGaze()
@@ -114,6 +120,13 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
       state = next
       avatar?.setState(next)
       applyGaze()
+    },
+    play(gesture) {
+      avatar?.play(gesture)
+    },
+    setMouth(level) {
+      mouth = level
+      avatar?.setMouth(level)
     },
     lookAtCursor(x, y) {
       cursor = { x, y }

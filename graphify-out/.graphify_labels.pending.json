@@ -1,5 +1,5 @@
 {
-  "0": "main/index.ts",
+  "0": "windows.ts",
   "1": "devDependencies",
   "2": "start",
   "3": "Code Review and Quality",
@@ -45,5 +45,12 @@
   "43": "provider.ts",
   "44": "@pixiv/three-vrm",
   "45": "typescript@6.0.3",
-  "46": "vite@8.3.5"
+  "46": "vite@8.3.5",
+  "47": "store.ts",
+  "48": "provider.ts",
+  "49": "schemas.ts",
+  "50": "settings.ts",
+  "51": "main/index.ts",
+  "52": "tray.ts",
+  "53": "@playwright/test"
 }

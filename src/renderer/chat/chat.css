@@ -141,3 +141,23 @@
   color: #b45309;
   background: var(--surface);
 }
+
+.mic {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.mic.recording {
+  background: #dc2626;
+  color: #fff;
+  /* The ring grows with the live mic level, so it is obvious the mic is open. */
+  box-shadow: 0 0 0 calc(2px + var(--level, 0) * 8px) rgb(220 38 38 / 35%);
+}
+
+.mic-live {
+  font-size: 12px;
+  font-weight: 600;
+}

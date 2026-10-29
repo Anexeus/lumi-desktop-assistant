@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { MicButton } from '../ui/MicButton'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
 
@@ -6,8 +7,10 @@ export function Chat(): React.JSX.Element {
   const state = useAppState()
   const { items, status } = useConversation()
   const [draft, setDraft] = useState('')
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const listEnd = useRef<HTMLDivElement>(null)
-  const busy = status !== 'idle'
+  // Busy while the text streams, and also while she is still saying it.
+  const busy = status !== 'idle' || state?.character === 'SPEAKING'
 
   // Block body on purpose: newer Chromium returns a Promise from scrollIntoView, and React
   // would treat that return value as the effect's cleanup function.
@@ -40,7 +43,7 @@ export function Chat(): React.JSX.Element {
             </span>
           )}
           <button type="button" className="ghost" onClick={() => void window.assistant.chat.clear()} disabled={!items.length}>
-            Clear
+            New chat
           </button>
           <button type="button" className="ghost" onClick={() => void window.assistant.openWindow('settings')}>
             Settings
@@ -49,7 +52,7 @@ export function Chat(): React.JSX.Element {
       </header>
 
       <section className="messages" aria-label="Conversation" aria-live="polite">
-        {items.length === 0 && <p className="empty">Ask me anything. I live on your desktop.</p>}
+        {items.length === 0 && <p className="empty">Ask me anything. Type /help for commands.</p>}
         {items.map((m) => (
           <p key={m.id} className={`bubble ${m.role}`}>
             <span className="visually-hidden">{m.role === 'user' ? 'You: ' : m.role === 'error' ? 'Error: ' : 'Assistant: '}</span>
@@ -60,6 +63,11 @@ export function Chat(): React.JSX.Element {
         <div ref={listEnd} />
       </section>
 
+      {voiceError && (
+        <p className="cloud-note" role="alert">
+          {voiceError}
+        </p>
+      )}
       {ai && !ai.local && <p className="cloud-note">Messages are sent to {new URL(ai.baseUrl).host}.</p>}
       <form className="composer" onSubmit={send}>
         <label htmlFor="message" className="visually-hidden">
@@ -75,6 +83,7 @@ export function Chat(): React.JSX.Element {
           maxLength={8000}
           autoFocus
         />
+        {state?.voice.input && <MicButton micId={state.voice.micId} onError={setVoiceError} />}
         {busy ? (
           <button type="button" className="stop" onClick={() => void window.assistant.chat.cancel()}>
             Stop

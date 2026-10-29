@@ -23,7 +23,15 @@ set up on 2026-10-29. End-user install steps arrive in Milestone 9.
 ollama pull qwen3:4b
 ```
 
-3. In the app: Settings → AI → "Use Ollama on this PC" → Test connection.
+3. For voice (speaking and push-to-talk), pull the audio model (1.7 GB):
+
+```
+ollama pull lfm3-audio
+```
+
+4. In the app: Settings → AI → "Use Ollama on this PC" → Test connection, and Settings → Voice → Test voice.
+
+If chat says it can't reach the AI, start Ollama from the Start menu (closing its window can stop it).
 
 Smaller GPUs or no GPU: try `qwen3:1.7b`. Bigger GPUs: `qwen3:8b`. Any OpenAI-compatible endpoint works too
 (LM Studio, Groq, Gemini, OpenRouter): paste its `/v1` address and an API key.

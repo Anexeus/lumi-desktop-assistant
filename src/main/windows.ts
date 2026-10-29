@@ -66,7 +66,8 @@ export class WindowManager {
       minimizable: false,
       fullscreenable: false,
       skipTaskbar: true,
-      webPreferences: secureWebPreferences
+      // She speaks replies on her own, without a click first.
+      webPreferences: { ...secureWebPreferences, autoplayPolicy: 'no-user-gesture-required' }
     })
     this.character.setAlwaysOnTop(alwaysOnTop, 'floating')
     // Empty space clicks through; the renderer turns this off while the cursor is over the body.
@@ -209,6 +210,12 @@ export class WindowManager {
       target.show()
       target.focus()
     }
+  }
+
+  /** True for the given panel's own page (used for per-window permissions). */
+  isPanel(contents: Electron.WebContents, name: WindowName): boolean {
+    const win = this.panels.get(name)
+    return !!win && !win.isDestroyed() && win.webContents === contents
   }
 
   allWindows(): BrowserWindow[] {

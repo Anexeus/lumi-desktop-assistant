@@ -1,10 +1,12 @@
 import type { AppState } from '@shared/ipc'
 import { createScene } from './scene'
+import { createSpeaker } from './speaker'
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement
 const grip = document.getElementById('grip') as HTMLDivElement
 const api = window.assistant.character
 const scene = createScene(canvas)
+const speaker = createSpeaker((level) => scene.setMouth(level))
 
 const CLICK_SLOP = 4 // px of movement before a press becomes a drag
 const KEY_RESIZE_STEP = 0.1
@@ -48,7 +50,10 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
   canvas.releasePointerCapture(e.pointerId)
-  if (mode === 'pressing') void window.assistant.openWindow('chat')
+  if (mode === 'pressing') {
+    scene.play('wave')
+    void window.assistant.openWindow('chat')
+  }
   if (mode === 'dragging') api.dragEnd()
   mode = 'idle'
 })
@@ -100,6 +105,7 @@ async function loadModel(): Promise<void> {
     const bytes = await window.assistant.model.get()
     const buffer = bytes ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer) : null
     document.body.dataset['model'] = await scene.setModel(buffer)
+    scene.play('wave') // hello on first appearance and after a model change
   } catch (error) {
     console.error('Could not load the character model', error)
     document.body.dataset['model'] = 'error'
@@ -109,6 +115,7 @@ async function loadModel(): Promise<void> {
 
 function applyState(state: AppState): void {
   scene.setState(state.character)
+  speaker.onState(state)
   document.body.dataset['state'] = state.character
   if (state.model.revision !== modelRevision) {
     modelRevision = state.model.revision
@@ -119,5 +126,23 @@ function applyState(state: AppState): void {
 void window.assistant.getState().then(applyState)
 window.assistant.onState(applyState)
 api.onCursor((x, y) => scene.lookAtCursor(x, y))
+
+// Wave back when the user greets her.
+const GREETING = /^\s*(hi|hii+|hello|hey|heya|yo|hola|namaste|good (morning|afternoon|evening))\b/i
+let lastUserId = 0
+window.assistant.chat.onEvent((event) => speaker.onChat(event))
+window.assistant.chat.onEvent((event) => {
+  if (event.type !== 'snapshot') return
+  const user = event.snapshot.items.filter((i) => i.role === 'user').at(-1)
+  if (!user || user.id <= lastUserId) return
+  lastUserId = user.id
+  if (GREETING.test(user.text)) scene.play('wave')
+})
+void window.assistant.chat.get().then((s) => (lastUserId = s.items.at(-1)?.id ?? 0))
+
+if (import.meta.env.DEV) {
+  // Dev aid: window.__character.play('stretch') from DevTools.
+  ;(window as unknown as { __character: unknown }).__character = { play: scene.play, setMouth: scene.setMouth }
+}
 
 window.addEventListener('beforeunload', () => scene.dispose())

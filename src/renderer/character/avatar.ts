@@ -2,6 +2,7 @@ import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pix
 import { Box3, Object3D, Vector3, type Camera } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { CharacterState } from '@shared/character'
+import { addOffsets, gestureOffsets, GESTURE_SECONDS, IDLE_GESTURES, talkingOffsets, ZERO, type Gesture } from './gestures'
 
 // Procedural animation for a VRM: one blended pose per state, plus additive blink, breathing,
 // gaze and mouth layers. Every state writes the same parameters, so states crossfade instead
@@ -37,6 +38,10 @@ export interface Avatar {
   /** World-space box used to frame the camera. */
   readonly bounds: Box3
   setState(state: CharacterState): void
+  /** Plays a gesture now, replacing any gesture already running. */
+  play(gesture: Gesture): void
+  /** Mouth openness 0..1 from real speech audio; null falls back to placeholder mouth movement. */
+  setMouth(level: number | null): void
   /** Point the eyes at a world-space position; null returns to looking at the viewer. */
   lookAt(world: Vector3 | null): void
   update(dt: number, elapsed: number): void
@@ -56,11 +61,18 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   vrm.scene.traverse((o) => (o.frustumCulled = false))
 
   const bone = (name: VRMHumanBoneName): Object3D | null => vrm.humanoid.getNormalizedBoneNode(name)
-  // Rest pose is a T-pose: drop the arms to the sides with a slight elbow bend.
-  bone('leftUpperArm')?.rotation.set(0, 0, -1.2)
-  bone('rightUpperArm')?.rotation.set(0, 0, 1.2)
-  bone('leftLowerArm')?.rotation.set(0, -0.15, 0)
-  bone('rightLowerArm')?.rotation.set(0, 0.15, 0)
+  // The rest pose is a T-pose: arms go down to the sides with a slight elbow bend (re-applied every frame below).
+  const rUpper = bone('rightUpperArm')
+  const lUpper = bone('leftUpperArm')
+  const rLower = bone('rightLowerArm')
+  const lLower = bone('leftLowerArm')
+  const applyArms = (o: typeof ZERO): void => {
+    rUpper?.rotation.set(0, 0, 1.2 + o.rUpperZ)
+    lUpper?.rotation.set(0, 0, -1.2 + o.lUpperZ)
+    rLower?.rotation.set(0, 0.15 + o.rLowerY, o.rLowerZ)
+    lLower?.rotation.set(0, -0.15 + o.lLowerY, o.lLowerZ)
+  }
+  applyArms(ZERO)
 
   vrm.update(0)
   const bounds = new Box3().setFromObject(vrm.scene)
@@ -84,6 +96,10 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   let blinkStart = -1
   let viseme = 0
   let visemeAt = 0
+  let gesture: { name: Gesture; start: number } | undefined
+  let nextIdleGesture = 8 + Math.random() * 8
+  let talk = 0 // 0..1, eases the talking hands in and out
+  let mouth: number | null = null
 
   const expr = (name: string, weight: number): void => vrm.expressionManager?.setValue(name, weight)
 
@@ -95,6 +111,12 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       state = next
       target = POSES[next]
       stateSince = elapsedNow
+    },
+    play(name) {
+      gesture = { name, start: elapsedNow }
+    },
+    setMouth(level) {
+      mouth = level === null ? null : Math.min(1, Math.max(0, level))
     },
     lookAt(world) {
       if (!vrm.lookAt) return
@@ -108,12 +130,27 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       const k = 1 - Math.exp(-dt * BLEND_RATE)
       for (const key of Object.keys(pose) as (keyof Pose)[]) pose[key] += (target[key] - pose[key]) * k
 
+      // Idle life: every so often, a random small action.
+      if (state === 'IDLE' && !gesture && t >= nextIdleGesture) {
+        gesture = { name: IDLE_GESTURES[Math.floor(Math.random() * IDLE_GESTURES.length)]!, start: t }
+      }
+      if (gesture && t - gesture.start >= GESTURE_SECONDS[gesture.name]) {
+        gesture = undefined
+        nextIdleGesture = t + 12 + Math.random() * 13
+      }
+      talk += ((state === 'SPEAKING' ? 1 : 0) - talk) * k
+      const g = addOffsets(
+        talkingOffsets(t, talk),
+        gesture ? gestureOffsets(gesture.name, (t - gesture.start) / GESTURE_SECONDS[gesture.name]) : ZERO
+      )
+      applyArms(g)
+
       const breathe = Math.sin(t * 1.7)
-      if (chest) chest.rotation.x = breathe * 0.015 - pose.lean
-      if (neck) neck.rotation.set(pose.headPitch * 0.4, 0, pose.headRoll * 0.4)
+      if (chest) chest.rotation.x = breathe * 0.015 - pose.lean - g.chest
+      if (neck) neck.rotation.set(pose.headPitch * 0.4, g.headYaw * 0.4, pose.headRoll * 0.4)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       const sway = Math.sin(t * 0.7) * 0.02
-      if (head) head.rotation.set(pose.headPitch * 0.6 + nod, 0, pose.headRoll * 0.6 + sway)
+      if (head) head.rotation.set(pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6, pose.headRoll * 0.6 + sway + g.headRoll)
       if (hips) {
         // A single small hop at the start of a notification, then settle.
         const since = t - stateSince
@@ -121,7 +158,7 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
         hips.position.y = hipsRestY + hop * pose.hop + breathe * 0.002
       }
 
-      expr('happy', pose.happy)
+      expr('happy', Math.min(1, pose.happy + g.happy))
       expr('sad', pose.sad)
       expr('surprised', pose.surprised)
       expr('relaxed', pose.relaxed)
@@ -139,14 +176,16 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       }
       expr('blink', blink)
 
-      // shortcut: random visemes while SPEAKING, until real audio-driven lip sync in Milestone 4.
-      if (state === 'SPEAKING' && t - visemeAt > 0.11) {
+      // Mouth: follows real speech audio when there is any; otherwise placeholder movement while SPEAKING.
+      if (t - visemeAt > 0.11) {
         viseme = Math.floor(Math.random() * VISEMES.length)
         visemeAt = t
       }
+      const open = mouth ?? (state === 'SPEAKING' ? 0.6 : 0)
       VISEMES.forEach((v, i) => {
         const current = vrm.expressionManager?.getValue(v) ?? 0
-        const want = state === 'SPEAKING' && i === viseme ? 0.6 : 0
+        // With audio, 'aa' tracks loudness and one other vowel shape flickers for variety.
+        const want = mouth !== null ? (v === 'aa' ? open * 0.8 : i === viseme ? open * 0.3 : 0) : i === viseme ? open : 0
         expr(v, current + (want - current) * Math.min(1, dt * 18))
       })
 

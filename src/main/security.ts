@@ -27,12 +27,20 @@ export function serveBundle(root: string): void {
   })
 }
 
-/** Session-wide defaults: deny all permissions, add the dev CSP to Vite responses. */
-export function hardenSession(): void {
+/**
+ * Session-wide defaults: deny every permission except microphone-only media for the windows
+ * `allowMic` approves (push-to-talk), and add the dev CSP to Vite responses.
+ */
+export function hardenSession(allowMic: (contents: Electron.WebContents) => boolean): void {
   const ses = session.defaultSession
-  // Microphone access is granted per push-to-talk press in Milestone 4; nothing is allowed yet.
-  ses.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
-  ses.setPermissionCheckHandler(() => false)
+  ses.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
+    callback(permission === 'media' && types.length > 0 && types.every((t) => t === 'audio') && allowMic(contents))
+  })
+  ses.setPermissionCheckHandler((contents, permission, _origin, details) => {
+    const type = 'mediaType' in details ? details.mediaType : undefined
+    return permission === 'media' && type !== 'video' && !!contents && allowMic(contents)
+  })
   if (devOrigin) {
     ses.webRequest.onHeadersReceived({ urls: [`${devOrigin}/*`] }, (details, callback) => {
       callback({

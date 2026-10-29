@@ -85,3 +85,25 @@ It is exact to the drawn silhouette (hair, accessories) and costs one 1×1 GPU r
 ## ADR-018 Procedural animation for now (2026-10-29)
 Decision: Per-state poses blended in code, with no VRMA motion files, which avoids more asset licensing.
 Revisit with licensed VRMA clips for richer motion in Milestone 9.
+
+## ADR-019 Local-first AI: Ollama + qwen3:4b by default (2026-10-29)
+Context: No budget. The PC has an RTX 4050 with 6 GB. Claude Pro has no API access.
+Decision: Default to Ollama on 127.0.0.1 with `qwen3:4b` (fits in VRAM, tool-capable, Apache-2.0). Cloud endpoints are
+opt-in with a visible privacy note. For a public release, users install Ollama and pull models themselves, so the
+app never redistributes model weights.
+
+## ADR-020 One OpenAI-compatible adapter first (2026-10-29)
+Decision: Ollama, LM Studio, Groq, Gemini, OpenRouter and OpenAI all speak `/v1/chat/completions` + SSE, so one
+adapter covers every free option. A native Anthropic adapter waits until someone has an API key to use it with.
+
+## ADR-021 Conversation lives in main (2026-10-29)
+Decision: One in-memory conversation in main, broadcast as snapshots + text deltas. The chat window and the island
+render the same state, and it drives the character state machine. Per-turn tokens make "send while streaming" safe.
+
+## ADR-022 API keys are bound to their origin (2026-10-29)
+Decision: Changing the AI address to a different origin deletes the stored key, and model listing for an unsaved
+address never sends the saved key. A key can therefore never leak to another service by editing the address.
+
+## ADR-023 Keep qwen3's default reasoning and filter it (2026-10-29)
+Measured: `reasoning_effort: "none"` → reasoning in the visible answer, 10 s. Default → clean answer, 1.2 s.
+Decision: Send no reasoning options. Strip `<think>` and ignore reasoning fields.

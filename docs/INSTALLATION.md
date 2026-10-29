@@ -13,6 +13,21 @@ set up on 2026-10-29. End-user install steps arrive in Milestone 9.
 | Claude Code | 2.1.308 verified | Claude desktop app or `npm i -g @anthropic-ai/claude-code` |
 | Python 3.10+ and uv | for Graphify only | python.org; `python -m pip install --user uv` |
 
+## Local AI (Ollama)
+
+1. Install Ollama from https://ollama.com/download (verified here: `OllamaSetup.exe` 0.40.13, signed by Ollama Inc.).
+   It installs per user and starts a local server on `http://127.0.0.1:11434`.
+2. Pull the default model (2.5 GB):
+
+```
+ollama pull qwen3:4b
+```
+
+3. In the app: Settings → AI → "Use Ollama on this PC" → Test connection.
+
+Smaller GPUs or no GPU: try `qwen3:1.7b`. Bigger GPUs: `qwen3:8b`. Any OpenAI-compatible endpoint works too
+(LM Studio, Groq, Gemini, OpenRouter): paste its `/v1` address and an API key.
+
 ## Claude Code tooling (reproduce on another machine)
 
 From the project folder:

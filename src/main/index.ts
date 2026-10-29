@@ -1,16 +1,21 @@
 import { app, BrowserWindow, dialog, globalShortcut, Menu, screen, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent, type CharacterState } from '@shared/character'
-import { Events, Invoke, Send, type AppState, type ChooseModelResult } from '@shared/ipc'
+import { Events, Invoke, Send, type AppState, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
+import { Conversation } from './ai/conversation'
+import { listModels, ProviderError, streamChat } from './ai/provider'
 import { handle, on } from './ipc'
 import { DEFAULT_MODEL, importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
+import { getSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
 import { menuTemplate, createTray, type TrayActions } from './tray'
 import type { VrmMeta } from './vrm-meta'
 import { loadWindowState, saveWindowState } from './window-state'
 import { WindowManager } from './windows'
 
 const SHORTCUT = 'Control+Alt+Shift+A'
+const ISLAND_SHORTCUT = 'Alt+Shift+Space' // Ctrl+Alt+Space is often taken; Alt+Space is the Windows window menu
+const API_KEY = 'ai.apiKey'
 const CURSOR_POLL_MS = 66 // ~15 Hz is enough for eyes to follow the pointer
 
 // Lets E2E tests run against an isolated profile. Ignored in packaged builds.
@@ -37,6 +42,12 @@ async function start(): Promise<void> {
   serveBundle(join(__dirname, '../renderer'))
 
   const saved = loadWindowState()
+  const settings = loadSettings()
+  const aiStatus = (): AppState['ai'] => ({
+    ...settings.ai,
+    hasApiKey: !!getSecret(API_KEY),
+    local: isLocalUrl(settings.ai.baseUrl)
+  })
   const custom = await readCustomModel()
   const modelInfo = (meta: VrmMeta, isCustom: boolean, revision: number): AppState['model'] => ({
     name: meta.name,
@@ -51,13 +62,21 @@ async function start(): Promise<void> {
     alwaysOnTop: saved.alwaysOnTop ?? true,
     shortcut: { accelerator: SHORTCUT, registered: false },
     character: initialSnapshot.state,
-    model: custom ? modelInfo(custom.meta, true, 0) : modelInfo(DEFAULT_MODEL, false, 0)
+    model: custom ? modelInfo(custom.meta, true, 0) : modelInfo(DEFAULT_MODEL, false, 0),
+    islandVisible: settings.islandVisible,
+    islandExpanded: false,
+    islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: false },
+    ai: aiStatus()
   }
 
   const persist = (): void => saveWindowState({ character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
 
-  const windows = new WindowManager(saved.character, state.alwaysOnTop, persist, () =>
-    setState({ characterVisible: false })
+  const windows = new WindowManager(
+    saved.character,
+    state.alwaysOnTop,
+    persist,
+    () => setState({ characterVisible: false }),
+    () => setState({ islandExpanded: false })
   )
 
   const actions: TrayActions = {
@@ -76,6 +95,11 @@ async function start(): Promise<void> {
     if (state.alwaysOnTop !== prev.alwaysOnTop) {
       windows.setAlwaysOnTop(state.alwaysOnTop)
       persist()
+    }
+    if (state.islandVisible !== prev.islandVisible) {
+      windows.setIslandVisible(state.islandVisible)
+      saveSettings({ ...settings, islandVisible: state.islandVisible })
+      settings.islandVisible = state.islandVisible
     }
     tray.update(state)
     for (const win of windows.allWindows()) win.webContents.send(Events.state, state)
@@ -97,6 +121,19 @@ async function start(): Promise<void> {
 
   windows.character.once('ready-to-show', () => {
     if (state.characterVisible) windows.character.showInactive()
+  })
+  windows.island.once('ready-to-show', () => {
+    if (state.islandVisible) windows.setIslandVisible(true)
+  })
+
+  const broadcastChat = (event: ChatEvent): void => {
+    for (const win of windows.allWindows()) win.webContents.send(Events.chat, event)
+  }
+  const conversation = new Conversation({
+    stream: (messages, signal) => streamChat({ ...settings.ai, apiKey: getSecret(API_KEY) }, messages, { signal }),
+    onSnapshot: (snapshot) => broadcastChat({ type: 'snapshot', snapshot }),
+    onDelta: (id, text) => broadcastChat({ type: 'delta', id, text }),
+    onCharacter: (event) => fire(event)
   })
 
   const fromCharacter = (sender: Electron.WebContents): boolean => sender === windows.character.webContents
@@ -126,6 +163,39 @@ async function start(): Promise<void> {
       return { ok: true, state: setState({ model: modelInfo(meta, true, state.model.revision + 1) }) }
     } catch (error) {
       return { ok: false, canceled: false, message: error instanceof Error ? error.message : 'Could not load that file.' }
+    }
+  })
+  handle(Invoke.setIslandVisible, ({ value }) => setState({ islandVisible: value }))
+  handle(Invoke.setIslandExpanded, ({ expanded }, e) => {
+    if (e.sender !== windows.island.webContents) throw new Error('Rejected island:set-expanded: not the island window')
+    windows.setIslandExpanded(expanded)
+    setState({ islandExpanded: windows.isIslandExpanded() })
+  })
+  handle(Invoke.chatGet, () => conversation.snapshot())
+  handle(Invoke.chatSend, ({ text }) => {
+    void conversation.send(text) // replies stream back as chat events
+  })
+  handle(Invoke.chatCancel, () => conversation.cancel())
+  handle(Invoke.chatClear, () => conversation.clear())
+  handle(Invoke.aiSetSettings, (next) => {
+    // A key belongs to one service: never send it to a different host after the address changes.
+    if (new URL(next.baseUrl).origin !== new URL(settings.ai.baseUrl).origin) setSecret(API_KEY, null)
+    settings.ai = next
+    saveSettings(settings)
+    return setState({ ai: aiStatus() })
+  })
+  handle(Invoke.aiSetApiKey, ({ key }) => {
+    setSecret(API_KEY, key)
+    return setState({ ai: aiStatus() })
+  })
+  handle(Invoke.aiListModels, async ({ baseUrl }): Promise<ListModelsResult> => {
+    const url = baseUrl ?? settings.ai.baseUrl
+    const sameService = new URL(url).origin === new URL(settings.ai.baseUrl).origin
+    try {
+      const models = await listModels({ baseUrl: url, model: settings.ai.model, apiKey: sameService ? getSecret(API_KEY) : undefined })
+      return { ok: true, models }
+    } catch (error) {
+      return { ok: false, message: error instanceof ProviderError ? error.message : 'Could not list models.' }
     }
   })
   handle(Invoke.resetModel, async () => {
@@ -175,14 +245,27 @@ async function start(): Promise<void> {
 
   const registered = globalShortcut.register(SHORTCUT, actions.toggleCharacter)
   if (!registered) console.warn(`Global shortcut ${SHORTCUT} is taken by another application`)
-  setState({ shortcut: { accelerator: SHORTCUT, registered } })
+  const islandRegistered = globalShortcut.register(ISLAND_SHORTCUT, () => {
+    if (!state.islandVisible) setState({ islandVisible: true })
+    windows.setIslandExpanded(!windows.isIslandExpanded())
+    setState({ islandExpanded: windows.isIslandExpanded() })
+  })
+  if (!islandRegistered) console.warn(`Global shortcut ${ISLAND_SHORTCUT} is taken by another application`)
+  setState({
+    shortcut: { accelerator: SHORTCUT, registered },
+    islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: islandRegistered }
+  })
 
   for (const event of ['display-added', 'display-removed', 'display-metrics-changed'] as const) {
-    screen.on(event as 'display-added', () => windows.settleCharacter())
+    screen.on(event as 'display-added', () => {
+      windows.settleCharacter()
+      if (state.islandVisible) windows.setIslandVisible(true)
+    })
   }
 
   app.on('second-instance', () => setState({ characterVisible: true }))
   app.on('before-quit', () => {
+    conversation.cancel()
     persist()
     windows.markQuitting()
   })

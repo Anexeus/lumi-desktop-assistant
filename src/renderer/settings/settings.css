@@ -117,3 +117,38 @@ kbd {
   user-select: text;
   overflow-wrap: anywhere;
 }
+
+.ai {
+  padding: 6px 0 10px;
+}
+
+.presets {
+  margin: 6px 0 4px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.field > span:first-child {
+  color: var(--muted);
+}
+
+.inline {
+  display: flex;
+  gap: 8px;
+}
+
+.field input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 10px;
+}

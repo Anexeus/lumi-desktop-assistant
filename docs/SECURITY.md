@@ -30,6 +30,11 @@ Mitigate in Milestone 9 (e.g. refuse to start when the switch is present in a pa
 
 ## Secrets
 
+Implemented (Milestone 3): keys go to `safeStorage` (DPAPI) in `userData/secrets.json`, renderers only ever see
+`hasApiKey`, and a key is deleted when the AI address moves to another origin. AI requests run in main; the
+renderer CSP is unchanged. AI addresses must be http(s) without embedded credentials. Chat input is capped at
+8,000 characters and replies render as plain text (no HTML).
+
 - API keys are stored with `safeStorage` (Windows DPAPI). Renderers never receive them.
 - Never logged. The logger redacts known key patterns and `Authorization` headers.
 - No secrets in docs, tests, fixtures, or git.

@@ -1,17 +1,17 @@
 # Graph Report - Desktop Assistant  (2026-10-29)
 
 ## Corpus Check
-- 72 files · ~51,248 words
+- 83 files · ~58,554 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 8 file(s) not represented in the graph (top: .css 4, (none) 3, .vrm 1)
+- Unclassified: 9 file(s) not represented in the graph (top: .css 5, (none) 3, .vrm 1)
 
 ## Summary
-- 803 nodes · 1028 edges · 47 communities (40 shown, 7 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 16 edges (avg confidence: 0.86)
+- 913 nodes · 1280 edges · 47 communities (42 shown, 5 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 34 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `88ba70bd`
+- Built from commit: `4bdeefd8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -30,7 +30,7 @@
 - Documentation and ADRs
 - Incremental Implementation
 - Debugging and Error Recovery
-- security.ts
+- ai.spec.ts
 - electron-builder.yml
 - Security Checklist
 - character.ts
@@ -49,7 +49,7 @@
 - Security
 - Current State
 - Reference Research
-- AssistantApi
+- shared/ipc.ts
 - Desktop Assistant: instructions for Claude Code
 - Installation
 - tsconfig.json
@@ -59,55 +59,55 @@
 - eslint.config.mjs
 - electron.vite.config.ts
 - Third-party notices
-- @playwright/test
+- provider.ts
 - @pixiv/three-vrm
 - typescript@6.0.3
 - vite@8.3.5
 
 ## God Nodes (most connected - your core abstractions)
-1. `start()` - 27 edges
-2. `Code Review and Quality` - 19 edges
-3. `Decisions (ADR log)` - 19 edges
-4. `WindowManager` - 18 edges
+1. `start()` - 43 edges
+2. `Decisions (ADR log)` - 24 edges
+3. `WindowManager` - 22 edges
+4. `Code Review and Quality` - 19 edges
 5. `compilerOptions` - 15 edges
 6. `Security Checklist` - 15 edges
 7. `Test-Driven Development` - 15 edges
-8. `compilerOptions` - 14 edges
-9. `Browser Testing with DevTools` - 13 edges
-10. `Documentation and ADRs` - 13 edges
+8. `Conversation` - 14 edges
+9. `compilerOptions` - 14 edges
+10. `Browser Testing with DevTools` - 13 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Conversation engine (main)` --references--> `text()`  [INFERRED]
-  docs/ARCHITECTURE.md → src/main/vrm-meta.ts
 - `ADR-015 Character state machine lives in main (2026-10-29)` --references--> `AppState`  [INFERRED]
   docs/DECISIONS.md → src/shared/ipc.ts
-- `run()` --calls--> `transition()`  [EXTRACTED]
-  tests/unit/character.test.ts → src/shared/character.ts
-- `start()` --calls--> `handle()`  [EXTRACTED]
-  src/main/index.ts → src/main/ipc.ts
-- `start()` --calls--> `on()`  [EXTRACTED]
-  src/main/index.ts → src/main/ipc.ts
+- `Conversation engine (main)` --references--> `text()`  [INFERRED]
+  docs/ARCHITECTURE.md → src/main/vrm-meta.ts
+- `2. Readability & Simplicity` --references--> `data()`  [INFERRED]
+  .claude/skills/code-review-and-quality/SKILL.md → tests/unit/provider.test.ts
+- `setup()` --calls--> `Conversation`  [EXTRACTED]
+  tests/unit/conversation.test.ts → src/main/ai/conversation.ts
+- `slow()` --calls--> `ProviderError`  [EXTRACTED]
+  tests/unit/conversation.test.ts → src/main/ai/provider.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (47 total, 7 thin omitted)
+## Communities (47 total, 5 thin omitted)
 
 ### Community 0 - "main/index.ts"
 Cohesion: 0.05
-Nodes (42): ADR-015 Character state machine lives in main (2026-10-29), electron, devOrigin, devServerUrl, handle(), on(), trusted(), customPath() (+34 more)
+Nodes (64): Conversation engine (main), electron, devOrigin, devServerUrl, handle(), on(), trusted(), customPath() (+56 more)
 
 ### Community 1 - "devDependencies"
 Cohesion: 0.13
-Nodes (15): devDependencies, electron@45.1.0, electron-builder@26.18.0, eslint@10.13.0, react@19.3.1, @types/node@24.19.2, @types/react@19.3.0, @types/react-dom@19.3.0 (+7 more)
+Nodes (15): devDependencies, electron@45.1.0, electron-builder@26.18.0, eslint@10.13.0, react@19.3.1, react-dom@19.3.1, @types/node@24.19.2, @types/react@19.3.0 (+7 more)
 
 ### Community 2 - "start"
 Cohesion: 0.11
-Nodes (22): CHARACTER_DEFAULT, CHARACTER_MAX, CHARACTER_MIN, clampSize(), defaultPlacement(), fitToDisplays(), overlap(), placeBeside() (+14 more)
+Nodes (19): CHARACTER_DEFAULT, CHARACTER_MAX, CHARACTER_MIN, clampSize(), defaultPlacement(), fitToDisplays(), overlap(), placeBeside() (+11 more)
 
 ### Community 3 - "Code Review and Quality"
-Cohesion: 0.07
-Nodes (29): 1. Correctness, 2. Readability & Simplicity, 3. Architecture, 4. Security, 5. Performance, Change Descriptions, Change Sizing, Code Review and Quality (+21 more)
+Cohesion: 0.06
+Nodes (30): 1. Correctness, 2. Readability & Simplicity, 3. Architecture, 4. Security, 5. Performance, Change Descriptions, Change Sizing, Code Review and Quality (+22 more)
 
 ### Community 4 - "Test-Driven Development"
 Cohesion: 0.07
@@ -149,9 +149,9 @@ Nodes (22): Common Rationalizations, Contract-First Slicing, Implementation Rule
 Cohesion: 0.09
 Nodes (21): Build Failure Triage, Common Rationalizations, Debugging and Error Recovery, Error-Specific Patterns, Instrumentation Guidelines, Overview, Red Flags, Runtime Error Triage (+13 more)
 
-### Community 14 - "security.ts"
-Cohesion: 0.12
-Nodes (14): vitest@5.0.5, vitest, APP_HOST, APP_SCHEME, devCsp(), isTrustedUrl(), PROD_CSP, resolveBundlePath() (+6 more)
+### Community 14 - "ai.spec.ts"
+Cohesion: 0.11
+Nodes (10): @playwright/test@1.64.1, @playwright/test, characterState(), openPanel(), page(), pageErrors, pages(), requests (+2 more)
 
 ### Community 15 - "electron-builder.yml"
 Cohesion: 0.10
@@ -163,7 +163,7 @@ Nodes (17): AI / LLM Security, Authentication, Authorization, CORS Configuration
 
 ### Community 17 - "character.ts"
 Cohesion: 0.07
-Nodes (27): three@0.186.1, three, Avatar, loadAvatar(), Pose, POSES, VISEMES, applyState() (+19 more)
+Nodes (26): three@0.186.1, three, Avatar, loadAvatar(), Pose, POSES, VISEMES, applyState() (+18 more)
 
 ### Community 18 - "compilerOptions"
 Cohesion: 0.11
@@ -178,20 +178,20 @@ Cohesion: 0.12
 Nodes (16): compilerOptions, composite, isolatedModules, jsx, lib, module, moduleResolution, noEmit (+8 more)
 
 ### Community 21 - "react"
-Cohesion: 0.21
-Nodes (9): react-dom@19.3.1, react, react-dom, Chat(), onKeyDown(), send(), Message, Settings() (+1 more)
+Cohesion: 0.15
+Nodes (13): react, react-dom, Chat(), onKeyDown(), send(), Island(), tail(), AiSettings() (+5 more)
 
 ### Community 22 - "Testing Patterns Reference (JavaScript/TypeScript)"
 Cohesion: 0.14
 Nodes (13): API / Integration Testing, Common Assertions, E2E Testing (Playwright), Mock at Boundaries Only, Mock Functions, Mock Modules, Mocking Patterns, React/Component Testing (+5 more)
 
 ### Community 23 - "Decisions (ADR log)"
-Cohesion: 0.11
-Nodes (18): ADR-001 Electron over Tauri (2026-10-29), ADR-002 React instead of Vue (2026-10-29), ADR-003 No Python backend (2026-10-29), ADR-004 Privileged work only in main; sandboxed renderers (2026-10-29), ADR-005 OmniRoute not adopted (2026-10-29), ADR-006 Claude Code via hooks + headless CLI (2026-10-29), ADR-007 SQLite driver (pending, Milestone 5), ADR-008 Agent-skills subset instead of full plugin (2026-10-29) (+10 more)
+Cohesion: 0.09
+Nodes (23): ADR-001 Electron over Tauri (2026-10-29), ADR-002 React instead of Vue (2026-10-29), ADR-003 No Python backend (2026-10-29), ADR-004 Privileged work only in main; sandboxed renderers (2026-10-29), ADR-005 OmniRoute not adopted (2026-10-29), ADR-006 Claude Code via hooks + headless CLI (2026-10-29), ADR-007 SQLite driver (pending, Milestone 5), ADR-008 Agent-skills subset instead of full plugin (2026-10-29) (+15 more)
 
 ### Community 24 - "Key modules"
-Cohesion: 0.15
-Nodes (12): Architecture, Character state machine (pure TS, renderer), Claude Code bridge, Conversation engine (main), Key modules, Memory, Plugin registry, tools, permissions, Repository layout (from Milestone 1) (+4 more)
+Cohesion: 0.17
+Nodes (11): Architecture, Character state machine (pure TS, renderer), Claude Code bridge, Key modules, Memory, Plugin registry, tools, permissions, Repository layout (from Milestone 1), Shape (+3 more)
 
 ### Community 25 - "compilerOptions"
 Cohesion: 0.15
@@ -218,24 +218,28 @@ Cohesion: 0.22
 Nodes (9): Claude Code, Dependency policy, Development-tool risks (this repo), Electron baseline (enforced from Milestone 1), MCP, Secrets, Security, Threat model (short) (+1 more)
 
 ### Community 31 - "Current State"
-Cohesion: 0.22
-Nodes (9): Bugs found and fixed while testing (Milestone 1), Bugs found and fixed while testing (Milestone 2), Current State, Known issues / follow-ups, Milestone 2: character (new), Not verified (needs a person at the screen), Pending from Milestone 0, Verified this session (commands actually run) (+1 more)
+Cohesion: 0.18
+Nodes (11): Bugs found and fixed while testing (Milestone 1), Bugs found and fixed while testing (Milestone 2), Current State, Findings while testing (Milestone 3), Known issues / follow-ups, Milestone 2: character, Milestone 3: AI conversation + island (new), Not verified (needs a person at the screen) (+3 more)
 
 ### Community 32 - "Reference Research"
 Cohesion: 0.25
 Nodes (7): 1. AIRI (moeru-ai/airi): primary reference, 2. Xiaoke AI (liupig/xiaokeai), 3. YUI (yw0nam/YUI): ideas only (noncommercial license), Cross-cutting conclusions, Licensing summary (read first), Reference Research, Snapshot
+
+### Community 33 - "shared/ipc.ts"
+Cohesion: 0.05
+Nodes (14): ADR-015 Character state machine lives in main (2026-10-29), createTray(), icon(), menuTemplate(), TrayActions, api, Window, AppState (+6 more)
 
 ### Community 34 - "Desktop Assistant: instructions for Claude Code"
 Cohesion: 0.29
 Nodes (6): Assets and licenses, Desktop Assistant: instructions for Claude Code, graphify, Security invariants (do not weaken), Stack and commands, Working rules
 
 ### Community 35 - "Installation"
-Cohesion: 0.40
-Nodes (4): Claude Code tooling (reproduce on another machine), Installation, Prerequisites, Troubleshooting
+Cohesion: 0.33
+Nodes (5): Claude Code tooling (reproduce on another machine), Installation, Local AI (Ollama), Prerequisites, Troubleshooting
 
 ### Community 38 - "package.json"
-Cohesion: 0.17
-Nodes (12): dependencies, zod@4.6.7, description, engines, node, license, main, name (+4 more)
+Cohesion: 0.14
+Nodes (14): dependencies, zod@4.6.7, description, @types/react-dom@19.3.0, engines, node, license, main (+6 more)
 
 ### Community 39 - "Application Plugin Registry (design)"
 Cohesion: 0.29
@@ -253,23 +257,27 @@ Nodes (5): shared, electron-vite@6.0.0, @vitejs/plugin-react@6.1.2, electron-vit
 Cohesion: 0.40
 Nodes (4): Claude Code skills (development only, not shipped), npm packages, Seed-san (default character model), Third-party notices
 
+### Community 43 - "provider.ts"
+Cohesion: 0.09
+Nodes (23): vitest, Conversation, ConversationDeps, systemPrompt(), ChatMessage, createThinkFilter(), describeHttpError(), endpoint() (+15 more)
+
 ## Knowledge Gaps
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Decisions (ADR log)` connect `Decisions (ADR log)` to `main/index.ts`, `README.md`?**
-  _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Are the 10 inferred relationships involving `start()` (e.g. with `main/index.ts` and `.characterBounds()`) actually correct?**
-  _`start()` has 10 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `AppState` connect `shared/ipc.ts` to `main/index.ts`, `character.ts`, `react`?**
+  _High betweenness centrality (0.087) - this node is a cross-community bridge._
+- **Are the 18 inferred relationships involving `start()` (e.g. with `main/index.ts` and `.cancel()`) actually correct?**
+  _`start()` has 18 INFERRED edges - model-reasoned connections that need verification._
 - **Should `main/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0518326545723806 - nodes in this community are weakly interconnected._
-- **Why does `AppState` connect `main/index.ts` to `character.ts`, `react`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+  _Cohesion score 0.05182072829131653 - nodes in this community are weakly interconnected._
+- **Why does `Decisions (ADR log)` connect `Decisions (ADR log)` to `shared/ipc.ts`, `README.md`?**
+  _High betweenness centrality (0.086) - this node is a cross-community bridge._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
-- **Why does `ADR-015 Character state machine lives in main (2026-10-29)` connect `main/index.ts` to `Decisions (ADR log)`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+- **Why does `ADR-015 Character state machine lives in main (2026-10-29)` connect `shared/ipc.ts` to `Decisions (ADR log)`?**
+  _High betweenness centrality (0.082) - this node is a cross-community bridge._
 - **Should `start` be split into smaller, more focused modules?**
-  _Cohesion score 0.10931174089068826 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1106612685560054 - nodes in this community are weakly interconnected._

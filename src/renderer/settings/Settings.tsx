@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAppState } from '../ui/useAppState'
+import { AiSettings } from './AiSettings'
 
 export function Settings(): React.JSX.Element {
   const state = useAppState()
@@ -20,6 +21,8 @@ export function Settings(): React.JSX.Element {
   return (
     <main className="settings">
       <h1>Settings</h1>
+
+      <AiSettings ai={state.ai} />
 
       <section aria-labelledby="character-heading">
         <h2 id="character-heading">Character</h2>
@@ -43,6 +46,17 @@ export function Settings(): React.JSX.Element {
             type="checkbox"
             checked={state.alwaysOnTop}
             onChange={(e) => void window.assistant.setAlwaysOnTop(e.target.checked)}
+          />
+        </label>
+        <label className="row">
+          <span>
+            Show the island
+            <small>A small bar at the top of the screen for quick questions.</small>
+          </span>
+          <input
+            type="checkbox"
+            checked={state.islandVisible}
+            onChange={(e) => void window.assistant.setIslandVisible(e.target.checked)}
           />
         </label>
       </section>
@@ -89,6 +103,11 @@ export function Settings(): React.JSX.Element {
             <kbd>{state.shortcut.accelerator.replaceAll('+', ' + ')}</kbd>
             {!state.shortcut.registered && <span className="warn"> (taken by another app)</span>}
           </dd>
+          <dt>Open the island for a quick question</dt>
+          <dd>
+            <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' + ')}</kbd>
+            {!state.islandShortcut.registered && <span className="warn"> (taken by another app)</span>}
+          </dd>
           <dt>With the character focused</dt>
           <dd>
             <kbd>Enter</kbd> chat · <kbd>Shift + F10</kbd> menu · <kbd>+</kbd> / <kbd>−</kbd> size
@@ -96,7 +115,7 @@ export function Settings(): React.JSX.Element {
         </dl>
       </section>
 
-      <p className="note">AI providers, voice, memory and tools are added in later milestones.</p>
+      <p className="note">Voice, memory and tools are added in later milestones.</p>
     </main>
   )
 }

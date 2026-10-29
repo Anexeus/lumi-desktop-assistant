@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import { Events, Invoke, Send, type AppState, type AssistantApi } from '@shared/ipc'
+import { Events, Invoke, Send, type AppState, type AssistantApi, type ChatEvent } from '@shared/ipc'
 
 // Sandboxed preload: exposes a narrow, typed API. No Node or Electron objects leak to the page.
 const api: AssistantApi = {
@@ -12,6 +12,26 @@ const api: AssistantApi = {
     const handler = (_event: IpcRendererEvent, state: AppState): void => listener(state)
     ipcRenderer.on(Events.state, handler)
     return () => ipcRenderer.removeListener(Events.state, handler)
+  },
+  setIslandVisible: (value) => ipcRenderer.invoke(Invoke.setIslandVisible, { value }),
+  island: {
+    setExpanded: (expanded) => ipcRenderer.invoke(Invoke.setIslandExpanded, { expanded })
+  },
+  chat: {
+    get: () => ipcRenderer.invoke(Invoke.chatGet),
+    send: (text) => ipcRenderer.invoke(Invoke.chatSend, { text }),
+    cancel: () => ipcRenderer.invoke(Invoke.chatCancel),
+    clear: () => ipcRenderer.invoke(Invoke.chatClear),
+    onEvent(listener) {
+      const handler = (_event: IpcRendererEvent, chatEvent: ChatEvent): void => listener(chatEvent)
+      ipcRenderer.on(Events.chat, handler)
+      return () => ipcRenderer.removeListener(Events.chat, handler)
+    }
+  },
+  ai: {
+    setSettings: (settings) => ipcRenderer.invoke(Invoke.aiSetSettings, settings),
+    setApiKey: (key) => ipcRenderer.invoke(Invoke.aiSetApiKey, { key }),
+    listModels: (baseUrl) => ipcRenderer.invoke(Invoke.aiListModels, baseUrl ? { baseUrl } : {})
   },
   model: {
     get: () => ipcRenderer.invoke(Invoke.getModel),

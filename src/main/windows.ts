@@ -5,7 +5,9 @@ import { devServerUrl } from './env'
 import { clampSize, fitToDisplays, placeBeside, type Rect } from './geometry'
 import { APP_HOST, APP_SCHEME } from './policy'
 
-type Page = 'character' | WindowName
+type Page = 'character' | 'island' | WindowName
+
+const ISLAND = { collapsed: { width: 340, height: 44 }, expanded: { width: 480, height: 380 }, top: 10 }
 
 const secureWebPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
   preload: join(__dirname, '../preload/index.js'),
@@ -34,6 +36,8 @@ function workAreas(): { all: Rect[]; primary: Rect } {
 
 export class WindowManager {
   readonly character: BrowserWindow
+  readonly island: BrowserWindow
+  private islandExpanded = false
   private readonly panels = new Map<WindowName, BrowserWindow>()
   private drag: { mouseX: number; mouseY: number; bounds: Rect } | undefined
   private quitting = false
@@ -42,7 +46,8 @@ export class WindowManager {
     saved: Rect | undefined,
     alwaysOnTop: boolean,
     private readonly onCharacterBoundsSettled: (bounds: Rect) => void,
-    onCharacterCloseRequested: () => void
+    onCharacterCloseRequested: () => void,
+    private readonly onIslandCollapsed: () => void
   ) {
     const { all, primary } = workAreas()
     this.character = new BrowserWindow({
@@ -72,6 +77,64 @@ export class WindowManager {
       onCharacterCloseRequested()
     })
     void loadPage(this.character, 'character')
+
+    this.island = new BrowserWindow({
+      ...this.islandBounds(false),
+      title: 'Desktop Assistant — Island',
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      useContentSize: true,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      webPreferences: secureWebPreferences
+    })
+    this.island.setAlwaysOnTop(true, 'floating')
+    this.island.on('close', (event) => {
+      if (!this.quitting) event.preventDefault()
+    })
+    // Clicking anywhere else folds the island back into its pill.
+    this.island.on('blur', () => this.islandExpanded && this.setIslandExpanded(false))
+    void loadPage(this.island, 'island')
+  }
+
+  /** Top-centre of the primary display's work area. */
+  private islandBounds(expanded: boolean): Rect {
+    const area = screen.getPrimaryDisplay().workArea
+    const size = expanded ? ISLAND.expanded : ISLAND.collapsed
+    return { x: Math.round(area.x + (area.width - size.width) / 2), y: area.y + ISLAND.top, ...size }
+  }
+
+  setIslandVisible(visible: boolean): void {
+    if (!visible) {
+      this.islandExpanded = false
+      this.island.hide()
+      return
+    }
+    this.island.setContentBounds(this.islandBounds(this.islandExpanded))
+    this.island.showInactive()
+  }
+
+  setIslandExpanded(expanded: boolean): void {
+    if (expanded === this.islandExpanded) return
+    this.islandExpanded = expanded
+    this.island.setContentBounds(this.islandBounds(expanded))
+    if (expanded) {
+      this.island.show()
+      this.island.focus()
+    } else {
+      this.island.showInactive()
+      this.onIslandCollapsed()
+    }
+  }
+
+  isIslandExpanded(): boolean {
+    return this.islandExpanded
   }
 
   markQuitting(): void {
@@ -149,7 +212,7 @@ export class WindowManager {
   }
 
   allWindows(): BrowserWindow[] {
-    return [this.character, ...this.panels.values()].filter((w) => !w.isDestroyed())
+    return [this.character, this.island, ...this.panels.values()].filter((w) => !w.isDestroyed())
   }
 
   private createPanel(name: WindowName): BrowserWindow {

@@ -28,7 +28,9 @@ Node 24, Electron 45, electron-vite 6, React 19, TypeScript 6 (strict), three, z
 - `npm run package:dir`: unpacked app in `release/win-unpacked` · `npm run package`: NSIS installer
 Only `zod` is a runtime dependency; renderer libraries are bundled by Vite and belong in devDependencies.
 Character window geometry uses **content bounds** only (window bounds drift on scaled displays).
-E2E tests set `DESKTOP_ASSISTANT_USER_DATA` to isolate the profile. Packaged builds ignore it.
+E2E tests set `DESKTOP_ASSISTANT_USER_DATA` to isolate the profile (packaged builds ignore it) and must never need a real
+model: `ai.spec.ts` uses an in-test fake server. Live Ollama check: `OLLAMA_TEST=1 npx vitest run tests/unit/ollama.integration.test.ts`.
+AI requests, the conversation and API keys live in main (`src/main/ai/`, `settings.ts`); renderers never see a key.
 
 ## Assets and licenses
 No third-party models, motions, or audio without a license that allows redistribution. YUI is

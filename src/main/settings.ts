@@ -6,7 +6,7 @@ import { providerForUrl } from '@shared/providers'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSettingsFile } from '@shared/schemas'
-import type { AiSettings, ApprovedApp, Graphics, McpServerConfig, VoiceSettings } from '@shared/ipc'
+import type { AiSettings, ApprovedApp, Graphics, IslandStyle, McpServerConfig, VoiceSettings } from '@shared/ipc'
 import type { Store } from './storage/store'
 
 // New installs use Lumi's own engine and the Windows voice: nothing else to install.
@@ -64,6 +64,7 @@ export interface Settings {
   graphics: Graphics
   local: { llm: string; stt: string }
   shortcuts: Record<ShortcutAction, string>
+  islandStyle: IslandStyle
 }
 
 export function loadSettings(store: Store): Settings {
@@ -84,7 +85,8 @@ export function loadSettings(store: Store): Settings {
     character: file.character ?? 'seed-san',
     graphics: file.graphics ?? 'balanced',
     local: file.local ?? DEFAULT_LOCAL,
-    shortcuts: file.shortcuts ?? DEFAULT_SHORTCUTS
+    shortcuts: file.shortcuts ?? DEFAULT_SHORTCUTS,
+    islandStyle: file.islandStyle ?? 'pill'
   }
 }
 

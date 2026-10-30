@@ -45,6 +45,42 @@ export const CHARACTERS = [
     license: 'CC0 (VRoid Studio sample model)',
     licenseUrl: 'https://opengameart.org/content/vroid-studio-cc0-models',
     voice: 'male'
+  },
+  {
+    id: 'vita',
+    name: 'Vita',
+    file: 'VRoid-Vita.vrm',
+    authors: ['VRoid Project'],
+    license: 'CC0 (VRoid Studio sample model)',
+    licenseUrl: 'https://opengameart.org/content/vroid-studio-cc0-models',
+    voice: 'female'
+  },
+  {
+    id: 'bibi',
+    name: 'Bibi',
+    file: 'VRoid-Bibi.vrm',
+    authors: ['VRoid Project'],
+    license: 'CC0 (VRoid Studio sample model)',
+    licenseUrl: 'https://opengameart.org/content/vroid-studio-cc0-models',
+    voice: 'female'
+  },
+  {
+    id: 'victoria',
+    name: 'Victoria Rubin',
+    file: 'VRoid-Victoria.vrm',
+    authors: ['VRoid Project'],
+    license: 'CC0 (VRoid Studio sample model)',
+    licenseUrl: 'https://opengameart.org/content/vroid-studio-cc0-models',
+    voice: 'female'
+  },
+  {
+    id: 'darkness',
+    name: 'Darkness Shibu',
+    file: 'VRoid-Darkness.vrm',
+    authors: ['VRoid Project'],
+    license: 'CC0 (VRoid Studio sample model)',
+    licenseUrl: 'https://opengameart.org/content/vroid-studio-cc0-models',
+    voice: 'female'
   }
 ] as const
 

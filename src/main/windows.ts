@@ -3,14 +3,16 @@ import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from
 import { release } from 'node:os'
 import { join } from 'node:path'
 import type { Perch } from '@shared/character'
-import type { WindowName } from '@shared/ipc'
+import type { IslandStyle, WindowName } from '@shared/ipc'
 import { devServerUrl } from './env'
-import { canSit, clampSize, fitToDisplays, peekPlacement, placeBeside, scaleBounds, seatedBounds, seatPlacement, type Frame, type Rect } from './geometry'
+import { canSit, clampSize, fitToDisplays, peekPlacement, placeBeside, scaleBounds, seatedBounds, seatPlacement, taskbarSeat, type Frame, type Rect } from './geometry'
 import { APP_HOST, APP_SCHEME } from './policy'
 
-type Page = 'character' | 'island' | WindowName
+type Page = 'character' | 'island' | 'menu' | WindowName
 
-const ISLAND = { collapsed: { width: 340, height: 44 }, expanded: { width: 480, height: 380 }, top: 10 }
+const ISLAND = { collapsed: { width: 300, height: 36 }, expanded: { width: 440, height: 340 }, top: 10 }
+// The menu window, and where the menu's corner sits inside it (the rest is room for its shadow; see menu.css).
+const MENU = { width: 284, height: 300, cornerX: 10, cornerY: 8 }
 
 const secureWebPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
   preload: join(__dirname, '../preload/index.js'),
@@ -55,7 +57,8 @@ const easeIn = (t: number): number => t * t
 
 export class WindowManager {
   readonly character: BrowserWindow
-  readonly island: BrowserWindow
+  private islandWin: BrowserWindow
+  private menuWin: BrowserWindow | undefined
   private islandExpanded = false
   private readonly panels = new Map<WindowName, BrowserWindow>()
   private drag: { mouseX: number; mouseY: number; bounds: Rect } | undefined
@@ -72,7 +75,8 @@ export class WindowManager {
     private readonly onCharacterBoundsSettled: (bounds: Rect) => void,
     onCharacterCloseRequested: () => void,
     private readonly onIslandCollapsed: () => void,
-    private readonly perchDeps?: PerchDeps
+    private readonly perchDeps?: PerchDeps,
+    private islandStyle: IslandStyle = 'pill'
   ) {
     const { all, primary } = workAreas()
     const initial = fitToDisplays(saved, all, primary)
@@ -109,16 +113,28 @@ export class WindowManager {
     })
     void loadPage(this.character, 'character')
 
-    // Blurred like the taskbar: the OS Acrylic material behind a clear page, with Windows 11's rounded corners and
-    // shadow (a custom pill shape is ignored for Acrylic windows; probed). Older Windows gets a transparent window.
-    this.island = new BrowserWindow({
+    this.islandWin = this.createIsland()
+  }
+
+  get island(): BrowserWindow {
+    return this.islandWin
+  }
+
+  /**
+   * Pill: a transparent window, so CSS draws truly curved sides (no blur behind it). Glass: the OS Acrylic material,
+   * blurred like the taskbar, with Windows 11's small rounded corners; Windows ignores a custom shape for Acrylic
+   * windows (probed: setShape, SetWindowRgn and accent policies). Older Windows always gets the pill.
+   */
+  private createIsland(): BrowserWindow {
+    const glass = glassSupported && this.islandStyle === 'glass'
+    const win = new BrowserWindow({
       icon: appIcon(),
       ...this.islandBounds(false),
       title: 'Lumi — Island',
       show: false,
       frame: false,
       backgroundColor: '#00000000',
-      ...(glassSupported ? { backgroundMaterial: 'acrylic' as const, roundedCorners: true } : { transparent: true, hasShadow: false }),
+      ...(glass ? { backgroundMaterial: 'acrylic' as const, roundedCorners: true } : { transparent: true, hasShadow: false }),
       useContentSize: true,
       resizable: false,
       maximizable: false,
@@ -127,13 +143,24 @@ export class WindowManager {
       skipTaskbar: true,
       webPreferences: secureWebPreferences
     })
-    this.island.setAlwaysOnTop(true, 'floating')
-    this.island.on('close', (event) => {
+    win.setAlwaysOnTop(true, 'floating')
+    win.on('close', (event) => {
       if (!this.quitting) event.preventDefault()
     })
     // Clicking anywhere else folds the island back into its pill.
-    this.island.on('blur', () => this.islandExpanded && this.setIslandExpanded(false))
-    void loadPage(this.island, 'island')
+    win.on('blur', () => this.islandExpanded && this.setIslandExpanded(false))
+    void loadPage(win, 'island')
+    return win
+  }
+
+  setIslandStyle(style: IslandStyle, visible: boolean): void {
+    if (style === this.islandStyle) return
+    this.islandStyle = style
+    const old = this.islandWin
+    this.islandExpanded = false
+    this.islandWin = this.createIsland()
+    if (visible) this.islandWin.once('ready-to-show', () => this.setIslandVisible(true))
+    old.destroy()
   }
 
   /** Top-centre of the primary display's work area. */
@@ -168,6 +195,66 @@ export class WindowManager {
 
   isIslandExpanded(): boolean {
     return this.islandExpanded
+  }
+
+  /** Opens the menu with its corner at `at` (screen DIPs), flipped left or up where it would leave the screen. */
+  showMenu(at: { x: number; y: number }): void {
+    if (!this.menuWin || this.menuWin.isDestroyed()) this.menuWin = this.createMenu()
+    const win = this.menuWin
+    const area = screen.getDisplayNearestPoint(at).workArea
+    const w = MENU.width - 2 * MENU.cornerX
+    const h = MENU.height - MENU.cornerY - 12
+    const left = at.x + w > area.x + area.width ? at.x - w : at.x
+    const top = at.y + h > area.y + area.height ? at.y - h : at.y
+    win.setBounds({
+      x: Math.round(Math.max(area.x, left) - MENU.cornerX),
+      y: Math.round(Math.max(area.y, top) - MENU.cornerY),
+      width: MENU.width,
+      height: MENU.height
+    })
+    const open = (): void => {
+      win.show()
+      win.focus()
+    }
+    if (win.webContents.isLoading()) win.once('ready-to-show', open)
+    else open()
+  }
+
+  hideMenu(): void {
+    if (this.menuWin?.isVisible()) this.menuWin.hide()
+  }
+
+  isMenu(contents: Electron.WebContents): boolean {
+    return !!this.menuWin && !this.menuWin.isDestroyed() && this.menuWin.webContents === contents
+  }
+
+  private createMenu(): BrowserWindow {
+    const win = new BrowserWindow({
+      icon: appIcon(),
+      width: MENU.width,
+      height: MENU.height,
+      title: 'Lumi — Menu',
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
+      maximizable: false,
+      minimizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      webPreferences: secureWebPreferences
+    })
+    win.setAlwaysOnTop(true, 'pop-up-menu')
+    win.on('blur', () => win.hide()) // a click anywhere else closes it, like a native menu
+    win.on('close', (event) => {
+      if (this.quitting) return
+      event.preventDefault()
+      win.hide()
+    })
+    void loadPage(win, 'menu')
+    return win
   }
 
   markQuitting(): void {
@@ -237,6 +324,7 @@ export class WindowManager {
   settleCharacter(): void {
     this.scaleBase = undefined
     const b = this.characterBounds()
+    if (this.seat?.handle === 0) this.seat = taskbarSeat(screen.getDisplayMatching(b).workArea) // the taskbar may have moved
     if (this.seat) return this.place(seatedBounds(b, this.seat.rect.y), 'sit')
     const display = screen.getDisplayMatching(b)
     const others = screen.getAllDisplays().filter((d) => d.id !== display.id).map((d) => d.bounds)
@@ -291,11 +379,11 @@ export class WindowManager {
   private async trySit(): Promise<void> {
     if (!this.perchDeps) return
     const token = this.perchToken
-    let frames: Frame[]
+    let frames: Frame[] = []
     try {
       frames = await this.perchDeps.frames()
     } catch {
-      return // no helper: she just stands where she was dropped
+      // no helper: she can still sit on the taskbar
     }
     if (token !== this.perchToken || this.drag) return
     const b = this.characterBounds()
@@ -303,7 +391,7 @@ export class WindowManager {
     if (!seat) return
     this.seat = seat.frame
     this.place(seat.bounds, 'sit', true)
-    this.followSeat(token)
+    if (seat.frame.handle !== 0) this.followSeat(token) // the taskbar doesn't move
   }
 
   /** Polls the seat window: quickly while it moves, slowly while it doesn't. She falls when it goes away. */
@@ -372,7 +460,7 @@ export class WindowManager {
   }
 
   allWindows(): BrowserWindow[] {
-    return [this.character, this.island, ...this.panels.values()].filter((w) => !w.isDestroyed())
+    return [this.character, this.island, ...(this.menuWin ? [this.menuWin] : []), ...this.panels.values()].filter((w) => !w.isDestroyed())
   }
 
   private createPanel(name: WindowName): BrowserWindow {

@@ -1,6 +1,8 @@
+import { findLocalModel } from '@shared/localModels'
 import { formatAccelerator } from '@shared/shortcuts'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MicButton } from '../ui/MicButton'
+import { Orb, type OrbMode } from '../ui/Orb'
 import { RichText } from '../ui/RichText'
 import { useAppState } from '../ui/useAppState'
 import { useConversation } from '../ui/useConversation'
@@ -8,19 +10,6 @@ import { useVoiceMode, type VoicePhase } from '../ui/useVoiceMode'
 
 const VOICE_LABEL: Record<Exclude<VoicePhase, 'off'>, string> = { listening: 'Listening… tap to stop', hearing: 'Hearing you…', transcribing: 'Got it…' }
 const tail = (text: string, n: number): string => (text.length > n ? '…' + text.slice(-n).trimStart() : text)
-
-type OrbMode = 'idle' | 'listening' | 'thinking' | 'streaming' | 'controlling'
-
-/** The Siri-style orb: colour blobs swirling in a glass sphere. It pops in when it appears and swells with the voice. */
-function Orb({ mode, level = 0 }: { mode: OrbMode; level?: number }): React.JSX.Element {
-  return (
-    <span className={`orb ${mode}`} style={{ '--level': level } as React.CSSProperties} aria-hidden="true">
-      <i />
-      <i />
-      <i />
-    </span>
-  )
-}
 
 export function Island(): React.JSX.Element {
   const state = useAppState()
@@ -74,7 +63,7 @@ export function Island(): React.JSX.Element {
               ? `Tap to talk to ${name}`
               : `Ask ${name}…`
   const orbMode: OrbMode = status !== 'idle' ? status : talking ? 'listening' : 'idle'
-  const glass = state?.glass ? ' glass' : ''
+  const glass = state?.glass && state.islandStyle === 'glass' ? ' glass' : ''
 
   if (!expanded && state?.controlling) {
     // While Lumi operates the desktop the pill becomes the emergency stop.
@@ -116,7 +105,14 @@ export function Island(): React.JSX.Element {
     <section className={`panel${glass}`} aria-label="Quick ask" onKeyDown={onKeyDown}>
       <header>
         <Orb mode={orbMode} />
-        <span className="panel-title">{state ? `${name} · ${state.ai.model}${state.ai.local ? '' : ' · cloud'}` : 'Lumi'}</span>
+        <span className="panel-title">
+          <strong>{name}</strong>
+          {state && (
+            <small>
+              {state.ai.provider === 'builtin' ? `${findLocalModel(state.local.llm)?.name.split(' (')[0] ?? 'Lumi built-in'}, on this PC` : `${state.ai.model}, ${state.ai.local ? 'on this PC' : 'online'}`}
+            </small>
+          )}
+        </span>
         <button type="button" className="link" onClick={() => void window.assistant.openWindow('chat')}>
           Open chat
         </button>

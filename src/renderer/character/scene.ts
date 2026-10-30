@@ -24,7 +24,10 @@ export interface CharacterScene {
   lookAtCursor(x: number, y: number): void
   setHeld(held: boolean): void
   nudge(dx: number, dy: number): void
-  setPerch(perch: Perch): void
+  /** `facing`: which way she turns when she sits (+1 right, −1 left). */
+  setPerch(perch: Perch, facing?: number): void
+  /** A jelly wobble when she is resized: + stretches (growing), − squashes (shrinking). */
+  bounce(amount: number): void
   setQuality(quality: Graphics): void
   dispose(): void
 }
@@ -46,6 +49,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   let avatar: Avatar | null = null
   let state: CharacterState = 'IDLE'
   let perch: Perch = 'none'
+  let facing = 1
   let cursor: { x: number; y: number } | null = null
   let mouth: number | null = null
   let loadToken = 0
@@ -71,7 +75,12 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     camera.updateProjectionMatrix()
   }
   frame()
-  window.addEventListener('resize', frame)
+  // Draw at the new size right away: a resize clears the canvas, and a cleared canvas both flickers and fails the hit test.
+  const onResize = (): void => {
+    frame()
+    if (avatar) renderer.render(scene, camera)
+  }
+  window.addEventListener('resize', onResize)
 
   const timer = new Timer()
   timer.connect(document) // pauses elapsed time while the page is hidden
@@ -99,7 +108,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     }
     avatar = next
     avatar.setState(state)
-    avatar.setPerch(perch)
+    avatar.setPerch(perch, facing)
     avatar.setMouth(mouth)
     scene.add(avatar.vrm.scene)
     frame()
@@ -154,9 +163,13 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     nudge(dx, dy) {
       avatar?.nudge(dx, dy)
     },
-    setPerch(next) {
+    setPerch(next, side = 1) {
       perch = next
-      avatar?.setPerch(next)
+      facing = side
+      avatar?.setPerch(next, side)
+    },
+    bounce(amount) {
+      avatar?.bounce(amount)
     },
     setQuality(quality) {
       const q = QUALITY[quality]
@@ -168,7 +181,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     dispose() {
       cancelAnimationFrame(raf)
       timer.dispose()
-      window.removeEventListener('resize', frame)
+      window.removeEventListener('resize', onResize)
       avatar?.dispose()
       renderer.dispose()
     }

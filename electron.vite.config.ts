@@ -20,7 +20,8 @@ export default defineConfig({
         input: {
           character: resolve('src/renderer/character.html'),
           chat: resolve('src/renderer/chat.html'),
-          island: resolve('src/renderer/island.html')
+          island: resolve('src/renderer/island.html'),
+          menu: resolve('src/renderer/menu.html')
         }
       }
     }

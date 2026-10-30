@@ -49,7 +49,7 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 
 ## 2. What the user gets
 
-- **Character:** 5 bundled CC0/licensed VRM characters with matching male/female voices; idle animations, waving,
+- **Character:** 9 bundled CC0/licensed VRM characters with matching male/female voices; idle animations, waving,
   picked-up "wheee" reaction with hair/cloth physics; scroll the wheel over her to resize; drag to move; peeks in from
   a screen edge; sits on an app window's top edge and rides along; cute lines ("Yay!", "Hee hee!") and a cheer
   when an action worked.
@@ -82,7 +82,8 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `60636a2` 0.2.1 | Fixes from testing the installed app: tool calls written as text, typing landing in Lumi, UTF-8 |
 | `4c503d2` 0.3.0 | Qwen3-VL 4B default, no-approval mode, Settings inside the chat window with tabs, ad blocker, no console windows, DB self-repair, forgiving tool arguments, this summary |
 | `2281387` 0.3.1 | Lumi icon everywhere, choose install location, settings logged at startup |
-| (next) 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
+| `37918b4` 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
+| (next) 0.5.0 | Pill island (glass optional), Lumi's own menu, guided API keys, 4 more characters + Miku/Teto links, side-on sitting and taskbar seat, smoother wheel resize |
 
 ## 4. How to work on it
 

@@ -168,3 +168,20 @@ Root causes found by testing on this PC, not guessed:
   sentence.
 - New: `OTHERAGENT.md` (the whole story for the next AI agent).
 - Typecheck and lint clean; unit 158 pass (2 skipped); E2E 51/51 (new: rebinding a shortcut in Settings).
+
+## 0.5.0: pill island, glass menu, guided API keys, 9 characters, side-on sitting, smoother resizing
+- **Island:** a smaller near-black pill with round ends (300×36), the default; "Frosted glass" stays as an option
+  (Settings → General → Island look). Real blur in a pill shape was probed four ways and is impossible on Windows here
+  (ADR-056). Checked on screen: pill, pill opened, glass.
+- **Menu:** the character's and tray's right-click open Lumi's own black-glass menu (orb + status, icons, Keep-on-top
+  switch, Stop with its shortcut, Quit); keyboard and Esc work; only the menu window may run items (E2E).
+- **API keys:** Settings → AI → an online provider shows "Connect <provider>" in three steps; "Get a key" opens the
+  provider's key page (fixed list), saving the key tests the connection at once (E2E: Gemini's key page opens).
+- **Characters:** Vita, Bibi, Victoria Rubin, Darkness Shibu added (CC0). "Find Miku / Find Teto / Browse VRoid Hub"
+  links for models that can't be bundled. All 9 rendered standing and sitting on screen.
+- **Sitting:** works on all 9 (stand-in window: hips on the edge at y 182 for each); now side-on so skirts stay modest;
+  the taskbar is a seat (E2E: hips on the work-area edge within 2 px); wider drop tolerance.
+- **Wheel resize:** renders immediately on each resize (a cleared canvas used to fail the hit test, turning the window
+  click-through mid-scroll so the scroll went to the app behind), stays clickable 0.7 s after each notch, handles mice
+  that report lines, and wobbles like jelly when she grows or shrinks.
+- Typecheck and lint clean; unit 159 pass (2 skipped); E2E 55/55 (new: menu, island look, key page, taskbar seat).

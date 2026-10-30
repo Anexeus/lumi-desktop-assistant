@@ -122,9 +122,12 @@ export function canSit(b: Rect, frame: Frame, area: Rect): boolean {
   return !frame.maximized && seatedBounds(b, frame.rect.y).y >= area.y - b.height * 0.1
 }
 
+/** The taskbar's top edge as a seat (handle 0): the bottom of the work area. */
+export const taskbarSeat = (area: Rect): Frame => ({ handle: 0, rect: { x: area.x, y: area.y + area.height, width: area.width, height: 0 }, maximized: false })
+
 /**
- * The window to sit on after a drop: the topmost one whose top edge lies between her hips and feet under her centre,
- * where that edge isn't hidden by a window above it. `frames` is topmost first.
+ * The seat after a drop: the topmost window whose top edge lies between her hips and feet under her centre (and isn't
+ * hidden by a window above it), or the taskbar when she is dropped onto it. `frames` is topmost first.
  */
 export function seatPlacement(b: Rect, frames: Frame[], area: Rect): { frame: Frame; bounds: Rect } | null {
   const cx = b.x + b.width / 2
@@ -132,9 +135,12 @@ export function seatPlacement(b: Rect, frames: Frame[], area: Rect): { frame: Fr
   const feet = b.y + b.height * FEET_LINE
   for (const [i, frame] of frames.entries()) {
     const r = frame.rect
-    if (cx < r.x + 24 || cx > r.x + r.width - 24 || r.y < hips - 24 || r.y > feet + 40) continue
+    if (cx < r.x + 24 || cx > r.x + r.width - 24 || r.y < hips - 40 || r.y > feet + 60) continue
     if (frames.slice(0, i).some((above) => contains(above.rect, cx, r.y + 2))) continue
     if (canSit(b, frame, area)) return { frame, bounds: seatedBounds(b, r.y) }
   }
+  // Feet dragged past the bottom of the work area: she sits on the taskbar with her legs over it.
+  const taskbar = taskbarSeat(area)
+  if (feet > taskbar.rect.y && cx >= area.x && cx <= area.x + area.width) return { frame: taskbar, bounds: seatedBounds(b, taskbar.rect.y) }
   return null
 }

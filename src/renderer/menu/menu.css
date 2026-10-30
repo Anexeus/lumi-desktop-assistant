@@ -1,0 +1,161 @@
+/* The character's and tray's menu: the island's black glass, a column of quiet rows, one opening motion. The window is
+   a little larger than the menu so its shadow has room (MENU in windows.ts must match these sizes). */
+:root {
+  --text: #f5f5f7;
+  --muted: rgb(245 245 247 / 58%);
+  --ink: rgb(0 0 0 / 93%);
+  --hover: rgb(255 255 255 / 10%);
+  --stop: #ff7a70;
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  color: var(--text);
+  font: 13px/1.3 var(--font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+#root {
+  padding: 8px 10px 12px;
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 6px;
+  border-radius: 18px;
+  background: var(--ink);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 9%),
+    inset 0 1px 0 rgb(255 255 255 / 7%),
+    0 6px 14px rgb(0 0 0 / 35%);
+  animation: menu-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  transform-origin: 16px 12px;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+.menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 10px;
+}
+
+.menu-head span {
+  display: grid;
+  min-width: 0;
+}
+
+.menu-head strong {
+  font-weight: 600;
+}
+
+.menu-head small {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu button {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.menu button svg {
+  flex: none;
+  opacity: 0.8;
+}
+
+.menu button:hover,
+.menu button:focus {
+  background: var(--hover);
+}
+
+.menu button.stop {
+  color: var(--stop);
+}
+
+.menu hr {
+  flex: none;
+  height: 1px;
+  margin: 4px 10px;
+  border: 0;
+  background: rgb(255 255 255 / 10%);
+}
+
+.menu kbd {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 8%);
+  color: var(--muted);
+  font: 10.5px/1.5 var(--font);
+}
+
+/* Keep on top: a small light switch; on is white with a black knob, so the orb stays the only colour. */
+.switch {
+  position: relative;
+  margin-left: auto;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 18%);
+  transition: background 150ms ease;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 150ms ease;
+}
+
+[aria-checked='true'] .switch {
+  background: rgb(255 255 255 / 88%);
+}
+
+[aria-checked='true'] .switch::after {
+  background: #000;
+  transform: translateX(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .switch,
+  .switch::after {
+    animation: none;
+    transition: none;
+  }
+}

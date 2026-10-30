@@ -284,3 +284,34 @@ The saved settings were validated as one object, so one invalid or unknown field
 a value that later became invalid) reset every setting to its default — the likely cause of the owner's settings
 "reverting to Ollama". `parseSettingsFile` validates each top-level setting separately; a bad one is reset alone and
 logged. Nested groups are still validated whole.
+
+## ADR-056 The island is a CSS pill by default; frosted glass is an option (2026-10-30)
+The owner asked for curved (pill) sides after asking for taskbar blur. Windows can't do both: probed on this PC, an
+Acrylic window ignores Electron's `setShape`, a `SetWindowRgn` pill region set from another process, and the
+compositor accent policy (which turned a transparent window solid black); a native WinForms window with the accent and a
+pill region also stayed rectangular. So the island has two looks (Settings → General → Island look): **Pill** (default)
+is a transparent window with a near-black CSS capsule (anti-aliased round ends, no blur), like a phone's Dynamic Island;
+**Frosted glass** is the Acrylic window from ADR-052. Transparency is fixed at window creation, so switching recreates
+the island window. It also got smaller (300×36; open 440×340).
+
+## ADR-057 Lumi's own menu window instead of the native context menu (2026-10-30)
+Native Win32 menus can't be styled. The character's right-click and the tray's right-click open one small transparent
+window drawn like the island (header with the orb and status, icons, a switch for "Keep on top", Stop with its shortcut,
+Quit), opened at the pointer and flipped at screen edges, closed by Esc, a click elsewhere (blur) or running an item.
+`menu:run` is accepted only from that window; items map to the existing tray actions. Keyboard: arrows, Home/End,
+Enter. The dev-only "Preview state" submenu went with the native menu.
+
+## ADR-058 More characters: the rest of VRoid's CC0 samples; Miku and Teto by link only (2026-10-30)
+Added Vita, Bibi, Victoria Rubin and Darkness Shibu (VRoid AvatarSample F, E, G, D-darkness; CC0 per the VRoid Project
+release on OpenGameArt, and their embedded VRoid Hub licence allows redistribution, modification and commercial use).
+Hatsune Miku and Kasane Teto can't be bundled: the free VRMs found (e.g. RIDEREX's on BOOTH) forbid redistributing the
+model data, and Miku's character rights belong to Crypton. Settings → Character links to VRoid Hub searches instead
+(fixed URLs, opened by main), and the user imports a model for personal use with "Use my own .vrm file…".
+
+## ADR-059 Sitting side-on; the taskbar is a seat (2026-10-30)
+Facing the viewer with the thighs raised, a skirt skinned to the thighs lifts and shows what it shouldn't (seen on
+Victoria, Shibu, Bibi; lowering the thighs or bringing the knees together did not fix it). Sitting, she now turns ~83°
+toward the middle of the screen (thighs along the edge, lower legs over the front) and turns her head back to the
+viewer: an unmistakable sitting silhouette and nothing to see under a skirt. Dragging her feet below the work area sits
+her on the taskbar's edge (no helper needed); most of the owner's windows are maximised, whose top edge is off limits.
+The window-top drop tolerance widened to hips−40 … feet+60 px.

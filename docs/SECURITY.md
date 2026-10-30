@@ -95,6 +95,8 @@ hints are not trusted for the confirmation decision unless the user marks the se
 - The character reads other apps' window **positions** (never titles or content) through the helper's read-only
   `frames`/`frame` operations, only after she is dropped and while she sits on a window.
 - Global shortcuts are user-chosen but must include Ctrl, Alt or Win, so they can't capture ordinary typing.
+- Lumi's menu is its own sandboxed window; `menu:run` is accepted only from it. External pages it opens (provider key
+  pages, VRoid Hub searches) come from fixed lists in main, never from a renderer.
 
 - Desktop control (UI Automation, typing, clicks) runs in a fixed bundled script; requests are JSON data, never code.
   Every action asks first; the red island shows when Lumi is acting; Ctrl+Alt+Shift+X / tray / island stops everything

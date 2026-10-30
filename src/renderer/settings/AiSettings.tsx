@@ -133,7 +133,8 @@ export function AiSettings({ ai, local }: { ai: AppState['ai']; local: AppState[
     try {
       await window.assistant.ai.setApiKey(value)
       setKey('')
-      setStatus({ kind: 'ok', text: value ? 'Key saved, encrypted by Windows for your account.' : 'Key removed.' })
+      if (!value) return setStatus({ kind: 'ok', text: 'Key removed.' })
+      await test() // shows "Connected. N models available." or what is wrong with the key
     } catch {
       setStatus({ kind: 'error', text: 'Could not save the key. Secure storage may be unavailable.' })
     }
@@ -154,6 +155,49 @@ export function AiSettings({ ai, local }: { ai: AppState['ai']; local: AppState[
         ))}
       </div>
       <p className="model-license">{provider.note}</p>
+
+      {ai.provider !== 'builtin' && !ai.local && (
+        <div className="connect">
+          <h3>Connect {provider.name}</h3>
+          <ol className="steps">
+            <li>
+              <span>
+                Create an API key on {provider.name}’s website{provider.keyUrl ? '' : ' (see its documentation)'}. Sign in there; copy the key it
+                shows you.
+              </span>
+              {provider.keyUrl && (
+                <button type="button" className="secondary small" onClick={() => void window.assistant.ai.openKeyPage(ai.provider)}>
+                  Get a key
+                </button>
+              )}
+            </li>
+            <li>
+              <span>Paste it here and save. Windows encrypts it for your account; Lumi never shows it again.</span>
+              <span className="inline">
+                <input
+                  type="password"
+                  value={key}
+                  onChange={(e) => setKey(e.target.value)}
+                  placeholder={ai.hasApiKey ? 'A key is saved' : 'Paste your key'}
+                  aria-label={`${provider.name} API key`}
+                  autoComplete="off"
+                />
+                <button type="button" onClick={() => void saveKey(key.trim())} disabled={!key.trim()}>
+                  Save key
+                </button>
+                {ai.hasApiKey && (
+                  <button type="button" className="secondary" onClick={() => void saveKey(null)}>
+                    Remove
+                  </button>
+                )}
+              </span>
+            </li>
+            <li>
+              <span>Lumi tests the connection when you save. Then pick a model below; the suggestions come from {provider.name}.</span>
+            </li>
+          </ol>
+        </div>
+      )}
 
       {ai.provider === 'builtin' ? (
         <>
@@ -200,31 +244,6 @@ export function AiSettings({ ai, local }: { ai: AppState['ai']; local: AppState[
             </button>
           </div>
         </form>
-      )}
-
-      {ai.provider !== 'builtin' && !ai.local && (
-        <div className="ai">
-          <label className="field">
-            <span>
-              {provider.name} API key {ai.hasApiKey && <small>(a key is saved)</small>}
-            </span>
-            <span className="inline">
-              <input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={ai.hasApiKey ? '••••••••' : 'Paste your key'} autoComplete="off" />
-              <button type="button" onClick={() => void saveKey(key.trim())} disabled={!key.trim()}>
-                Save key
-              </button>
-              {ai.hasApiKey && (
-                <button type="button" className="secondary" onClick={() => void saveKey(null)}>
-                  Remove
-                </button>
-              )}
-            </span>
-          </label>
-          <p className="model-license">
-            Each service keeps its own key, encrypted by Windows for your account and never shown again.
-            {provider.keyUrl && <> Get one at <span className="selectable">{provider.keyUrl}</span></>}
-          </p>
-        </div>
       )}
 
       {status && (

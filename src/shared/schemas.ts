@@ -4,7 +4,7 @@ import { CHARACTER_IDS } from './characters'
 import { z } from 'zod'
 import { CHARACTER_EVENTS } from './character'
 import { isAccelerator, SHORTCUT_ACTIONS } from './shortcuts'
-import { Invoke, Send } from './ipc'
+import { Invoke, MENU_ACTIONS, Send } from './ipc'
 
 const coord = z.number().finite().min(-100_000).max(100_000)
 const point = z.object({ screenX: coord, screenY: coord }).strict()
@@ -90,7 +90,8 @@ export const settingsFileSchema = z
     character: z.enum(CHARACTER_IDS),
     graphics: graphicsSchema,
     local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict(),
-    shortcuts: shortcutsSchema
+    shortcuts: shortcutsSchema,
+    islandStyle: z.enum(['pill', 'glass'])
   })
   .partial()
   .strict()
@@ -134,6 +135,8 @@ export const invokeSchemas = {
   [Invoke.localRemove]: z.object({ id: z.enum(LOCAL_MODEL_IDS) }).strict(),
   [Invoke.localSelect]: z.object({ kind: z.enum(['llm', 'stt']), id: z.enum(LOCAL_MODEL_IDS) }).strict(),
   [Invoke.setIslandVisible]: z.object({ value: z.boolean() }).strict(),
+  [Invoke.setIslandStyle]: z.object({ style: z.enum(['pill', 'glass']) }).strict(),
+  [Invoke.menuRun]: z.object({ action: z.enum(MENU_ACTIONS) }).strict(),
   [Invoke.setIslandExpanded]: z.object({ expanded: z.boolean() }).strict(),
   [Invoke.chatGet]: none,
   [Invoke.chatSend]: z.object({ text: z.string().trim().min(1).max(8000) }).strict(),
@@ -142,6 +145,8 @@ export const invokeSchemas = {
   [Invoke.aiSetSettings]: aiSettingsSchema,
   [Invoke.aiSetApiKey]: z.object({ key: z.string().trim().min(1).max(1000).nullable() }).strict(),
   [Invoke.aiListModels]: z.object({ baseUrl: baseUrlSchema.optional() }).strict(),
+  [Invoke.aiOpenKeyPage]: z.object({ provider: z.enum(PROVIDER_IDS) }).strict(),
+  [Invoke.openCharacterSite]: z.object({ site: z.enum(['miku', 'teto', 'browse']) }).strict(),
   [Invoke.memoryList]: none,
   [Invoke.memoryAdd]: z.object({ kind: z.enum(['memory', 'note']), text: z.string().max(2000) }).strict(),
   [Invoke.memoryDelete]: z.object({ id: z.number().int().positive() }).strict(),

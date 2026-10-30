@@ -44,7 +44,7 @@ export function Chat(): React.JSX.Element {
   if (state?.panelView === 'settings') {
     return (
       <main className="chat">
-        <TitleBar title={`${state.assistantName} · Settings`}>
+        <TitleBar title="Settings">
           <button type="button" className="ghost" onClick={() => void window.assistant.openWindow('chat')}>
             ← Chat
           </button>

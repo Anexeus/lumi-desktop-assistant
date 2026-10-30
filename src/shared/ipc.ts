@@ -6,6 +6,13 @@ import type { ShortcutAction } from './shortcuts'
 
 export type WindowName = 'chat' | 'settings'
 
+/** The island's look: a black pill with curved sides, or Windows' blurred glass (which can only round its corners a little). */
+export type IslandStyle = 'pill' | 'glass'
+
+/** What the character's and tray's menu can do. */
+export const MENU_ACTIONS = ['chat', 'settings', 'character', 'alwaysOnTop', 'stop', 'quit', 'close'] as const
+export type MenuAction = (typeof MENU_ACTIONS)[number]
+
 export interface ChatItem {
   id: number
   /** "tool" items are activity lines ("Searched your folders for …"), not messages. */
@@ -216,6 +223,7 @@ export interface AppState {
   model: ModelInfo
   islandVisible: boolean
   islandExpanded: boolean
+  islandStyle: IslandStyle
   ai: AiStatus
   /** Save chats so they survive restarts. Turning it off keeps what is saved until deleted. */
   historyEnabled: boolean
@@ -256,6 +264,8 @@ export const Invoke = {
   localRemove: 'local:remove',
   localSelect: 'local:select',
   setIslandVisible: 'island:set-visible',
+  setIslandStyle: 'island:set-style',
+  menuRun: 'menu:run',
   setIslandExpanded: 'island:set-expanded',
   chatGet: 'chat:get',
   chatSend: 'chat:send',
@@ -264,6 +274,8 @@ export const Invoke = {
   aiSetSettings: 'ai:set-settings',
   aiSetApiKey: 'ai:set-api-key',
   aiListModels: 'ai:list-models',
+  aiOpenKeyPage: 'ai:open-key-page',
+  openCharacterSite: 'model:open-site',
   memoryList: 'memory:list',
   memoryAdd: 'memory:add',
   memoryDelete: 'memory:delete',
@@ -333,8 +345,13 @@ export interface AssistantApi {
   /** Returns state updates. Call the returned function to unsubscribe. */
   onState(listener: (state: AppState) => void): () => void
   setIslandVisible(value: boolean): Promise<AppState>
+  setIslandStyle(style: IslandStyle): Promise<AppState>
   /** Rebinds a global shortcut (null restores the default). Fails when another app or Lumi action already uses it. */
   setShortcut(action: ShortcutAction, accelerator: string | null): Promise<{ ok: true; state: AppState } | { ok: false; message: string }>
+  menu: {
+    /** Menu window only: runs the item and closes the menu. */
+    run(action: MenuAction): Promise<void>
+  }
   island: {
     /** Island window only: grow into the input panel or shrink back to the pill. */
     setExpanded(expanded: boolean): Promise<void>
@@ -352,6 +369,8 @@ export interface AssistantApi {
     setApiKey(key: string | null): Promise<AppState>
     /** Lists models at baseUrl (default: the saved one); doubles as a connection test. */
     listModels(baseUrl?: string): Promise<ListModelsResult>
+    /** Opens the current provider's own page for creating an API key, in the default browser. */
+    openKeyPage(provider: ProviderId): Promise<void>
   }
   /** Emergency stop: cancels the reply, any pending approval and any desktop action in flight. */
   stop(): Promise<void>
@@ -423,6 +442,8 @@ export interface AssistantApi {
     /** Switches to a bundled character (dropping any custom model) and matches the voice to it. */
     select(id: string): Promise<AppState>
     setGraphics(quality: Graphics): Promise<AppState>
+    /** Opens a VRoid Hub search for more characters (Lumi can't bundle Miku or Teto: their licences forbid it). */
+    openSite(site: 'miku' | 'teto' | 'browse'): Promise<void>
   }
   character: {
     setIgnoreMouse(ignore: boolean): void

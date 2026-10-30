@@ -1,11 +1,11 @@
-import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { z } from 'zod'
-import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent, type CharacterState } from '@shared/character'
+import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent } from '@shared/character'
 import { Events, Invoke, Send, type AppState, type WindowName, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
 import { runCommand, saveMemory } from './ai/commands'
 import { Conversation } from './ai/conversation'
@@ -34,7 +34,7 @@ import { importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
 import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
 import { openStore } from './storage/store'
-import { menuTemplate, createTray, type TrayActions } from './tray'
+import { createTray, type TrayActions } from './tray'
 import type { VrmMeta } from './vrm-meta'
 import { loadWindowState, saveWindowState } from './window-state'
 import { glassSupported, WindowManager } from './windows'
@@ -168,6 +168,7 @@ async function start(): Promise<void> {
     character: initialSnapshot.state,
     model: custom ? modelInfo(custom.meta, 0) : bundledInfo(settings.character, 0),
     islandVisible: settings.islandVisible,
+    islandStyle: settings.islandStyle,
     islandExpanded: false,
     ai: aiStatus(),
     historyEnabled: settings.historyEnabled,
@@ -203,7 +204,8 @@ async function start(): Promise<void> {
       },
       warm: () => void desktop.request('ping').catch(() => {}),
       onPerch: (perch) => setState({ perch })
-    }
+    },
+    settings.islandStyle
   )
 
   const actions: TrayActions = {
@@ -212,7 +214,8 @@ async function start(): Promise<void> {
     openChat: () => showPanel('chat'),
     openSettings: () => showPanel('settings'),
     stop: () => emergencyStop(),
-    quit: () => app.quit()
+    quit: () => app.quit(),
+    showMenu: () => windows.showMenu(screen.getCursorScreenPoint())
   }
   const tray = createTray(actions)
   /** Chat and Settings share one window; "settings" switches its view instead of opening another window. */
@@ -534,6 +537,12 @@ async function start(): Promise<void> {
     }
   })
   handle(Invoke.setIslandVisible, ({ value }) => setState({ islandVisible: value }))
+  handle(Invoke.setIslandStyle, ({ style }) => {
+    settings.islandStyle = style
+    saveSettings(store, settings)
+    windows.setIslandStyle(style, state.islandVisible)
+    return setState({ islandStyle: style, islandExpanded: false })
+  })
 
   const shortcutActions: Record<ShortcutAction, () => void> = {
     character: actions.toggleCharacter,
@@ -801,6 +810,21 @@ async function start(): Promise<void> {
     newChat()
     notifyData()
   })
+  const CHARACTER_SITES = {
+    miku: 'https://hub.vroid.com/en/search/Hatsune%20Miku',
+    teto: 'https://hub.vroid.com/en/search/Kasane%20Teto',
+    browse: 'https://hub.vroid.com/en'
+  } as const
+  handle(Invoke.openCharacterSite, ({ site }, e) => {
+    if (!windows.isPanel(e.sender, 'chat')) throw new Error('Rejected model:open-site: not the chat window')
+    void shell.openExternal(CHARACTER_SITES[site])
+  })
+  // The key pages come from Lumi's own provider list, never from the renderer.
+  handle(Invoke.aiOpenKeyPage, ({ provider }, e) => {
+    if (!windows.isPanel(e.sender, 'chat')) throw new Error('Rejected ai:open-key-page: not the chat window')
+    const url = findProvider(provider).keyUrl
+    if (url) void shell.openExternal(url)
+  })
   handle(Invoke.aiListModels, async ({ baseUrl }): Promise<ListModelsResult> => {
     try {
       // Built-in: "testing the connection" means starting the engine with the chosen model.
@@ -838,26 +862,21 @@ async function start(): Promise<void> {
   on(Send.resize, (p, e) => fromCharacter(e.sender) && windows.resizeCharacter(p.width, p.height))
   on(Send.scale, (p, e) => fromCharacter(e.sender) && windows.scaleCharacter(p.factor))
   on(Send.resizeEnd, (_p, e) => fromCharacter(e.sender) && windows.settleCharacter())
-  on(Send.showMenu, (_p, e) => {
-    if (!fromCharacter(e.sender)) return
-    const template: MenuItemConstructorOptions[] = menuTemplate(state, actions)
-    if (!app.isPackaged) template.splice(-1, 0, { label: 'Preview state (dev)', submenu: previewMenu() }, { type: 'separator' })
-    Menu.buildFromTemplate(template).popup({ window: windows.character })
+  on(Send.showMenu, (_p, e) => fromCharacter(e.sender) && actions.showMenu())
+  handle(Invoke.menuRun, ({ action }, e) => {
+    if (!windows.isMenu(e.sender)) throw new Error('Rejected menu:run: not the menu window')
+    windows.hideMenu()
+    const run: Record<typeof action, () => void> = {
+      chat: actions.openChat,
+      settings: actions.openSettings,
+      character: actions.toggleCharacter,
+      alwaysOnTop: () => actions.setAlwaysOnTop(!state.alwaysOnTop),
+      stop: actions.stop,
+      quit: actions.quit,
+      close: () => {}
+    }
+    run[action]()
   })
-
-  // Dev aid: trigger each state by hand to check its animation.
-  function previewMenu(): MenuItemConstructorOptions[] {
-    const events: [CharacterState, CharacterEvent[]][] = [
-      ['LISTENING', ['cancel', 'listen']],
-      ['THINKING', ['cancel', 'think']],
-      ['SPEAKING', ['cancel', 'speak']],
-      ['WORKING', ['cancel', 'work']],
-      ['NOTIFICATION', ['cancel', 'notify']],
-      ['ERROR', ['cancel', 'error']],
-      ['IDLE', ['cancel', 'done']]
-    ]
-    return events.map(([label, seq]) => ({ label, click: () => seq.forEach(fire) }))
-  }
 
   // Feed the cursor position to the character so its eyes can follow it anywhere on screen.
   let lastCursor = ''

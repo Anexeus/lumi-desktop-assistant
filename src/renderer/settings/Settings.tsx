@@ -188,6 +188,23 @@ export function Settings(): React.JSX.Element {
             onChange={(e) => void window.assistant.setIslandVisible(e.target.checked)}
           />
         </label>
+        {state.glass && (
+          <div className="field">
+            <span id="island-look-label">Island look</span>
+            <div className="segmented" role="radiogroup" aria-labelledby="island-look-label">
+              {(['pill', 'glass'] as const).map((look) => (
+                <button key={look} type="button" role="radio" aria-checked={state.islandStyle === look} onClick={() => void window.assistant.setIslandStyle(look)}>
+                  {look === 'pill' ? 'Pill' : 'Frosted glass'}
+                </button>
+              ))}
+            </div>
+            <small className="model-license">
+              {state.islandStyle === 'pill'
+                ? 'A black capsule with round ends, like a phone’s Dynamic Island.'
+                : 'Blurs what is behind it, like the taskbar. Windows can only round its corners slightly.'}
+            </small>
+          </div>
+        )}
       </section>
       {keyboard}
       </>
@@ -234,6 +251,24 @@ export function Settings(): React.JSX.Element {
             <button type="button" className="secondary" onClick={() => void chooseModel()} disabled={busy}>
               Use my own .vrm file…
             </button>
+          </div>
+          <div className="find-more">
+            <span>
+              Want Hatsune Miku, Kasane Teto or someone else? Their creators don’t allow apps to include them, but you can download a free
+              model for yourself on VRoid Hub (sign in with pixiv, open a model whose terms allow it, press Download), then choose
+              “Use my own .vrm file…”.
+            </span>
+            <span className="model-actions">
+              <button type="button" className="secondary small" onClick={() => void window.assistant.model.openSite('miku')}>
+                Find Miku
+              </button>
+              <button type="button" className="secondary small" onClick={() => void window.assistant.model.openSite('teto')}>
+                Find Teto
+              </button>
+              <button type="button" className="secondary small" onClick={() => void window.assistant.model.openSite('browse')}>
+                Browse VRoid Hub
+              </button>
+            </span>
           </div>
           <div className="field">
             <span id="graphics-label">Graphics quality</span>

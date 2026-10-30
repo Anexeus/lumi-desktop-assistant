@@ -16,7 +16,11 @@ const api: AssistantApi = {
     return () => ipcRenderer.removeListener(Events.state, handler)
   },
   setIslandVisible: (value) => ipcRenderer.invoke(Invoke.setIslandVisible, { value }),
+  setIslandStyle: (style) => ipcRenderer.invoke(Invoke.setIslandStyle, { style }),
   setShortcut: (action, accelerator) => ipcRenderer.invoke(Invoke.setShortcut, { action, accelerator }),
+  menu: {
+    run: (action) => ipcRenderer.invoke(Invoke.menuRun, { action })
+  },
   island: {
     setExpanded: (expanded) => ipcRenderer.invoke(Invoke.setIslandExpanded, { expanded })
   },
@@ -34,7 +38,8 @@ const api: AssistantApi = {
   ai: {
     setSettings: (settings) => ipcRenderer.invoke(Invoke.aiSetSettings, settings),
     setApiKey: (key) => ipcRenderer.invoke(Invoke.aiSetApiKey, { key }),
-    listModels: (baseUrl) => ipcRenderer.invoke(Invoke.aiListModels, baseUrl ? { baseUrl } : {})
+    listModels: (baseUrl) => ipcRenderer.invoke(Invoke.aiListModels, baseUrl ? { baseUrl } : {}),
+    openKeyPage: (provider) => ipcRenderer.invoke(Invoke.aiOpenKeyPage, { provider })
   },
   memory: {
     list: () => ipcRenderer.invoke(Invoke.memoryList),
@@ -94,7 +99,8 @@ const api: AssistantApi = {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),
     select: (id) => ipcRenderer.invoke(Invoke.selectCharacter, { id }),
-    setGraphics: (quality) => ipcRenderer.invoke(Invoke.setGraphics, { quality })
+    setGraphics: (quality) => ipcRenderer.invoke(Invoke.setGraphics, { quality }),
+    openSite: (site) => ipcRenderer.invoke(Invoke.openCharacterSite, { site })
   },
   character: {
     onCursor(listener) {

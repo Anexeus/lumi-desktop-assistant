@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.4.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.5.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -67,8 +67,11 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 
 - **Settings** open inside the chat window (Settings button, tray, or the character's menu), with tabs on top.
 - **AI provider** (Settings → AI): Lumi built-in (Qwen3 on this PC, GPU when available), Ollama, Google Gemini, Groq,
-  OpenAI, Anthropic, OpenRouter, or any OpenAI-compatible address. Paste a key under the provider; each service keeps its
-  own key, encrypted by Windows (DPAPI) and never shown again; **Remove** deletes it.
+  OpenAI, Anthropic, OpenRouter, or any OpenAI-compatible address.
+- **Online AI keys:** Settings → AI → click a provider (e.g. Google Gemini, which has a free tier) → in "Connect …" press
+  **Get a key** (opens the provider's key page; sign in and create a key), copy it, paste it and press **Save key**.
+  Lumi tests the connection at once; then pick a model. Each service keeps its own key, encrypted by Windows (DPAPI) and
+  never shown again; **Remove** deletes it.
 - **Local models** (Settings → AI → Lumi built-in): download, switch, remove. Qwen3-VL 4B Instruct (default: fast, can
   see screenshots) needs ~4.5 GB of GPU memory (or ~6 GB RAM on CPU); Qwen3 4B and 1.7B are alternatives.
 - **Microphone and speech** (Settings → Voice): microphone, push-to-talk, Whisper or the AI service for speech-to-text,
@@ -82,7 +85,11 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 - **Projects** (Settings → Tools → folders): Lumi runs only the scripts in an approved project's `package.json`.
 - **Character size:** scroll the mouse wheel over the character (or `+`/`−` with it focused). Drag it to move.
 - **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
-  edge and she sits on it and rides along when you move it (she hops down when it closes or minimises).
+  edge (or drag her down onto the taskbar) and she sits on it, side-on, and rides along when you move the window (she
+  hops down when it closes or minimises).
+- **Menu:** right-click the character or the tray icon. **Island look** (Settings → General): Pill or Frosted glass.
+- **More characters:** 9 bundled (Settings → Character). For Miku, Teto and others: "Find Miku" / "Find Teto" open
+  VRoid Hub; download a model whose terms allow it, then **Use my own .vrm file…**.
 
 ## Docs
 

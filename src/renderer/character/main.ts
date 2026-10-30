@@ -18,6 +18,7 @@ const pick = (lines: string[]): string => lines[Math.floor(Math.random() * lines
 let interactive = false
 let mode: 'idle' | 'pressing' | 'dragging' = 'idle'
 let droppedAt = -Infinity // when she was last put down, so "Peekaboo!" follows a drop, not a restart
+let wheelUntil = 0 // while scrolling, she stays clickable even when the cursor ends up past her shrinking outline
 let pressX = 0
 let pressY = 0
 let lastX = 0
@@ -44,7 +45,7 @@ function endPress(): void {
 window.addEventListener('mousemove', (e) => {
   if (mode !== 'idle' && e.buttons === 0) endPress() // the button was released somewhere we didn't hear about
   if (mode !== 'idle') return
-  setInteractive(scene.hitTest(e.clientX, e.clientY))
+  setInteractive(scene.hitTest(e.clientX, e.clientY) || performance.now() < wheelUntil)
 })
 document.addEventListener('mouseleave', () => mode === 'idle' && setInteractive(false))
 
@@ -111,13 +112,16 @@ function stepScale(): void {
 }
 function scaleBy(logFactor: number): void {
   pendingScale = Math.max(-0.7, Math.min(0.7, pendingScale + logFactor))
+  scene.bounce(logFactor)
   if (!scaling) scaling = requestAnimationFrame(stepScale)
 }
 window.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault() // never page zoom (Ctrl+wheel) or scroll
-    if (mode === 'idle') scaleBy(-e.deltaY * WHEEL_RATE)
+    if (mode !== 'idle') return
+    wheelUntil = performance.now() + 700
+    scaleBy(-(e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY) * WHEEL_RATE) // some mice report lines, not pixels
   },
   { passive: false }
 )
@@ -157,7 +161,8 @@ let perch: Perch = 'none'
 function applyState(state: AppState): void {
   scene.setState(state.character)
   scene.setQuality(state.graphics)
-  scene.setPerch(state.perch)
+  // Sitting, she turns toward the middle of the screen.
+  scene.setPerch(state.perch, window.screenX + window.innerWidth / 2 < screen.availWidth / 2 ? 1 : -1)
   speaker.onState(state)
   document.body.dataset['state'] = state.character
   document.body.dataset['perch'] = state.perch

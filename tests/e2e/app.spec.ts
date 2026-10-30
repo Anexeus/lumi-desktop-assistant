@@ -97,6 +97,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'island',
     'local',
     'memory',
+    'menu',
     'model',
     'onDataChanged',
     'onState',
@@ -104,6 +105,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'setAlwaysOnTop',
     'setAssistantName',
     'setCharacterVisible',
+    'setIslandStyle',
     'setIslandVisible',
     'setShortcut',
     'stop',
@@ -267,6 +269,70 @@ test('a global shortcut can be rebound in Settings and reset', async () => {
 })
 
 /** Chat and Settings share the chat window; "settings" switches its view (and picks a tab). */
+test('the menu opens from the character, runs an item and closes; only it may run items', async () => {
+  await character.evaluate(() => window.assistant.character.showMenu())
+  await expect.poll(() => app.windows().some((w) => w.url().endsWith('/menu.html'))).toBe(true)
+  const menu = app.windows().find((w) => w.url().endsWith('/menu.html'))!
+  const visible = (): Promise<boolean> =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith('/menu.html'))!.isVisible())
+  await expect.poll(visible).toBe(true)
+  await expect(menu.getByRole('menuitemcheckbox', { name: /Keep on top/ })).toBeVisible()
+  await menu.getByRole('menuitem', { name: 'Settings' }).click()
+  await expect.poll(visible).toBe(false)
+  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.panelView))).toBe('settings')
+  await expect(character.evaluate(() => window.assistant.menu.run('quit'))).rejects.toThrow(/not the menu window/)
+})
+
+test('the island switches between the pill and frosted glass', async () => {
+  const style = (): Promise<string> => character.evaluate(() => window.assistant.getState().then((s) => s.islandStyle))
+  expect(await style()).toBe('pill')
+  await character.evaluate(() => window.assistant.setIslandStyle('glass'))
+  await expect.poll(style).toBe('glass')
+  await expect.poll(() => app.windows().filter((w) => w.url().endsWith('/island.html')).length).toBe(1)
+  await character.evaluate(() => window.assistant.setIslandStyle('pill'))
+  await expect.poll(style).toBe('pill')
+  await expect.poll(() => app.windows().filter((w) => w.url().endsWith('/island.html')).length).toBe(1)
+  await expect(app.windows().find((w) => w.url().endsWith('/island.html'))!.locator('.pill')).toBeVisible()
+})
+
+test('connecting an online AI: "Get a key" opens that provider’s key page', async () => {
+  await app.evaluate(({ shell }) => {
+    const g = globalThis as unknown as { opened: string[] }
+    g.opened = []
+    shell.openExternal = (async (u: string) => void g.opened.push(u)) as typeof shell.openExternal
+  })
+  const settings = await panel('settings', 'AI')
+  await settings.getByRole('radio', { name: /Google Gemini/ }).click()
+  await expect(settings.getByRole('heading', { name: 'Connect Google Gemini' })).toBeVisible()
+  await settings.getByRole('button', { name: 'Get a key' }).click()
+  await expect.poll(() => app.evaluate(() => (globalThis as unknown as { opened: string[] }).opened)).toEqual(['https://aistudio.google.com/apikey'])
+  await settings.getByRole('radio', { name: /Lumi built-in/ }).click()
+})
+
+test('dropped onto the taskbar she sits on it; picked up, she stands', async () => {
+  const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea)
+  const b = await characterWindow((w) => w.getContentBounds())
+  await character.evaluate(
+    ([dx, dy]) => {
+      const c = window.assistant.character
+      c.dragStart(500, 500)
+      c.dragMove(500 + dx, 500 + dy)
+      c.dragEnd()
+    },
+    [area.x + 200 - b.x, area.y + area.height - b.height * 0.5 - b.y]
+  )
+  await expect(character.locator('body')).toHaveAttribute('data-perch', 'sit', { timeout: 15_000 })
+  // Hips on the taskbar's top edge once she has slid down onto it.
+  const hips = (): Promise<number> => characterWindow((w) => w.getContentBounds()).then((r) => Math.round(r.y + r.height * 0.62))
+  await expect.poll(async () => Math.abs((await hips()) - (area.y + area.height))).toBeLessThanOrEqual(2)
+  await character.evaluate(() => {
+    window.assistant.character.dragStart(500, 500)
+    window.assistant.character.dragMove(400, 200)
+  })
+  await expect(character.locator('body')).toHaveAttribute('data-perch', 'none')
+  await character.evaluate(() => window.assistant.character.dragEnd())
+})
+
 const panel = async (name: 'chat' | 'settings', tab?: string): Promise<Page> => {
   await character.evaluate((n) => window.assistant.openWindow(n), name)
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('/chat.html'))).toBe(true)

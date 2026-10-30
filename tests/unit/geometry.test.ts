@@ -120,7 +120,14 @@ describe('seatPlacement', () => {
     expect(seatPlacement(b, [cover, frame(1, { x: 300, y: 470, width: 800, height: 500 })], area)).toBeNull()
   })
 
-  it('refuses an edge so high her head would leave the screen', () => {
+  it('sits on the taskbar when dropped onto it, but stands when put down just above it', () => {
+    const onTaskbar = seatPlacement({ ...b, y: 700 }, [], area) // feet at 1084, below the work area (1040)
+    expect(onTaskbar?.frame.handle).toBe(0)
+    expect(onTaskbar!.bounds.y + 400 * SEAT_LINE).toBeCloseTo(1040, 0)
+    expect(seatPlacement({ ...b, y: 600 }, [], area)).toBeNull() // feet at 984: standing at the bottom
+  })
+
+    it('refuses an edge so high her head would leave the screen', () => {
     expect(seatPlacement({ ...b, y: -320 }, [frame(1, { x: 300, y: 40, width: 800, height: 500 })], area)).toBeNull()
   })
 })

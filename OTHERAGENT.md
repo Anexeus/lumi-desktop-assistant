@@ -20,8 +20,8 @@ keys, browse and play videos in her own ad-blocked browser, write notes and code
 project's npm scripts, and hand coding tasks to Claude Code. Electron 45 + React 19 + TypeScript 6 strict + three.js /
 three-vrm + zod 4 + node:sqlite. Repo: https://github.com/Anexeus/lumi-desktop-assistant (private, owner Anexeus).
 
-**Version now:** 0.4.0 (this round). Previous releases: 0.2.0, 0.2.1, 0.3.0, 0.3.1 (only the latest release is kept on
-GitHub; older ones were deleted at the owner's request).
+**Version now:** 0.5.0 (this round). Previous releases: 0.2.0 … 0.4.0 (only the latest release is kept on GitHub;
+older ones are deleted when a new one is published, at the owner's request; their git tags stay).
 
 ## 2. The owner and how to work with them
 
@@ -145,6 +145,21 @@ app windows. What was done:
   - The database damage seen earlier was most likely caused by test procedures (copying/restoring `assistant.db` while
     Lumi ran, leaving a stale `-wal`); the store closes cleanly on quit and repairs damaged indexes at startup.
 
+### 4.9 "Curve the island, fix the menu, API keys, Miku/Teto, smoother resizing, sitting" → 0.5.0
+- **Island pill:** the owner wanted curved sides and a smaller island. Real blur in a pill shape is impossible here
+  (probed: `setShape`, an outside `SetWindowRgn`, compositor accent policies, a native blur window — ADR-056), so the
+  default is a near-black CSS pill (300×36) and "Frosted glass" (the Acrylic bar) is a setting.
+- **Menu:** Lumi's own black-glass menu replaces the native one for the character and the tray (ADR-057).
+- **API keys:** a numbered "Connect <provider>" box with a "Get a key" button and an automatic connection test.
+- **Characters:** four more CC0 VRoid samples (Vita, Bibi, Victoria Rubin, Darkness Shibu). Miku/Teto can't be bundled
+  (licences); Settings links to VRoid Hub searches and the import button (ADR-058).
+- **Sitting:** worked on all characters, but the owner keeps windows maximised (no seat), and facing the viewer a skirt
+  lifted. Now: side-on sitting, the taskbar as a seat, wider tolerance (ADR-059).
+- **Wheel:** the real "doesn't work" bug — a resize cleared the canvas, the next mouse move hit-tested transparent
+  pixels and the window went click-through mid-scroll. Now it renders on every resize, stays clickable briefly, and
+  wobbles like jelly.
+- The settings title and headings lost the template tells ("Lumi · Settings", ALL-CAPS labels).
+
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 
 - Main owns all state (`AppState`) and broadcasts it; renderers are sandboxed and only use `window.assistant`.
@@ -198,7 +213,7 @@ older releases if the owner wants only the latest. Record results in `docs/UPGRA
 - Electron/Chromium apps (VS Code, Claude, Discord) expose few UI Automation controls; screenshots + vision help.
 - The installer is unsigned (SmartScreen: More info → Run anyway). Never tested on a second PC.
 - No barge-in (talking over her to interrupt); use Stop or the emergency stop.
-- The island cannot be a true pill with real blur on Windows (see 4.8); it is a rounded Acrylic bar.
+- The island cannot be a pill AND blurred on Windows (see 4.9): Pill (default) or Frosted glass, the owner's choice.
 - Sitting needs the desktop helper (PowerShell, ~2 s to start the first time; it is warmed when you pick her up).
   Windows above the seat window are not re-checked after she sits (she stays on her window).
 - Shortcut recording uses physical key positions (US names); on AZERTY-like layouts a letter can differ from its label.

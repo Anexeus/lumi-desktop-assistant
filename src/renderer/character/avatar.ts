@@ -1,7 +1,7 @@
 import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pixiv/three-vrm'
-import { Box3, Object3D, Vector3, type Camera } from 'three'
+import { Box3, Object3D, Vector3, type PerspectiveCamera } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import type { CharacterState } from '@shared/character'
+import { SEAT_LINE, type CharacterState, type Perch } from '@shared/character'
 import { addOffsets, gestureOffsets, GESTURE_SECONDS, IDLE_GESTURES, talkingOffsets, ZERO, type Gesture } from './gestures'
 
 // Procedural animation for a VRM: one blended pose per state, plus additive blink, breathing,
@@ -41,6 +41,8 @@ export interface Avatar {
   readonly vrm: VRM
   /** World-space box used to frame the camera. */
   readonly bounds: Box3
+  /** Her hips at rest: the body's centre line (the box can be lopsided, e.g. a prop held to one side). */
+  readonly body: Vector3
   setState(state: CharacterState): void
   /** Plays a gesture now, replacing any gesture already running. */
   play(gesture: Gesture): void
@@ -52,11 +54,13 @@ export interface Avatar {
   setHeld(held: boolean): void
   /** The window moved by (dx, dy) screen pixels; the body lags and swings back, and hair and clothes follow. */
   nudge(dx: number, dy: number): void
+  /** Sits on a window edge, peeks in from a screen edge, falls (arms up), or stands. */
+  setPerch(perch: Perch): void
   update(dt: number, elapsed: number): void
   dispose(): void
 }
 
-export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): Promise<Avatar> {
+export async function loadAvatar(source: ArrayBuffer | string, camera: PerspectiveCamera): Promise<Avatar> {
   const loader = new GLTFLoader()
   loader.register((parser) => new VRMLoaderPlugin(parser))
   const gltf = typeof source === 'string' ? await loader.loadAsync(source) : await loader.parseAsync(source, '')
@@ -100,13 +104,22 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   const head = bone('head')
   const neck = bone('neck')
   const chest = bone('chest') ?? bone('spine')
+  const spine = chest === bone('spine') ? null : bone('spine') // a second bend point for leaning, when the model has both
   const hips = bone('hips')
   const hipsRestY = hips?.position.y ?? 0
+  const hipsWorld = hips ? hips.getWorldPosition(new Vector3()) : bounds.getCenter(new Vector3())
   const lLeg = bone('leftUpperLeg')
   const rLeg = bone('rightUpperLeg')
+  const lKnee = bone('leftLowerLeg')
+  const rKnee = bone('rightLowerLeg')
   const rootRest = vrm.scene.position.clone()
+  const hipsOnScreen = new Vector3()
   let held = false
   let heldWeight = 0
+  let perch: Perch = 'none'
+  let sit = 0 // 0..1 blend weights, eased like the state poses
+  let peek = 0
+  let peekSide = 0 // +1: the screen is to her right (left edge), −1: to her left
   const inertia = { x: 0, y: 0, vx: 0, vy: 0 } // world-space offset of the body behind the window
 
   let target = POSES.IDLE
@@ -128,6 +141,7 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
   return {
     vrm,
     bounds,
+    body: hipsWorld,
     setState(next) {
       if (next === state) return
       state = next
@@ -147,6 +161,10 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       // A quick flick swings her noticeably; the clamps below keep her in the window.
       inertia.vx -= dx * 0.05
       inertia.vy += dy * 0.05
+    },
+    setPerch(next) {
+      perch = next
+      if (next === 'left' || next === 'right') peekSide = next === 'left' ? 1 : -1
     },
     lookAt(world) {
       if (!vrm.lookAt) return
@@ -169,17 +187,32 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
         nextIdleGesture = t + 12 + Math.random() * 13
       }
       talk += ((state === 'SPEAKING' ? 1 : 0) - talk) * k
-      heldWeight += ((held ? 1 : 0) - heldWeight) * Math.min(1, dt * 8)
+      heldWeight += ((held || perch === 'fall' ? 1 : 0) - heldWeight) * Math.min(1, dt * 8)
+      sit += ((perch === 'sit' ? 1 : 0) - sit) * k
+      peek += ((perch === 'left' || perch === 'right' ? 1 : 0) - peek) * k
       const g = addOffsets(
         talkingOffsets(t, talk),
         gesture ? gestureOffsets(gesture.name, (t - gesture.start) / GESTURE_SECONDS[gesture.name]) : ZERO
       )
       const h = heldWeight
-      // Held: both arms up in a cheerful V with bent elbows ("wheee!").
-      applyArms({ ...g, rUpperZ: g.rUpperZ - 1.8 * h, lUpperZ: g.lUpperZ + 1.8 * h, rLowerZ: g.rLowerZ - 0.7 * h, lLowerZ: g.lLowerZ + 0.7 * h })
-      const kick = Math.sin(t * 7) * 0.25 * h // legs dangle and kick while held
-      turn(lLeg, kick, 0, 0.06 * h)
-      turn(rLeg, -kick, 0, -0.06 * h)
+      const s = sit
+      // Held: both arms up in a cheerful V with bent elbows ("wheee!"). Sitting: hands forward over the lap.
+      applyArms({
+        ...g,
+        rUpperZ: g.rUpperZ - 1.8 * h - 0.12 * s,
+        lUpperZ: g.lUpperZ + 1.8 * h + 0.12 * s,
+        rLowerZ: g.rLowerZ - 0.7 * h,
+        lLowerZ: g.lLowerZ + 0.7 * h,
+        rLowerY: g.rLowerY + 0.7 * s,
+        lLowerY: g.lLowerY - 0.7 * s
+      })
+      // Legs dangle and kick while held; sitting, the thighs point forward over the edge and the feet swing.
+      const kick = Math.sin(t * 7) * 0.25 * h
+      const swing = Math.sin(t * 2.4) * 0.22 * s
+      turn(lLeg, kick - 1.45 * s, 0, 0.06 * h + 0.06 * s)
+      turn(rLeg, -kick - 1.45 * s, 0, -0.06 * h - 0.06 * s)
+      turn(lKnee, (1.5 + swing) * s, 0, 0)
+      turn(rKnee, (1.5 - swing) * s, 0, 0)
 
       // Damped spring: the body trails the window's motion, then settles.
       const clampDt = Math.min(dt, 0.05)
@@ -187,22 +220,35 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Camera): 
       inertia.vy += (-60 * inertia.y - 7 * inertia.vy) * clampDt
       inertia.x = Math.max(-0.14, Math.min(0.14, inertia.x + inertia.vx * clampDt))
       inertia.y = Math.max(-0.1, Math.min(0.1, inertia.y + inertia.vy * clampDt))
-      vrm.scene.position.set(rootRest.x + inertia.x, rootRest.y + inertia.y, rootRest.z)
+      // Seated, the body moves down so her hips are on the window's edge, which main puts at SEAT_LINE of the window.
+      let seatShift = 0
+      if (s > 0.001) {
+        hipsOnScreen.copy(hipsWorld).project(camera)
+        const hipsLine = (1 - hipsOnScreen.y) / 2 // 0 at the top of the window, 1 at the bottom
+        const visible = 2 * (camera.position.z - hipsWorld.z) * Math.tan((camera.fov * Math.PI) / 360)
+        seatShift = (hipsLine - SEAT_LINE) * visible * s
+      }
+      vrm.scene.position.set(rootRest.x + inertia.x, rootRest.y + inertia.y + seatShift, rootRest.z)
 
+      // Peeking: she bends in from behind the screen edge at the hips, spine and chest (~37° in all), turns to the
+      // screen and tilts her head; her legs stay out of sight past the edge.
+      const lean = -peekSide * peek
       const breathe = Math.sin(t * 1.7)
-      turn(chest, breathe * 0.015 - pose.lean - g.chest, 0, 0)
-      turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4, pose.headRoll * 0.4)
+      turn(hips, 0, 0, lean * 0.2)
+      turn(spine, 0, peekSide * 0.15 * peek, lean * 0.22)
+      turn(chest, breathe * 0.015 - pose.lean - g.chest, peekSide * 0.25 * peek, lean * (spine ? 0.22 : 0.44))
+      turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4 + peekSide * 0.1 * peek, pose.headRoll * 0.4)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       const sway = Math.sin(t * 0.7) * 0.02
-      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6, pose.headRoll * 0.6 + sway + g.headRoll)
+      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6 + peekSide * 0.15 * peek, pose.headRoll * 0.6 + sway + g.headRoll + lean * 0.15)
       if (hips) {
-        // A single small hop at the start of a notification, then settle.
+        // A single small hop at the start of a notification, then settle; gestures (the "Yay!" cheer) hop too.
         const since = t - stateSince
         const hop = state === 'NOTIFICATION' && since < 0.5 ? Math.sin((since / 0.5) * Math.PI) * 0.08 : 0
-        hips.position.y = hipsRestY + hop * pose.hop + breathe * 0.002
+        hips.position.y = hipsRestY + hop * pose.hop + g.hop * 0.06 + breathe * 0.002
       }
 
-      expr('happy', Math.min(1, pose.happy + g.happy))
+      expr('happy', Math.min(1, pose.happy + g.happy + 0.35 * peek))
       expr('sad', pose.sad)
       expr('surprised', Math.min(1, pose.surprised + 0.5 * heldWeight))
       expr('relaxed', pose.relaxed)

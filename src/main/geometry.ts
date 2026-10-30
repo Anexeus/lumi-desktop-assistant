@@ -1,4 +1,5 @@
 // Pure window-geometry helpers (no Electron imports) so they can be unit tested.
+import { SEAT_LINE } from '@shared/character'
 
 export interface Rect {
   x: number
@@ -78,4 +79,62 @@ export function placeBeside(anchor: Rect, size: { width: number; height: number 
   let y = anchor.y + anchor.height - size.height
   y = Math.min(Math.max(y, area.y), area.y + area.height - size.height)
   return { x: Math.round(x), y: Math.round(y), ...size }
+}
+
+const PEEK_ZONE = 0.25 // drop her centre this close to an outer screen edge (× her width) and she peeks in from it
+const PEEK_PAST = 0.12 // her centre ends past the edge: only her leaning head and shoulder show
+const FEET_LINE = 0.96 // her feet, as a fraction of her window height from the top
+
+/**
+ * Peeking in from the left or right edge of `display` (its full bounds) when she was dropped close to it, unless another
+ * display continues past that edge (there she would just show up on the next screen).
+ */
+export function peekPlacement(b: Rect, display: Rect, others: Rect[]): { side: 'left' | 'right'; bounds: Rect } | null {
+  const cx = b.x + b.width / 2
+  const midY = b.y + b.height / 2
+  const continues = (x: number): boolean => others.some((d) => x >= d.x && x < d.x + d.width && midY >= d.y && midY < d.y + d.height)
+  if (cx < display.x + b.width * PEEK_ZONE && !continues(display.x - 1)) {
+    return { side: 'left', bounds: { ...b, x: Math.round(display.x - b.width * (0.5 + PEEK_PAST)) } }
+  }
+  const right = display.x + display.width
+  if (cx > right - b.width * PEEK_ZONE && !continues(right)) {
+    return { side: 'right', bounds: { ...b, x: Math.round(right - b.width * (0.5 - PEEK_PAST)) } }
+  }
+  return null
+}
+
+/** An app window as the desktop helper reports it, converted to DIPs. */
+export interface Frame {
+  handle: number
+  rect: Rect
+  maximized: boolean
+}
+
+const contains = (r: Rect, x: number, y: number): boolean => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height
+
+/** Her bounds while sitting on `top` (a window's top edge): hips on the edge, legs over the front. */
+export function seatedBounds(b: Rect, top: number): Rect {
+  return { ...b, y: Math.round(top - b.height * SEAT_LINE) }
+}
+
+/** False when sitting there would put her head above the work area (e.g. a maximised window). */
+export function canSit(b: Rect, frame: Frame, area: Rect): boolean {
+  return !frame.maximized && seatedBounds(b, frame.rect.y).y >= area.y - b.height * 0.1
+}
+
+/**
+ * The window to sit on after a drop: the topmost one whose top edge lies between her hips and feet under her centre,
+ * where that edge isn't hidden by a window above it. `frames` is topmost first.
+ */
+export function seatPlacement(b: Rect, frames: Frame[], area: Rect): { frame: Frame; bounds: Rect } | null {
+  const cx = b.x + b.width / 2
+  const hips = b.y + b.height * SEAT_LINE
+  const feet = b.y + b.height * FEET_LINE
+  for (const [i, frame] of frames.entries()) {
+    const r = frame.rect
+    if (cx < r.x + 24 || cx > r.x + r.width - 24 || r.y < hips - 24 || r.y > feet + 40) continue
+    if (frames.slice(0, i).some((above) => contains(above.rect, cx, r.y + 2))) continue
+    if (canSit(b, frame, area)) return { frame, bounds: seatedBounds(b, r.y) }
+  }
+  return null
 }

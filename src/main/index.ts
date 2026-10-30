@@ -29,6 +29,7 @@ import { appIcon } from './icon'
 import { findCharacter } from '@shared/characters'
 import { findLocalModel, LOCAL_MODELS } from '@shared/localModels'
 import { findProvider } from '@shared/providers'
+import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS, type ShortcutAction } from '@shared/shortcuts'
 import { importModel, readCustomModel, removeCustomModel } from './model'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
 import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
@@ -37,10 +38,8 @@ import { menuTemplate, createTray, type TrayActions } from './tray'
 import type { VrmMeta } from './vrm-meta'
 import { loadWindowState, saveWindowState } from './window-state'
 import { glassSupported, WindowManager } from './windows'
+import type { Frame } from './geometry'
 
-const SHORTCUT = 'Control+Alt+Shift+A'
-const STOP_SHORTCUT = 'Control+Alt+Shift+X'
-const ISLAND_SHORTCUT = 'Alt+Shift+Space' // Ctrl+Alt+Space is often taken; Alt+Space is the Windows window menu
 const API_KEY = 'ai.apiKey'
 const GITHUB_TOKEN = 'github.token'
 const CURSOR_POLL_MS = 66 // ~15 Hz is enough for eyes to follow the pointer
@@ -165,12 +164,11 @@ async function start(): Promise<void> {
     assistantName: settings.assistantName,
     characterVisible: true,
     alwaysOnTop: saved.alwaysOnTop ?? true,
-    shortcut: { accelerator: SHORTCUT, registered: false },
+    shortcuts: { character: { accelerator: settings.shortcuts.character, registered: false }, island: { accelerator: settings.shortcuts.island, registered: false }, stop: { accelerator: settings.shortcuts.stop, registered: false } },
     character: initialSnapshot.state,
     model: custom ? modelInfo(custom.meta, 0) : bundledInfo(settings.character, 0),
     islandVisible: settings.islandVisible,
     islandExpanded: false,
-    islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: false },
     ai: aiStatus(),
     historyEnabled: settings.historyEnabled,
     voice: settings.voice,
@@ -180,20 +178,32 @@ async function start(): Promise<void> {
     claude: { path: null, hooksInstalled: false, hookServer: false, tasks: [], events: [] },
     graphics: settings.graphics,
     controlling: false,
-    stopShortcut: STOP_SHORTCUT,
     panelView: 'chat',
+    perch: 'none',
     local: { runtime: false, llm: '', stt: '', installed: [], download: null, downloadError: null, servers: { llm: { state: 'stopped', device: null, message: '' }, stt: { state: 'stopped', device: null, message: '' } } }
   }
   state.local = localState()
 
   const persist = (): void => saveWindowState(store, { character: windows.characterBounds(), alwaysOnTop: state.alwaysOnTop })
 
+  type HelperFrame = { handle: number; x: number; y: number; w: number; h: number; max: boolean }
+  const toFrame = (f: HelperFrame): Frame => ({ handle: f.handle, rect: screen.screenToDipRect(null, { x: f.x, y: f.y, width: f.w, height: f.h }), maximized: f.max })
   const windows = new WindowManager(
     saved.character,
     state.alwaysOnTop,
     persist,
     () => setState({ characterVisible: false }),
-    () => setState({ islandExpanded: false })
+    () => setState({ islandExpanded: false }),
+    {
+      // Read-only window positions from the desktop helper (physical pixels), so she can sit on a window and follow it.
+      frames: async () => (await desktop.request<HelperFrame[]>('frames')).map(toFrame),
+      frame: async (handle) => {
+        const f = await desktop.request<HelperFrame | null>('frame', { handle })
+        return f ? toFrame(f) : null
+      },
+      warm: () => void desktop.request('ping').catch(() => {}),
+      onPerch: (perch) => setState({ perch })
+    }
   )
 
   const actions: TrayActions = {
@@ -524,6 +534,50 @@ async function start(): Promise<void> {
     }
   })
   handle(Invoke.setIslandVisible, ({ value }) => setState({ islandVisible: value }))
+
+  const shortcutActions: Record<ShortcutAction, () => void> = {
+    character: actions.toggleCharacter,
+    island: () => {
+      if (!state.islandVisible) setState({ islandVisible: true })
+      windows.setIslandExpanded(!windows.isIslandExpanded())
+      setState({ islandExpanded: windows.isIslandExpanded() })
+    },
+    stop: () => emergencyStop()
+  }
+  /** (Re)registers every global shortcut from settings; `registered` is false where another app owns the keys. */
+  function registerShortcuts(): AppState['shortcuts'] {
+    globalShortcut.unregisterAll()
+    const result = {} as AppState['shortcuts']
+    for (const action of SHORTCUT_ACTIONS) {
+      const accelerator = settings.shortcuts[action]
+      let registered = false
+      try {
+        registered = globalShortcut.register(accelerator, shortcutActions[action])
+      } catch {
+        // an accelerator Electron can't parse: reported as not registered
+      }
+      if (!registered) console.warn(`Global shortcut ${accelerator} is taken by another application`)
+      result[action] = { accelerator, registered }
+    }
+    return result
+  }
+  handle(Invoke.setShortcut, ({ action, accelerator }) => {
+    const next = accelerator ?? DEFAULT_SHORTCUTS[action]
+    if (SHORTCUT_ACTIONS.some((a) => a !== action && settings.shortcuts[a] === next)) {
+      return { ok: false as const, message: 'Another Lumi shortcut already uses those keys.' }
+    }
+    const previous = settings.shortcuts[action]
+    settings.shortcuts = { ...settings.shortcuts, [action]: next }
+    const shortcuts = registerShortcuts()
+    if (!shortcuts[action].registered && next !== previous) {
+      settings.shortcuts = { ...settings.shortcuts, [action]: previous } // keep the old keys working
+      setState({ shortcuts: registerShortcuts() })
+  windows.settleCharacter() // saved at a screen edge: she peeks again
+      return { ok: false as const, message: 'Another app already uses those keys. Try a different combination.' }
+    }
+    saveSettings(store, settings)
+    return { ok: true as const, state: setState({ shortcuts }) }
+  })
   handle(Invoke.setIslandExpanded, ({ expanded }, e) => {
     if (e.sender !== windows.island.webContents) throw new Error('Rejected island:set-expanded: not the island window')
     windows.setIslandExpanded(expanded)
@@ -828,19 +882,7 @@ async function start(): Promise<void> {
     setState({ claude: claudeState() })
   })
 
-  const registered = globalShortcut.register(SHORTCUT, actions.toggleCharacter)
-  if (!registered) console.warn(`Global shortcut ${SHORTCUT} is taken by another application`)
-  if (!globalShortcut.register(STOP_SHORTCUT, emergencyStop)) console.warn(`Global shortcut ${STOP_SHORTCUT} is taken by another application`)
-  const islandRegistered = globalShortcut.register(ISLAND_SHORTCUT, () => {
-    if (!state.islandVisible) setState({ islandVisible: true })
-    windows.setIslandExpanded(!windows.isIslandExpanded())
-    setState({ islandExpanded: windows.isIslandExpanded() })
-  })
-  if (!islandRegistered) console.warn(`Global shortcut ${ISLAND_SHORTCUT} is taken by another application`)
-  setState({
-    shortcut: { accelerator: SHORTCUT, registered },
-    islandShortcut: { accelerator: ISLAND_SHORTCUT, registered: islandRegistered }
-  })
+  setState({ shortcuts: registerShortcuts() })
 
   for (const event of ['display-added', 'display-removed', 'display-metrics-changed'] as const) {
     screen.on(event as 'display-added', () => {

@@ -1,13 +1,11 @@
-/* The island is clear "liquid glass": a dark tinted lens with a bright top sheen, a specular rim and an
-   inner glow, over a transparent window so its pill shape is real. (OS Acrylic is rectangular only.) */
+/* The island sits on the OS Acrylic material, the same blurred glass as the Windows taskbar, with a neutral dark tint
+   and no colour of its own: the only colour is the Siri-style orb. Without Acrylic (older Windows) the window is
+   transparent and the tint is nearly opaque. */
 :root {
-  --text: #f6f4ff;
-  --muted: rgb(246 244 255 / 66%);
-  --lens: rgb(14 12 24 / 56%);
-  --lens-strong: rgb(14 12 24 / 74%);
-  --rim: rgb(255 255 255 / 30%);
-  --accent: #9b8cff;
-  --accent-2: #5aa2ff;
+  --text: #f5f5f7;
+  --muted: rgb(245 245 247 / 64%);
+  --line: rgb(255 255 255 / 13%);
+  --tint: rgb(24 24 28 / 94%);
   --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -28,7 +26,7 @@ body,
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid rgb(255 255 255 / 80%);
   outline-offset: 2px;
 }
 
@@ -40,18 +38,21 @@ body,
   clip: rect(0 0 0 0);
 }
 
-.liquid {
-  background:
-    radial-gradient(120% 160% at 50% -60%, rgb(255 255 255 / 34%), transparent 58%),
-    linear-gradient(180deg, rgb(255 255 255 / 10%), rgb(255 255 255 / 0%) 50%, rgb(255 255 255 / 5%)),
-    var(--lens);
-  border: 1px solid var(--rim);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 60%),
-    inset 0 -1px 1px rgb(255 255 255 / 14%),
-    inset 0 0 18px rgb(255 255 255 / 7%);
-  backdrop-filter: blur(10px) saturate(180%);
-  text-shadow: 0 1px 2px rgb(0 0 0 / 45%);
+.pill,
+.panel {
+  background: var(--tint);
+  border-radius: 12px;
+}
+
+/* Windows draws the rounded corners, border and shadow around the Acrylic window itself. */
+.pill.glass,
+.panel.glass {
+  --tint: rgb(14 14 18 / 34%);
+  border-radius: 0;
+}
+
+.panel.glass {
+  --tint: rgb(14 14 18 / 48%); /* more text here, so a little more contrast over busy wallpapers */
 }
 
 .pill {
@@ -60,10 +61,8 @@ body,
   gap: 6px;
   width: 100%;
   height: 100%;
-  padding: 0 8px 0 16px;
-  border-radius: 999px;
+  padding: 0 8px 0 12px;
   color: var(--text);
-  transition: box-shadow 300ms ease;
 }
 
 .pill-main,
@@ -88,49 +87,11 @@ body,
 
 .pill-type {
   flex: none;
-  border-radius: 999px;
-}
-
-/* Voice mode: the dot breathes with the mic level, the rim glows green. */
-.pill.talking {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 60%),
-    inset 0 0 0 1px rgb(74 222 128 / 60%),
-    inset 0 0 18px rgb(74 222 128 / 25%);
-}
-
-.dot.talking {
-  background: radial-gradient(circle at 35% 30%, #fff 0 15%, #4ade80 30%);
-  box-shadow: 0 0 calc(6px + var(--level, 0) * 18px) #4ade80;
-  transform: scale(calc(1 + var(--level, 0) * 1.4));
-  transition: transform 80ms linear;
-}
-
-.pill-text.error {
-  color: #fca5a5;
+  border-radius: 8px;
 }
 
 .pill:hover {
-  border-color: rgb(255 255 255 / 45%);
-}
-
-/* While Lumi works, the rim glows like a live activity. */
-.pill.thinking,
-.pill.streaming {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 60%),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent),
-    inset 0 0 16px color-mix(in srgb, var(--accent) 35%, transparent);
-  animation: glow 1.6s ease-in-out infinite;
-}
-
-@keyframes glow {
-  50% {
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 60%),
-      inset 0 0 0 1px color-mix(in srgb, var(--accent-2) 80%, transparent),
-      inset 0 0 22px color-mix(in srgb, var(--accent-2) 45%, transparent);
-  }
+  background: color-mix(in srgb, var(--tint), rgb(255 255 255 / 6%));
 }
 
 .pill-text {
@@ -142,40 +103,126 @@ body,
   color: var(--muted);
 }
 
+.pill.talking .pill-text,
+.pill.controlling .pill-text {
+  color: var(--text);
+}
+
+.pill-text.error {
+  color: #ffb4b4;
+}
+
 kbd {
   font: 11px var(--font);
   color: var(--muted);
-  border: 1px solid var(--rim);
-  border-radius: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
   padding: 2px 6px;
   background: rgb(255 255 255 / 6%);
-  text-shadow: none;
 }
 
-.dot {
+/* The orb: three soft colour blobs turning at different speeds inside a dark glass sphere, with a specular highlight.
+   It pops in (scale overshoot) when it appears, spins faster while Lumi thinks, and swells with the mic level. */
+.orb {
+  --size: 22px;
+  --c1: #ff3d9a;
+  --c2: #3d8bff;
+  --c3: #2ef2c8;
+  --spin: 9s;
+  position: relative;
   flex: none;
-  width: 9px;
-  height: 9px;
+  width: var(--size);
+  height: var(--size);
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 15%, #4ade80 30%);
-  box-shadow: 0 0 8px #4ade80;
+  overflow: hidden;
+  isolation: isolate;
+  background: radial-gradient(circle at 50% 55%, #1b1430, #050308 70%);
+  box-shadow:
+    0 0 calc(6px + var(--level, 0) * 16px) color-mix(in srgb, var(--c2) 55%, transparent),
+    inset 0 0 0 1px rgb(255 255 255 / 18%);
+  scale: calc(1 + var(--level, 0) * 0.45);
+  transition:
+    scale 90ms linear,
+    box-shadow 200ms ease;
+  animation: orb-pop 520ms cubic-bezier(0.2, 1.7, 0.4, 1) both;
 }
 
-.dot.thinking {
-  background: radial-gradient(circle at 35% 30%, #fff 0 15%, #facc15 30%);
-  box-shadow: 0 0 8px #facc15;
-  animation: breathe 1s ease-in-out infinite;
+.orb i {
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  filter: blur(2.5px);
+  animation: orb-spin var(--spin) linear infinite;
 }
 
-.dot.streaming {
-  background: radial-gradient(circle at 35% 30%, #fff 0 15%, var(--accent) 30%);
-  box-shadow: 0 0 8px var(--accent);
-  animation: breathe 0.6s ease-in-out infinite;
+.orb i:nth-child(1) {
+  background: radial-gradient(circle at 32% 36%, var(--c1) 0 22%, transparent 48%);
 }
 
-@keyframes breathe {
+.orb i:nth-child(2) {
+  background: radial-gradient(circle at 68% 42%, var(--c2) 0 24%, transparent 50%);
+  animation-duration: calc(var(--spin) * 1.4);
+  animation-direction: reverse;
+}
+
+.orb i:nth-child(3) {
+  background: radial-gradient(circle at 50% 72%, var(--c3) 0 20%, transparent 46%);
+  animation-duration: calc(var(--spin) * 0.8);
+}
+
+.orb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, rgb(255 255 255 / 70%), transparent 32%);
+  mix-blend-mode: screen;
+}
+
+.orb.idle {
+  opacity: 0.88;
+}
+
+.orb.listening {
+  --spin: 3.2s;
+}
+
+.orb.thinking {
+  --spin: 1.1s;
+}
+
+.orb.streaming {
+  --spin: 2s;
+}
+
+/* Operating the desktop: the orb turns red so it is obvious, and the pill is the stop button. */
+.orb.controlling {
+  --c1: #ff3b30;
+  --c2: #ff7a45;
+  --c3: #ff2d55;
+  --spin: 1.6s;
+  animation:
+    orb-pop 520ms cubic-bezier(0.2, 1.7, 0.4, 1) both,
+    orb-alert 1s ease-in-out 520ms infinite;
+}
+
+@keyframes orb-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes orb-pop {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+}
+
+@keyframes orb-alert {
   50% {
-    opacity: 0.4;
+    opacity: 0.6;
   }
 }
 
@@ -183,16 +230,13 @@ kbd {
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: 100%;
-  border-radius: 24px;
   overflow: hidden;
-  animation: open 180ms ease-out;
-  --lens: var(--lens-strong);
+  animation: open 160ms ease-out;
 }
 
 @keyframes open {
   from {
     opacity: 0;
-    transform: scale(0.98);
   }
 }
 
@@ -200,7 +244,11 @@ kbd {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 12px 8px 16px;
+  padding: 12px 10px 8px 14px;
+}
+
+.panel header .orb {
+  --size: 18px;
 }
 
 .panel-title {
@@ -215,7 +263,7 @@ kbd {
 .panel button {
   font: inherit;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
 }
 
@@ -229,7 +277,7 @@ kbd {
 .link:hover,
 .close:hover {
   color: var(--text);
-  background: rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 9%);
 }
 
 .close {
@@ -261,7 +309,7 @@ kbd {
 }
 
 .reply.error {
-  color: #fca5a5;
+  color: #ffb4b4;
 }
 
 .muted {
@@ -272,7 +320,7 @@ kbd {
   display: flex;
   gap: 8px;
   padding: 10px 12px 12px;
-  border-top: 1px solid rgb(255 255 255 / 12%);
+  border-top: 1px solid var(--line);
 }
 
 .panel input {
@@ -280,26 +328,30 @@ kbd {
   min-width: 0;
   font: inherit;
   color: var(--text);
-  background: rgb(255 255 255 / 9%);
-  border: 1px solid var(--rim);
-  border-radius: 14px;
-  padding: 8px 12px;
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 30%);
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 11px;
+}
+
+.panel input:focus {
+  border-color: rgb(255 255 255 / 30%);
+  outline: none;
 }
 
 .panel form button {
-  padding: 8px 14px;
-  color: #120f1c;
+  padding: 7px 14px;
+  color: #111114;
   font-weight: 650;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 35%), rgb(255 255 255 / 0%) 60%),
-    linear-gradient(135deg, var(--accent), var(--accent-2));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
-  text-shadow: none;
+  background: rgb(245 245 247 / 92%);
+}
+
+.panel form button:hover:not(:disabled) {
+  background: #fff;
 }
 
 .panel form button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -309,9 +361,9 @@ kbd {
   gap: 6px;
   flex: none;
   color: var(--text);
-  background: rgb(255 255 255 / 12%);
-  border-color: var(--rim);
-  padding: 8px 10px;
+  background: rgb(255 255 255 / 10%);
+  border-color: var(--line);
+  padding: 7px 10px;
 }
 
 .panel .mic.recording {
@@ -324,14 +376,6 @@ kbd {
 .mic-live {
   font-size: 12px;
   font-weight: 600;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .dot,
-  .pill,
-  .panel {
-    animation: none !important;
-  }
 }
 
 .reply :is(p, ul, ol, pre) {
@@ -352,20 +396,10 @@ kbd {
   white-space: pre;
 }
 
-/* Lumi is operating the desktop: an unmistakable red rim, and the whole pill is the stop button. */
-.pill.controlling {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 60%),
-    inset 0 0 0 1px rgb(248 113 113 / 85%),
-    inset 0 0 18px rgb(248 113 113 / 35%);
-}
-
-.pill.controlling .pill-text {
-  color: var(--text);
-}
-
-.dot.controlling {
-  background: radial-gradient(circle at 35% 30%, #fff 0 15%, #f87171 30%);
-  box-shadow: 0 0 10px #f87171;
-  animation: breathe 0.8s ease-in-out infinite;
+@media (prefers-reduced-motion: reduce) {
+  .orb,
+  .orb i,
+  .panel {
+    animation: none !important;
+  }
 }

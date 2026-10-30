@@ -218,6 +218,7 @@ export class Conversation {
           if (turn !== this.turn) return save()
           if (controller.signal.aborted) throw new ProviderError('canceled', 'Canceled.')
           item.text = outcome.title
+          item.ok = outcome.ok
           this.emit()
           messages.push({ role: 'tool', tool_call_id: call.id || `call_${round}_${i}`, content: wrapToolResult(outcome.result) })
         }

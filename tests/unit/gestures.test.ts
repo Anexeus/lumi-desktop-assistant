@@ -29,6 +29,14 @@ describe('gestures', () => {
     expect(stretch.lUpperZ).toBeGreaterThan(1.5)
   })
 
+  it('cheer raises both arms, smiles and hops', () => {
+    const cheer = gestureOffsets('cheer', 0.25)
+    expect(cheer.rUpperZ).toBeLessThan(-1.5)
+    expect(cheer.lUpperZ).toBeGreaterThan(1.5)
+    expect(cheer.happy).toBeGreaterThan(0.9)
+    expect(cheer.hop).toBeGreaterThan(0.5)
+  })
+
   it('talking hands vanish at weight 0', () => {
     for (const v of Object.values(talkingOffsets(12.3, 0))) expect(Math.abs(v)).toBe(0)
     expect(talkingOffsets(12.3, 1).rLowerY).toBeGreaterThan(0)

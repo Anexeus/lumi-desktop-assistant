@@ -1,3 +1,4 @@
+import type { Perch } from '@shared/character'
 import type { AppState } from '@shared/ipc'
 import { createScene } from './scene'
 import { createSpeaker } from './speaker'
@@ -9,9 +10,14 @@ const speaker = createSpeaker((level) => scene.setMouth(level))
 
 const CLICK_SLOP = 4 // px of movement before a press becomes a drag
 const KEY_RESIZE_STEP = 0.1
+// Cute lines for little moments. Windows voices say "Hee hee" more clearly than "Hehe".
+const TAP_LINES = ['Hi hi!', 'Yay!', 'Hee hee!']
+const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
+const pick = (lines: string[]): string => lines[Math.floor(Math.random() * lines.length)]!
 
 let interactive = false
 let mode: 'idle' | 'pressing' | 'dragging' = 'idle'
+let droppedAt = -Infinity // when she was last put down, so "Peekaboo!" follows a drop, not a restart
 let pressX = 0
 let pressY = 0
 let lastX = 0
@@ -29,6 +35,7 @@ function endPress(): void {
   if (mode === 'dragging') {
     api.dragEnd()
     scene.setHeld(false)
+    droppedAt = performance.now()
   }
   mode = 'idle'
 }
@@ -69,6 +76,7 @@ canvas.addEventListener('pointermove', (e) => {
 canvas.addEventListener('pointerup', (e) => {
   if (mode === 'pressing') {
     scene.play('wave')
+    speaker.exclaim(pick(TAP_LINES))
     void window.assistant.openWindow('chat')
   }
   endPress() // before releasing capture, which fires lostpointercapture
@@ -127,13 +135,16 @@ canvas.addEventListener('keydown', (e) => {
 let modelRevision = -1
 let modelFile: string | null = null
 
-async function loadModel(): Promise<void> {
+async function loadModel(changed: boolean): Promise<void> {
   document.body.dataset['model'] = 'loading'
   try {
     const bytes = await window.assistant.model.get()
     const buffer = bytes ? (bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer) : null
     document.body.dataset['model'] = await scene.setModel(buffer, modelFile)
-    scene.play('wave') // hello on first appearance and after a model change
+    // Hello on first appearance (quietly: Lumi may start with Windows); a newly picked character cheers "Yay!".
+    if (!changed) return scene.play('wave')
+    scene.play('cheer')
+    speaker.exclaim('Yay!')
   } catch (error) {
     console.error('Could not load the character model', error)
     document.body.dataset['model'] = 'error'
@@ -141,15 +152,25 @@ async function loadModel(): Promise<void> {
   }
 }
 
+let perch: Perch = 'none'
+
 function applyState(state: AppState): void {
   scene.setState(state.character)
   scene.setQuality(state.graphics)
+  scene.setPerch(state.perch)
   speaker.onState(state)
   document.body.dataset['state'] = state.character
+  document.body.dataset['perch'] = state.perch
+  if (state.perch !== perch) {
+    perch = state.perch
+    const line = PERCH_LINES[perch]
+    if (line && (perch === 'fall' || performance.now() - droppedAt < 6000)) speaker.exclaim(line) // sitting can wait ~2 s for the helper
+  }
   if (state.model.revision !== modelRevision) {
+    const changed = modelRevision !== -1
     modelRevision = state.model.revision
     modelFile = state.model.file
-    void loadModel()
+    void loadModel(changed)
   }
 }
 
@@ -168,7 +189,19 @@ window.assistant.chat.onEvent((event) => {
   lastUserId = user.id
   if (GREETING.test(user.text)) scene.play('wave')
 })
-void window.assistant.chat.get().then((s) => (lastUserId = s.items.at(-1)?.id ?? 0))
+// "Yay!" with a little cheer once per request, when something she did for you worked.
+let cheeredFor = 0
+window.assistant.chat.onEvent((event) => {
+  if (event.type !== 'snapshot') return
+  const items = event.snapshot.items
+  const user = items.filter((i) => i.role === 'user').at(-1)
+  if (!user || user.id <= cheeredFor) return
+  if (!items.some((i) => i.id > user.id && i.role === 'tool' && i.ok)) return
+  cheeredFor = user.id
+  scene.play('cheer')
+  speaker.exclaim('Yay!')
+})
+void window.assistant.chat.get().then((s) => (lastUserId = cheeredFor = s.items.at(-1)?.id ?? 0))
 
 if (import.meta.env.DEV) {
   // Dev aid: window.__character.play('stretch') from DevTools.

@@ -253,3 +253,34 @@ console. Ollama now stops when Lumi quits, which the built-in engine makes moot.
 ## ADR-034 Own Markdown subset instead of a Markdown library (2026-10-29)
 Local models write paragraphs, lists, bold, inline code and fences. A 50-line parser renders exactly that as React text
 nodes, so there is no HTML path to sanitize and no dependency. Links and images are intentionally not rendered.
+
+## ADR-052 The island sits on the OS Acrylic material, not a CSS pill (2026-10-30)
+The owner wanted the island blurred like the Windows taskbar. CSS `backdrop-filter` only blurs the page itself, never
+the desktop, so real blur needs `backgroundMaterial: 'acrylic'`. Probed on this PC: Acrylic works on a frameless,
+non-transparent window (resizable or not) with Windows 11's rounded corners and shadow; a transparent Acrylic window is
+square; `setShape` (a pill-shaped region) is ignored for Acrylic windows. So the island is a rounded Acrylic bar with a
+neutral dark tint and no colours of its own; the only colour is the Siri-style orb (red while Lumi controls the PC).
+Older Windows (no Acrylic) gets the transparent window with an opaque tint.
+
+## ADR-053 Rebindable global shortcuts (2026-10-30)
+Settings → General → Keyboard shortcuts records a new combination for show/hide character, the island, and the
+emergency stop. Accepted only with Ctrl, Alt or Win (Shift alone, or a bare key, would swallow typing in every app),
+modifiers in a fixed order, one key from a fixed list (`src/shared/shortcuts.ts`, also the zod check). A combination
+another Lumi shortcut uses is refused; one another app owns fails to register and the old keys are restored. Physical
+key positions (US names) are recorded, so on non-QWERTY layouts a letter may differ from its label.
+
+## ADR-054 Peeking from screen edges and sitting on app windows (2026-10-30)
+Dropped next to an outer left/right screen edge, the character slides half past it and leans in (a pose, no new
+window). Dropped with an app window's top edge between her hips and feet, she sits on it and follows it; when it is
+minimised, closed, maximised or moved too high she falls to the bottom of the screen. Electron cannot see other apps'
+windows, so two read-only operations were added to the existing desktop helper: `frames` (titled, visible, uncloaked
+app windows, topmost first, visible-frame bounds via DWM) and `frame` (one window). They return positions only, never
+content or titles, run in compiled C# (8–17 ms), and are polled only while she sits (300 ms; 30 ms while the window
+moves). The placement maths is pure (`peekPlacement`, `seatPlacement` in geometry.ts) and unit tested. The camera now
+centres on the hips, so lopsided models (a prop held to one side) stand in the middle of their window and line up.
+
+## ADR-055 Settings are validated one by one (2026-10-30)
+The saved settings were validated as one object, so one invalid or unknown field (written by another Lumi version, or
+a value that later became invalid) reset every setting to its default — the likely cause of the owner's settings
+"reverting to Ollama". `parseSettingsFile` validates each top-level setting separately; a bad one is reset alone and
+logged. Nested groups are still validated whole.

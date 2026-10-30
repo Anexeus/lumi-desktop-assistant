@@ -151,3 +151,20 @@ Root causes found by testing on this PC, not guessed:
   Timed on a copy of the real profile: reply 1.6 s (0.5 s with voice off). Measurements taken while forcing Chromium
   accessibility (for UI Automation testing) were 10× slower and are not representative.
 - Unit 146 pass, E2E 50/50.
+
+## 0.4.0: taskbar-glass island, Siri orb, rebindable keys, peeking and sitting, cute lines
+- **Island:** OS Acrylic blur like the taskbar (probed: CSS can't blur the desktop, a custom pill shape is ignored on
+  Acrylic windows), neutral tint, no colours; the green dot became a Siri-style orb (pops in, spins faster while
+  thinking, swells with the voice, red while Lumi controls the PC). Checked on screen over a striped backdrop.
+- **Keyboard shortcuts** can be changed in Settings → General (E2E: record, refuse a duplicate, reset; registration
+  checked through `globalShortcut.isRegistered`).
+- **Peeking:** dropped near the left/right edge she leans in from behind it. **Sitting:** dropped on a window's top edge
+  she sits on it, follows it when it moves, and falls when it is minimised. Verified with a stand-in window in another
+  process: sat at y 180 (430 − 0.62 × 404), followed a +120/−70 move exactly, fell to y 508 (bottom) when minimised.
+- **Cute lines:** "Hi hi!", "Yay!", "Hee hee!", "Peekaboo!", "Whoa!", a cheer when an action worked; higher-pitched;
+  they now fall back to the Windows voice (with the built-in engine they used to be silent).
+- **Fixes:** settings no longer all reset when one saved value is invalid (ADR-055); the character no longer grows a few
+  pixels per launch at 125 % scaling; lopsided models are centred on their body; a missing AI voice is not retried per
+  sentence.
+- New: `OTHERAGENT.md` (the whole story for the next AI agent).
+- Typecheck and lint clean; unit 158 pass (2 skipped); E2E 51/51 (new: rebinding a shortcut in Settings).

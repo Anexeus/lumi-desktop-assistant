@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Invoke, Send } from '../../src/shared/ipc'
-import { invokeSchemas, sendSchemas, windowStateSchema } from '../../src/shared/schemas'
+import { invokeSchemas, parseSettingsFile, sendSchemas, windowStateSchema } from '../../src/shared/schemas'
+import { formatAccelerator, isAccelerator, toAccelerator } from '../../src/shared/shortcuts'
 
 describe('IPC schemas', () => {
   it('covers every declared channel', () => {
@@ -47,5 +48,51 @@ describe('ai settings', () => {
     expect(aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: '', model: 'x' }).success).toBe(false)
     expect(() => aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: 'not a url', model: 'x' })).not.toThrow()
     expect(aiSettingsSchema.safeParse({ provider: 'custom', baseUrl: 'not a url', model: 'x' }).success).toBe(false)
+  })
+})
+
+describe('settings file', () => {
+  it('keeps every valid setting when one is invalid or unknown', () => {
+    const file = parseSettingsFile({ assistantName: 'Mia', graphics: 'ultra', character: 'shino', future: true })
+    expect(file).toEqual({ assistantName: 'Mia', character: 'shino' })
+  })
+
+  it('accepts saved shortcuts and drops unusable ones', () => {
+    const shortcuts = { character: 'Control+Alt+Shift+A', island: 'Alt+Shift+Space', stop: 'Control+Alt+Shift+X' }
+    expect(parseSettingsFile({ shortcuts }).shortcuts).toEqual(shortcuts)
+    expect(parseSettingsFile({ shortcuts: { ...shortcuts, stop: 'Shift+X' } }).shortcuts).toBeUndefined()
+    expect(parseSettingsFile(null)).toEqual({})
+  })
+})
+
+describe('shortcuts', () => {
+  const press = (code: string, mods: Partial<Record<'ctrlKey' | 'altKey' | 'shiftKey' | 'metaKey', boolean>> = {}) =>
+    toAccelerator({ code, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, ...mods })
+
+  it('turns key presses into accelerators in a fixed modifier order', () => {
+    expect(press('KeyA', { ctrlKey: true, altKey: true, shiftKey: true })).toBe('Control+Alt+Shift+A')
+    expect(press('Space', { altKey: true, shiftKey: true })).toBe('Alt+Shift+Space')
+    expect(press('F9', { metaKey: true })).toBe('Super+F9')
+    expect(press('Digit7', { ctrlKey: true })).toBe('Control+7')
+    expect(press('ArrowUp', { ctrlKey: true, altKey: true })).toBe('Control+Alt+Up')
+    expect(press('Slash', { ctrlKey: true })).toBe('Control+/')
+  })
+
+  it('waits while only modifiers are held and refuses combinations that would swallow typing', () => {
+    expect(press('ControlLeft', { ctrlKey: true })).toBeNull()
+    expect(press('KeyA')).toBeNull()
+    expect(press('KeyA', { shiftKey: true })).toBeNull()
+    expect(press('NumpadEnter', { ctrlKey: true })).toBeNull()
+  })
+
+  it('validates saved accelerators', () => {
+    for (const ok of ['Control+Alt+Shift+A', 'Alt+Shift+Space', 'Super+F12', 'Control+-']) expect(isAccelerator(ok)).toBe(true)
+    for (const bad of ['A', 'Shift+A', 'Alt+Control+A', 'Control+Control+A', 'Control+Hyper+A', 'Control+F25', 'Control+', 'Control+AB'])
+      expect(isAccelerator(bad)).toBe(false)
+  })
+
+  it('formats for people', () => {
+    expect(formatAccelerator('Control+Alt+Shift+X')).toBe('Ctrl + Alt + Shift + X')
+    expect(formatAccelerator('Super+Space', ' ')).toBe('Win Space')
   })
 })

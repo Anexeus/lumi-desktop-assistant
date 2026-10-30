@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, placeBeside, scaleBounds } from '../../src/main/geometry'
+import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, peekPlacement, placeBeside, scaleBounds, seatPlacement, type Frame } from '../../src/main/geometry'
+import { SEAT_LINE } from '../../src/shared/character'
 
 const primary = { x: 0, y: 0, width: 1920, height: 1040 }
 const secondary = { x: 1920, y: 0, width: 2560, height: 1400 }
@@ -74,5 +75,52 @@ describe('scaleBounds', () => {
     const min = scaleBounds(b, 0.01)
     expect(min.width).toBe(160)
     expect(min.width / min.height).toBeCloseTo(320 / 420, 2)
+  })
+})
+
+describe('peekPlacement', () => {
+  const display = { x: 0, y: 0, width: 1920, height: 1080 }
+  const size = { width: 300, height: 400 }
+
+  it('peeks from an outer edge when dropped close to it, centre just past the edge', () => {
+    const left = peekPlacement({ x: -100, y: 300, ...size }, display, [])
+    expect(left?.side).toBe('left')
+    expect(left!.bounds.x + size.width / 2).toBeLessThan(0)
+    expect(left!.bounds.x + size.width).toBeGreaterThan(64) // still grabbable
+    const right = peekPlacement({ x: 1800, y: 300, ...size }, display, [])
+    expect(right?.side).toBe('right')
+    expect(right!.bounds.x + size.width / 2).toBeGreaterThan(1920)
+    expect(right!.bounds.y).toBe(300)
+  })
+
+  it('stands normally away from the edges, and never peeks into a neighbouring display', () => {
+    expect(peekPlacement({ x: 500, y: 300, ...size }, display, [])).toBeNull()
+    expect(peekPlacement({ x: 1800, y: 300, ...size }, display, [secondary])).toBeNull()
+    expect(peekPlacement({ x: -100, y: 300, ...size }, display, [secondary])?.side).toBe('left')
+  })
+})
+
+describe('seatPlacement', () => {
+  const area = { x: 0, y: 0, width: 1920, height: 1040 }
+  const b = { x: 400, y: 100, width: 300, height: 400 } // centre x 550, hips at 348, feet at 484
+  const frame = (handle: number, rect: Frame['rect'], maximized = false): Frame => ({ handle, rect, maximized })
+
+  it('sits on the window whose top edge is between her hips and feet, hips on the edge', () => {
+    const notepad = frame(1, { x: 300, y: 470, width: 800, height: 500 })
+    const seat = seatPlacement(b, [notepad], area)
+    expect(seat?.frame.handle).toBe(1)
+    expect(seat!.bounds.y + 400 * SEAT_LINE).toBeCloseTo(470, 0)
+    expect(seat!.bounds.x).toBe(400)
+  })
+
+  it('ignores windows she is not over, maximised windows and edges hidden under another window', () => {
+    expect(seatPlacement(b, [frame(1, { x: 900, y: 470, width: 800, height: 500 })], area)).toBeNull()
+    expect(seatPlacement(b, [frame(1, { x: 0, y: 470, width: 1920, height: 570 }, true)], area)).toBeNull()
+    const cover = frame(2, { x: 0, y: 200, width: 1920, height: 800 })
+    expect(seatPlacement(b, [cover, frame(1, { x: 300, y: 470, width: 800, height: 500 })], area)).toBeNull()
+  })
+
+  it('refuses an edge so high her head would leave the screen', () => {
+    expect(seatPlacement({ ...b, y: -320 }, [frame(1, { x: 300, y: 40, width: 800, height: 500 })], area)).toBeNull()
   })
 })

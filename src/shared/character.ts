@@ -39,6 +39,12 @@ const table: Record<CharacterState, Partial<Record<CharacterEvent, Target>>> = {
 
 export const initialSnapshot: CharacterSnapshot = { state: 'IDLE', resume: 'IDLE' }
 
+/** How the character is placed: standing, peeking in from the left or right screen edge, sitting on a window, falling. */
+export type Perch = 'none' | 'left' | 'right' | 'sit' | 'fall'
+
+/** Where her hips are while she sits on a window's top edge, as a fraction of her window height from the top. */
+export const SEAT_LINE = 0.62
+
 /** Returns the next snapshot, or null when the event is not valid in the current state. */
 export function transition(current: CharacterSnapshot, event: CharacterEvent): CharacterSnapshot | null {
   const target = table[current.state][event]

@@ -22,6 +22,31 @@ public static class LumiNative {
   [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public KEYBDINPUT ki; public long pad; }
   [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public UIntPtr extra; }
   [DllImport("user32.dll", SetLastError=true)] public static extern uint SendInput(uint n, INPUT[] inputs, int size);
+  [DllImport("user32.dll")] public static extern IntPtr GetTopWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int index);
+  [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+  [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
+  [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")] public static extern int DwmGetInt(IntPtr h, int attr, out int v, int size);
+  // A window people can see: visible, not minimised, not cloaked (other virtual desktop, suspended UWP), not a tool window.
+  public static long[] Frame(IntPtr h) {
+    if (!IsWindow(h) || !IsWindowVisible(h) || IsIconic(h) || (GetWindowLong(h, -20) & 0x80) != 0) return null;
+    int cloaked; if (DwmGetInt(h, 14, out cloaked, 4) == 0 && cloaked != 0) return null;
+    RECT r; if (DwmGetWindowAttribute(h, 9, out r, 16) != 0) return null; // the visible frame, without invisible borders
+    return new long[] { h.ToInt64(), r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top, IsZoomed(h) ? 1 : 0 };
+  }
+  // Titled app windows, topmost first, except those of process `skip` (Lumi).
+  public static System.Collections.Generic.List<long[]> Frames(uint skip) {
+    var list = new System.Collections.Generic.List<long[]>();
+    for (IntPtr h = GetTopWindow(IntPtr.Zero); h != IntPtr.Zero && list.Count < 60; h = GetWindow(h, 2)) {
+      uint pid; GetWindowThreadProcessId(h, out pid);
+      if (pid == skip || GetWindowTextLength(h) == 0) continue;
+      var f = Frame(h);
+      if (f != null && f[3] >= 120 && f[4] >= 60) list.Add(f);
+    }
+    return list;
+  }
   public static void TypeChar(char c) {
     var down = new INPUT { type = 1, ki = new KEYBDINPUT { wScan = c, dwFlags = 4 } };
     var up = new INPUT { type = 1, ki = new KEYBDINPUT { wScan = c, dwFlags = 4 | 2 } };
@@ -270,6 +295,13 @@ function Handle($req) {
       if ($req.x -ne $null) { [void][LumiNative]::SetCursorPos([int]$req.x, [int]$req.y) }
       [LumiNative]::mouse_event(0x0800, 0, 0, [int](120 * [int]$req.amount), [UIntPtr]::Zero)
       return @{ done = 'scrolled' }
+    }
+    # Read-only window positions, so the character can sit on a window's top edge and follow it.
+    'frames' { return ,@([LumiNative]::Frames([uint32]$LumiPid) | ForEach-Object { @{ handle = $_[0]; x = $_[1]; y = $_[2]; w = $_[3]; h = $_[4]; max = [bool]$_[5] } }) }
+    'frame' {
+      $f = [LumiNative]::Frame([IntPtr][int64]$req.handle)
+      if ($f -eq $null) { return $null }
+      return @{ handle = $f[0]; x = $f[1]; y = $f[2]; w = $f[3]; h = $f[4]; max = [bool]$f[5] }
     }
     'ping' { return @{ ok = $true } }
     default { throw "Unknown operation." }

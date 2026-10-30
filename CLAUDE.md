@@ -38,6 +38,8 @@ Tools live in `src/main/tools/` (every act-risk tool goes through `PermissionBro
 Local AI: `src/main/ai/local.ts` (llama-server / whisper-server from `resources/runtimes`, fetched by `npm run runtimes`;
 models in userData `models/local`). Desktop control: `src/main/tools/desktop.ts` + `resources/scripts/desktop.ps1`.
 Project scripts: `src/main/tools/projects.ts` (package.json scripts only; this is the allow-list, not a shell).
+Peeking/sitting: `windows.ts` + pure `geometry.ts`; window positions from the helper's read-only `frames`/`frame` ops.
+Global shortcuts: `src/shared/shortcuts.ts` (validation + key recording), registered in `index.ts`. History: `OTHERAGENT.md`.
 Progress of the 2026-10-30 upgrade: `docs/UPGRADE_PROGRESS.md`. Logs: userData `logs/lumi.log`.
 E2E fakes the Claude CLI and hook config with `DESKTOP_ASSISTANT_FAKE_CLAUDE`, `_NODE`, `_CLAUDE_SETTINGS`, `_HOOK_PORT`
 (unpackaged only): never point tests at the real `~/.claude/settings.json`.

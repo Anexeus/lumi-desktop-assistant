@@ -16,6 +16,7 @@ const api: AssistantApi = {
     return () => ipcRenderer.removeListener(Events.state, handler)
   },
   setIslandVisible: (value) => ipcRenderer.invoke(Invoke.setIslandVisible, { value }),
+  setShortcut: (action, accelerator) => ipcRenderer.invoke(Invoke.setShortcut, { action, accelerator }),
   island: {
     setExpanded: (expanded) => ipcRenderer.invoke(Invoke.setIslandExpanded, { expanded })
   },

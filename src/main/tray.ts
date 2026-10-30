@@ -1,6 +1,7 @@
 import { Menu, Tray, type MenuItemConstructorOptions } from 'electron'
 import { appIcon } from './icon'
 import type { AppState } from '@shared/ipc'
+import { formatAccelerator } from '@shared/shortcuts'
 
 export interface TrayActions {
   toggleCharacter(): void
@@ -24,7 +25,7 @@ export function menuTemplate(state: AppState, actions: TrayActions): MenuItemCon
     { label: 'Open chat', click: actions.openChat },
     { label: 'Settings…', click: actions.openSettings },
     { type: 'separator' },
-    { label: `Stop what ${state.assistantName} is doing (${state.stopShortcut.replaceAll('Control', 'Ctrl')})`, click: actions.stop },
+    { label: `Stop what ${state.assistantName} is doing (${formatAccelerator(state.shortcuts.stop.accelerator, '+')})`, click: actions.stop },
     { type: 'separator' },
     { label: `Quit ${state.assistantName}`, click: actions.quit }
   ]
@@ -35,7 +36,7 @@ export function createTray(actions: TrayActions): { update(state: AppState): voi
   tray.on('click', actions.toggleCharacter)
   return {
     update(state) {
-      const hint = state.shortcut.registered ? ` (${state.shortcut.accelerator} to show/hide)` : ''
+      const hint = state.shortcuts.character.registered ? ` (${formatAccelerator(state.shortcuts.character.accelerator, '+')} to show/hide)` : ''
       tray.setToolTip(`${state.assistantName}${hint}`)
       tray.setContextMenu(Menu.buildFromTemplate(menuTemplate(state, actions)))
     }

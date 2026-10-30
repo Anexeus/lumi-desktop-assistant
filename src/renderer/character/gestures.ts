@@ -1,6 +1,6 @@
 // Short procedural gestures, layered on top of the state pose. Pure math, so they are unit-testable.
 
-export type Gesture = 'wave' | 'nod' | 'stretch' | 'lookAround' | 'tilt'
+export type Gesture = 'wave' | 'nod' | 'stretch' | 'lookAround' | 'tilt' | 'cheer'
 
 /** Offsets added to the rest pose, in radians (arms, head, chest) and blend weights (happy). */
 export interface Offsets {
@@ -16,6 +16,7 @@ export interface Offsets {
   headRoll: number
   chest: number // + leans back
   happy: number
+  hop: number // 0..1, lifts the whole body (a little jump)
 }
 
 export const ZERO: Offsets = {
@@ -30,10 +31,11 @@ export const ZERO: Offsets = {
   headPitch: 0,
   headRoll: 0,
   chest: 0,
-  happy: 0
+  happy: 0,
+  hop: 0
 }
 
-export const GESTURE_SECONDS: Record<Gesture, number> = { wave: 2.2, nod: 1.1, stretch: 2.8, lookAround: 3.2, tilt: 1.8 }
+export const GESTURE_SECONDS: Record<Gesture, number> = { wave: 2.2, nod: 1.1, stretch: 2.8, lookAround: 3.2, tilt: 1.8, cheer: 1.4 }
 
 /** The idle repertoire, picked at random while nothing else is happening. */
 export const IDLE_GESTURES: Gesture[] = ['lookAround', 'tilt', 'stretch', 'nod', 'wave']
@@ -77,6 +79,15 @@ export function gestureOffsets(gesture: Gesture, p: number): Offsets {
     case 'tilt':
       o.headRoll = 0.28 * w
       o.happy = 0.2 * w
+      break
+    case 'cheer': // "Yay!": both arms shoot up, two little hops, a big smile
+      o.rUpperZ = -1.7 * w
+      o.lUpperZ = 1.7 * w
+      o.rLowerZ = (-0.5 + Math.sin(T * 14) * 0.25) * w
+      o.lLowerZ = (0.5 - Math.sin(T * 14) * 0.25) * w
+      o.headPitch = -0.12 * w
+      o.happy = 1 * w
+      o.hop = Math.abs(Math.sin(p * Math.PI * 2)) * w
       break
   }
   return o

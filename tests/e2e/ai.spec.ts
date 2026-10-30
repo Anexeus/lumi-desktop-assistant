@@ -192,9 +192,9 @@ test('the island sits at the top centre, expands, answers and shares the convers
   expect(collapsed.height).toBeLessThan(60)
 
   const state = await island.evaluate(() => window.assistant.getState())
-  expect(state.islandShortcut.accelerator).toBe('Alt+Shift+Space')
-  const registered = await app.evaluate(({ globalShortcut }, k) => globalShortcut.isRegistered(k), state.islandShortcut.accelerator)
-  expect(state.islandShortcut.registered).toBe(registered)
+  expect(state.shortcuts.island.accelerator).toBe('Alt+Shift+Space')
+  const registered = await app.evaluate(({ globalShortcut }, k) => globalShortcut.isRegistered(k), state.shortcuts.island.accelerator)
+  expect(state.shortcuts.island.registered).toBe(registered)
 
   await island.getByRole('button', { name: /Open quick ask/ }).click()
   await expect(island.getByRole('textbox', { name: 'Message' })).toBeFocused()

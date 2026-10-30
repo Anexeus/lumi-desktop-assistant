@@ -1,5 +1,6 @@
-import type { Graphics } from '@shared/ipc'
+import type { AppState, Graphics } from '@shared/ipc'
 import { CHARACTERS } from '@shared/characters'
+import { DEFAULT_SHORTCUTS, formatAccelerator, SHORTCUT_ACTIONS, toAccelerator, type ShortcutAction } from '@shared/shortcuts'
 import { useState, type KeyboardEvent } from 'react'
 import { useAppState } from '../ui/useAppState'
 import { AiSettings } from './AiSettings'
@@ -14,6 +15,60 @@ const GRAPHICS: { value: Graphics; label: string; hint: string }[] = [
   { value: 'balanced', label: 'Balanced', hint: 'Sharp on most screens, 30 fps.' },
   { value: 'high', label: 'High', hint: 'Full resolution, smooth 60 fps. Uses more GPU.' }
 ]
+
+const SHORTCUT_LABELS: Record<ShortcutAction, string> = {
+  character: 'Show or hide the character',
+  island: 'Open the island for a quick question',
+  stop: 'Stop everything Lumi is doing'
+}
+
+/** One global shortcut: click the keys, press the new combination (Esc cancels), or reset it. */
+function ShortcutRow({ action, value }: { action: ShortcutAction; value: AppState['shortcuts'][ShortcutAction] }): React.JSX.Element {
+  const [recording, setRecording] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const labelId = `shortcut-${action}`
+
+  async function save(accelerator: string | null): Promise<void> {
+    setRecording(false)
+    const result = await window.assistant.setShortcut(action, accelerator)
+    setError(result.ok ? null : result.message)
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    if (!recording) return
+    e.preventDefault() // Tab, Space and the rest become part of the shortcut, not page actions
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) return setRecording(false)
+    const accelerator = toAccelerator(e)
+    if (accelerator) void save(accelerator)
+  }
+
+  return (
+    <div className="shortcut">
+      <span id={labelId}>{SHORTCUT_LABELS[action]}</span>
+      <button
+        type="button"
+        className={`shortcut-keys${recording ? ' recording' : ''}`}
+        aria-labelledby={labelId}
+        aria-pressed={recording}
+        aria-describedby={`${labelId}-hint`}
+        onClick={() => {
+          setError(null)
+          setRecording(!recording)
+        }}
+        onKeyDown={onKeyDown}
+        onBlur={() => setRecording(false)}
+      >
+        {recording ? 'Press the new keys…' : <kbd>{formatAccelerator(value.accelerator)}</kbd>}
+      </button>
+      <button type="button" className="secondary" disabled={value.accelerator === DEFAULT_SHORTCUTS[action]} onClick={() => void save(null)}>
+        Reset
+      </button>
+      <small id={`${labelId}-hint`} className={error || !value.registered ? 'warn' : undefined} role={error ? 'alert' : undefined}>
+        {error ?? (!value.registered ? 'Another app uses these keys, so this shortcut is off. Choose different keys.' : recording ? 'Use Ctrl, Alt or Win with one key. Esc cancels.' : '')}
+      </small>
+    </div>
+  )
+}
 
 const TABS = ['General', 'AI', 'Voice', 'Character', 'Tools', 'Integrations', 'Claude Code', 'Memory'] as const
 type Tab = (typeof TABS)[number]
@@ -36,19 +91,14 @@ export function Settings(): React.JSX.Element {
   }
 
   const { model } = state
-  const keyboard = (      <section aria-labelledby="keys-heading">
-      <h2 id="keys-heading">Keyboard</h2>
+  const keyboard = (
+    <section aria-labelledby="keys-heading">
+      <h2 id="keys-heading">Keyboard shortcuts</h2>
+      <p className="note">These work everywhere in Windows. Click the keys to change them.</p>
+      {SHORTCUT_ACTIONS.map((action) => (
+        <ShortcutRow key={action} action={action} value={state.shortcuts[action]} />
+      ))}
       <dl className="keys">
-        <dt>Show or hide the character</dt>
-        <dd>
-          <kbd>{state.shortcut.accelerator.replaceAll('+', ' + ')}</kbd>
-          {!state.shortcut.registered && <span className="warn"> (taken by another app)</span>}
-        </dd>
-        <dt>Open the island for a quick question</dt>
-        <dd>
-          <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' + ')}</kbd>
-          {!state.islandShortcut.registered && <span className="warn"> (taken by another app)</span>}
-        </dd>
         <dt>With the character focused</dt>
         <dd>
           <kbd>Enter</kbd> chat · <kbd>Shift + F10</kbd> menu · <kbd>+</kbd> / <kbd>−</kbd> size

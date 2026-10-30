@@ -1,3 +1,4 @@
+import { formatAccelerator } from '@shared/shortcuts'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MicButton } from '../ui/MicButton'
 import { RichText } from '../ui/RichText'
@@ -7,6 +8,19 @@ import { useVoiceMode, type VoicePhase } from '../ui/useVoiceMode'
 
 const VOICE_LABEL: Record<Exclude<VoicePhase, 'off'>, string> = { listening: 'Listening… tap to stop', hearing: 'Hearing you…', transcribing: 'Got it…' }
 const tail = (text: string, n: number): string => (text.length > n ? '…' + text.slice(-n).trimStart() : text)
+
+type OrbMode = 'idle' | 'listening' | 'thinking' | 'streaming' | 'controlling'
+
+/** The Siri-style orb: colour blobs swirling in a glass sphere. It pops in when it appears and swells with the voice. */
+function Orb({ mode, level = 0 }: { mode: OrbMode; level?: number }): React.JSX.Element {
+  return (
+    <span className={`orb ${mode}`} style={{ '--level': level } as React.CSSProperties} aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  )
+}
 
 export function Island(): React.JSX.Element {
   const state = useAppState()
@@ -19,6 +33,7 @@ export function Island(): React.JSX.Element {
   const busy = status !== 'idle' || state?.character === 'SPEAKING'
   const voice = useVoiceMode(state?.voice.micId ?? '', busy, state?.voice.wake ? state.assistantName : undefined)
   const talking = voice.phase !== 'off'
+  const name = state?.assistantName ?? 'Lumi'
 
   const lastUser = [...items].reverse().find((i) => i.role === 'user')
   const lastReply = lastUser ? [...items].reverse().find((i) => i.id > lastUser.id && (i.role === 'assistant' || i.role === 'error')) : undefined
@@ -56,27 +71,29 @@ export function Island(): React.JSX.Element {
           : voice.error
             ? voice.error
             : state?.voice.input
-              ? `🎙 Tap here to talk to ${state.assistantName}`
-              : `Ask ${state?.assistantName ?? 'Lumi'}…`
+              ? `Tap to talk to ${name}`
+              : `Ask ${name}…`
+  const orbMode: OrbMode = status !== 'idle' ? status : talking ? 'listening' : 'idle'
+  const glass = state?.glass ? ' glass' : ''
 
   if (!expanded && state?.controlling) {
     // While Lumi operates the desktop the pill becomes the emergency stop.
-    const keys = state.stopShortcut.replaceAll('Control', 'Ctrl').replaceAll('+', ' ')
     return (
-      <div className="pill liquid controlling">
-        <button type="button" className="pill-main" onClick={() => void window.assistant.stop()} aria-label={`${state.assistantName} is using your PC. Click to stop.`}>
-          <span className="dot controlling" aria-hidden="true" />
-          <span className="pill-text">{state.assistantName} is using your PC · tap to stop</span>
+      <div className={`pill controlling${glass}`}>
+        <button type="button" className="pill-main" onClick={() => void window.assistant.stop()} aria-label={`${name} is using your PC. Click to stop.`}>
+          <Orb mode="controlling" />
+          <span className="pill-text">{name} is using your PC · tap to stop</span>
         </button>
-        <kbd>{keys}</kbd>
+        <kbd>{formatAccelerator(state.shortcuts.stop.accelerator, ' ')}</kbd>
       </div>
     )
   }
 
   if (!expanded) {
     const canTalk = !!state?.voice.input
+    const island = state?.shortcuts.island
     return (
-      <div className={`pill liquid ${status}${talking ? ' talking' : ''}`} style={{ '--level': voice.level } as React.CSSProperties}>
+      <div className={`pill${talking ? ' talking' : ''}${glass}`}>
         <button
           type="button"
           className="pill-main"
@@ -84,21 +101,22 @@ export function Island(): React.JSX.Element {
           aria-pressed={canTalk ? talking : undefined}
           aria-label={canTalk ? `Voice mode${talking ? ' on' : ''}: ${label}. Click to ${talking ? 'stop' : 'talk'}.` : `Assistant: ${label}. Click to type.`}
         >
-          <span className={`dot ${talking ? 'talking' : status}`} aria-hidden="true" />
+          {/* A new key when voice mode starts or stops, so the orb pops in again like Siri's. */}
+          <Orb key={talking ? 'voice' : 'quiet'} mode={orbMode} level={talking ? voice.level : 0} />
           <span className={`pill-text${voice.error && !talking ? ' error' : ''}`}>{label}</span>
         </button>
         <button type="button" className="pill-type" onClick={() => setExpanded(true)} aria-label="Open quick ask" title="Type instead">
-          {state?.islandShortcut.registered ? <kbd>{state.islandShortcut.accelerator.replaceAll('+', ' ')}</kbd> : <kbd>Type</kbd>}
+          <kbd>{island?.registered ? formatAccelerator(island.accelerator, ' ') : 'Type'}</kbd>
         </button>
       </div>
     )
   }
 
   return (
-    <section className="panel liquid" aria-label="Quick ask" onKeyDown={onKeyDown}>
+    <section className={`panel${glass}`} aria-label="Quick ask" onKeyDown={onKeyDown}>
       <header>
-        <span className={`dot ${status}`} aria-hidden="true" />
-        <span className="panel-title">{state ? `${state.assistantName} · ${state.ai.model}${state.ai.local ? '' : ' · cloud'}` : 'Lumi'}</span>
+        <Orb mode={orbMode} />
+        <span className="panel-title">{state ? `${name} · ${state.ai.model}${state.ai.local ? '' : ' · cloud'}` : 'Lumi'}</span>
         <button type="button" className="link" onClick={() => void window.assistant.openWindow('chat')}>
           Open chat
         </button>

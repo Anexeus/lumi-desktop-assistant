@@ -92,6 +92,9 @@ hints are not trusted for the confirmation decision unless the user marks the se
 - "Do what I ask without asking first" (Settings → Tools, off by default) skips approval cards for act tools. The
   emergency stop, the red island and the plugin switches still apply.
 - Lumi's browser blocks ads and trackers (Ghostery engine, network level).
+- The character reads other apps' window **positions** (never titles or content) through the helper's read-only
+  `frames`/`frame` operations, only after she is dropped and while she sits on a window.
+- Global shortcuts are user-chosen but must include Ctrl, Alt or Win, so they can't capture ordinary typing.
 
 - Desktop control (UI Automation, typing, clicks) runs in a fixed bundled script; requests are JSON data, never code.
   Every action asks first; the red island shows when Lumi is acting; Ctrl+Alt+Shift+X / tray / island stops everything

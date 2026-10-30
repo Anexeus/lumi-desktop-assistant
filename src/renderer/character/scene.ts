@@ -1,5 +1,5 @@
 import { DirectionalLight, AmbientLight, PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three'
-import type { CharacterState } from '@shared/character'
+import type { CharacterState, Perch } from '@shared/character'
 import type { Graphics } from '@shared/ipc'
 import { loadAvatar, type Avatar } from './avatar'
 import type { Gesture } from './gestures'
@@ -24,6 +24,7 @@ export interface CharacterScene {
   lookAtCursor(x: number, y: number): void
   setHeld(held: boolean): void
   nudge(dx: number, dy: number): void
+  setPerch(perch: Perch): void
   setQuality(quality: Graphics): void
   dispose(): void
 }
@@ -44,6 +45,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
 
   let avatar: Avatar | null = null
   let state: CharacterState = 'IDLE'
+  let perch: Perch = 'none'
   let cursor: { x: number; y: number } | null = null
   let mouth: number | null = null
   let loadToken = 0
@@ -57,10 +59,12 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
       // for raised arms (wave, cheer, stretch) and accessories. The margins are click-through, so they cost nothing.
       const size = avatar.bounds.getSize(new Vector3())
       const centre = avatar.bounds.getCenter(new Vector3())
+      centre.x = avatar.body.x // the body in the middle of the window, so peeking and sitting line up for every model
       centre.y += size.y * 0.1 // most of the extra room goes above the head
       const halfFov = (camera.fov * Math.PI) / 360
       const fitHeight = (size.y * 1.3) / 2 / Math.tan(halfFov)
-      const fitWidth = (Math.max(size.x, size.y * 0.55) * 1.5) / 2 / Math.tan(halfFov) / camera.aspect
+      const halfWidth = Math.max(avatar.bounds.max.x - centre.x, centre.x - avatar.bounds.min.x, size.y * 0.275) // the wider side
+      const fitWidth = (halfWidth * 2 * 1.5) / 2 / Math.tan(halfFov) / camera.aspect
       camera.position.set(centre.x, centre.y, centre.z + Math.max(fitHeight, fitWidth))
       camera.lookAt(centre)
     }
@@ -95,6 +99,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     }
     avatar = next
     avatar.setState(state)
+    avatar.setPerch(perch)
     avatar.setMouth(mouth)
     scene.add(avatar.vrm.scene)
     frame()
@@ -148,6 +153,10 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     },
     nudge(dx, dy) {
       avatar?.nudge(dx, dy)
+    },
+    setPerch(next) {
+      perch = next
+      avatar?.setPerch(next)
     },
     setQuality(quality) {
       const q = QUALITY[quality]

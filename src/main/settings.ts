@@ -1,10 +1,11 @@
 import { app, safeStorage } from 'electron'
 import { randomBytes } from 'node:crypto'
 import type { CharacterId } from '@shared/characters'
+import { DEFAULT_SHORTCUTS, type ShortcutAction } from '@shared/shortcuts'
 import { providerForUrl } from '@shared/providers'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { settingsFileSchema, type SettingsFile } from '@shared/schemas'
+import { parseSettingsFile } from '@shared/schemas'
 import type { AiSettings, ApprovedApp, Graphics, McpServerConfig, VoiceSettings } from '@shared/ipc'
 import type { Store } from './storage/store'
 
@@ -62,6 +63,7 @@ export interface Settings {
   character: CharacterId
   graphics: Graphics
   local: { llm: string; stt: string }
+  shortcuts: Record<ShortcutAction, string>
 }
 
 export function loadSettings(store: Store): Settings {
@@ -69,8 +71,7 @@ export function loadSettings(store: Store): Settings {
   const raw = store.getJson('settings') as { ai?: { provider?: string; baseUrl?: string } } | null
   // Saved before providers existed: keep the service they used (e.g. Ollama) rather than failing validation.
   if (raw?.ai && !raw.ai.provider && typeof raw.ai.baseUrl === 'string') raw.ai.provider = providerForUrl(raw.ai.baseUrl)
-  const parsed = settingsFileSchema.safeParse(raw)
-  const file: SettingsFile = parsed.success ? parsed.data : {}
+  const file = parseSettingsFile(raw)
   return {
     assistantName: file.assistantName ?? DEFAULT_NAME,
     ai: file.ai ?? DEFAULT_AI,
@@ -82,7 +83,8 @@ export function loadSettings(store: Store): Settings {
     claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') },
     character: file.character ?? 'seed-san',
     graphics: file.graphics ?? 'balanced',
-    local: file.local ?? DEFAULT_LOCAL
+    local: file.local ?? DEFAULT_LOCAL,
+    shortcuts: file.shortcuts ?? DEFAULT_SHORTCUTS
   }
 }
 

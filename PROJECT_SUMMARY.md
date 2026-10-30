@@ -11,6 +11,7 @@ Vite (electron-vite 6) · Vitest + Playwright · electron-builder (NSIS). Node 2
 
 This file is written so any developer or AI coding agent (Claude Code, Codex, Cursor, Copilot…) can pick the project up
 cold. Read it, then `README.md` (exact commands), then `docs/CURRENT_STATE.md` / `docs/UPGRADE_PROGRESS.md`.
+The full history of the conversation that built Lumi, the owner's preferences and the testing traps: `OTHERAGENT.md`.
 
 ---
 
@@ -49,10 +50,13 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 ## 2. What the user gets
 
 - **Character:** 5 bundled CC0/licensed VRM characters with matching male/female voices; idle animations, waving,
-  picked-up "wheee" reaction with hair/cloth physics; scroll the wheel over her to resize; drag to move.
+  picked-up "wheee" reaction with hair/cloth physics; scroll the wheel over her to resize; drag to move; peeks in from
+  a screen edge; sits on an app window's top edge and rides along; cute lines ("Yay!", "Hee hee!") and a cheer
+  when an action worked.
 - **Chat window** (click the character): chat, Tasks (Claude Code), **Settings** (same window, tabs: General, AI, Voice,
   Character, Tools, Integrations, Claude Code, Memory).
-- **Island** (top of screen): quick ask; tap for hands-free voice mode; turns red while Lumi operates the PC; tap = stop.
+- **Island** (top of screen): taskbar-style blurred glass with a Siri-style orb; quick ask; tap for hands-free voice
+  mode; the orb turns red while Lumi operates the PC; tap = stop. Global shortcuts are changeable in Settings.
 - **AI:** built-in engine (llama.cpp, GPU via Vulkan with CPU fallback) with **Qwen3-VL 4B Instruct** (default: fast,
   follows instructions, can see screenshots) or Qwen3 4B / 1.7B; or Ollama; or cloud providers with per-provider keys.
 - **Voice:** push-to-talk, hands-free mode with voice-activity detection, optional wake word ("Lumi"), Whisper on the PC
@@ -76,7 +80,9 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `b9bc5e6` | Browser control, notes/file writing, downloads, drag physics, graphics quality, Ollama started hidden |
 | `7de0f9b` 0.2.0 | Built-in llama.cpp/whisper.cpp (no Ollama), online providers, UI Automation desktop control, project scripts, emergency stop, wheel resize, logs |
 | `60636a2` 0.2.1 | Fixes from testing the installed app: tool calls written as text, typing landing in Lumi, UTF-8 |
-| (next) 0.3.0 | Qwen3-VL 4B default, no-approval mode, Settings inside the chat window with tabs, ad blocker, no console windows, DB self-repair, forgiving tool arguments, this summary |
+| `4c503d2` 0.3.0 | Qwen3-VL 4B default, no-approval mode, Settings inside the chat window with tabs, ad blocker, no console windows, DB self-repair, forgiving tool arguments, this summary |
+| `2281387` 0.3.1 | Lumi icon everywhere, choose install location, settings logged at startup |
+| (next) 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
 
 ## 4. How to work on it
 

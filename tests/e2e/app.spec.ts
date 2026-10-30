@@ -105,6 +105,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'setAssistantName',
     'setCharacterVisible',
     'setIslandVisible',
+    'setShortcut',
     'stop',
     'tools',
     'voice',
@@ -236,8 +237,33 @@ test('character can be hidden and shown; shortcut state matches registration', a
   await expect.poll(() => characterWindow((w) => w.isVisible())).toBe(true)
 
   const state = await character.evaluate(() => window.assistant.getState())
-  const registered = await app.evaluate(({ globalShortcut }, acc) => globalShortcut.isRegistered(acc), state.shortcut.accelerator)
-  expect(state.shortcut.registered).toBe(registered)
+  const registered = await app.evaluate(({ globalShortcut }, acc) => globalShortcut.isRegistered(acc), state.shortcuts.character.accelerator)
+  expect(state.shortcuts.character.registered).toBe(registered)
+})
+
+test('a global shortcut can be rebound in Settings and reset', async () => {
+  const settings = await panel('settings', 'General')
+  const isRegistered = (acc: string): Promise<boolean> => app.evaluate(({ globalShortcut }, a) => globalShortcut.isRegistered(a), acc)
+  const keys = settings.getByRole('button', { name: 'Open the island for a quick question' })
+  await keys.click()
+  await expect(keys).toHaveText('Press the new keys…')
+  await settings.keyboard.press('Shift+K') // Shift alone is not enough for a global shortcut: still recording
+  await expect(keys).toHaveText('Press the new keys…')
+  await settings.keyboard.press('Control+Alt+Shift+F9')
+  await expect(keys).toHaveText('Ctrl + Alt + Shift + F9')
+  await expect.poll(() => isRegistered('Control+Alt+Shift+F9')).toBe(true)
+  expect(await isRegistered('Alt+Shift+Space')).toBe(false)
+
+  // Another Lumi action's keys are refused, and the old binding keeps working.
+  await keys.click()
+  await settings.keyboard.press('Control+Alt+Shift+X')
+  await expect(settings.getByRole('alert')).toContainText('Another Lumi shortcut')
+  expect(await isRegistered('Control+Alt+Shift+F9')).toBe(true)
+
+  await settings.locator('.shortcut').filter({ has: keys }).getByRole('button', { name: 'Reset' }).click()
+  await expect(keys).toHaveText('Alt + Shift + Space')
+  await expect.poll(() => isRegistered('Alt+Shift+Space')).toBe(true)
+  expect(await isRegistered('Control+Alt+Shift+F9')).toBe(false)
 })
 
 /** Chat and Settings share the chat window; "settings" switches its view (and picks a tab). */

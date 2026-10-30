@@ -4,14 +4,15 @@ A Windows desktop AI companion: an animated VRM character in a transparent, alwa
 text, sees and operates your apps with your permission, helps with coding, and runs its AI locally (no Ollama needed) or
 through an online provider you choose.
 
-**New here (person or AI agent)?** Read [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) first.
+**New here (person or AI agent)?** Read [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) first; AI agents taking over
+should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps).
 
 **Status:** see [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) and [docs/UPGRADE_PROGRESS.md](docs/UPGRADE_PROGRESS.md)
 (what is verified, and what is not).
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.3.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.4.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -72,13 +73,16 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
   see screenshots) needs ~4.5 GB of GPU memory (or ~6 GB RAM on CPU); Qwen3 4B and 1.7B are alternatives.
 - **Microphone and speech** (Settings → Voice): microphone, push-to-talk, Whisper or the AI service for speech-to-text,
   Windows or AI-service voice, optional "only respond when I say the name".
-- **Hands-free voice:** tap the island at the top of the screen ("Tap here to talk"); tap again to stop.
+- **Hands-free voice:** tap the island at the top of the screen ("Tap to talk"); tap again to stop.
+- **Keyboard shortcuts** (Settings → General): click the keys and press new ones; Reset restores the default.
 - **Screen access and computer control** (Settings → Tools → plugins): turn the "Screen and desktop control" plugin off
-  to disable it entirely. "Do what I ask without asking first" removes the approval cards. While it acts, the island turns red. **Emergency stop: Ctrl+Alt+Shift+X**, the tray menu, or
+  to disable it entirely. "Do what I ask without asking first" removes the approval cards. While it acts, the island's orb turns red. **Emergency stop: Ctrl+Alt+Shift+X**, the tray menu, or
   tapping the red island. Every action asks first ("Allow for this chat" stops repeats). "Let cloud AI see screenshots"
   is off by default.
 - **Projects** (Settings → Tools → folders): Lumi runs only the scripts in an approved project's `package.json`.
 - **Character size:** scroll the mouse wheel over the character (or `+`/`−` with it focused). Drag it to move.
+- **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
+  edge and she sits on it and rides along when you move it (she hops down when it closes or minimises).
 
 ## Docs
 

@@ -1,7 +1,8 @@
 import type { ProviderId } from './providers'
 // IPC contract shared by main, preload and renderers. Types and channel names only:
 // the preload imports this file, so it must stay free of runtime dependencies.
-import type { CharacterEvent, CharacterState } from './character'
+import type { CharacterEvent, CharacterState, Perch } from './character'
+import type { ShortcutAction } from './shortcuts'
 
 export type WindowName = 'chat' | 'settings'
 
@@ -10,6 +11,8 @@ export interface ChatItem {
   /** "tool" items are activity lines ("Searched your folders for …"), not messages. */
   role: 'user' | 'assistant' | 'error' | 'tool'
   text: string
+  /** Tool items only: whether the action worked, once it has finished. */
+  ok?: boolean
 }
 
 export type ApprovalDecision = 'once' | 'chat' | 'deny'
@@ -207,12 +210,12 @@ export interface AppState {
   assistantName: string
   characterVisible: boolean
   alwaysOnTop: boolean
-  shortcut: { accelerator: string; registered: boolean }
+  /** Global shortcuts; `registered` is false when another app already owns the combination. */
+  shortcuts: Record<ShortcutAction, { accelerator: string; registered: boolean }>
   character: CharacterState
   model: ModelInfo
   islandVisible: boolean
   islandExpanded: boolean
-  islandShortcut: { accelerator: string; registered: boolean }
   ai: AiStatus
   /** Save chats so they survive restarts. Turning it off keeps what is saved until deleted. */
   historyEnabled: boolean
@@ -225,10 +228,10 @@ export interface AppState {
   local: LocalState
   /** True while Lumi is operating the desktop (shown on the island, with the emergency stop). */
   controlling: boolean
-  /** The emergency-stop shortcut, e.g. Control+Alt+Shift+X. */
-  stopShortcut: string
   /** What the chat window shows: the conversation or Settings (Settings has no window of its own). */
   panelView: 'chat' | 'settings'
+  /** Peeking in from a screen edge, sitting on a window, falling off one, or just standing. */
+  perch: Perch
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -246,6 +249,7 @@ export const Invoke = {
   chooseModel: 'model:choose',
   selectCharacter: 'model:select',
   setGraphics: 'graphics:set',
+  setShortcut: 'shortcuts:set',
   emergencyStop: 'app:emergency-stop',
   localDownload: 'local:download',
   localCancel: 'local:cancel',
@@ -329,6 +333,8 @@ export interface AssistantApi {
   /** Returns state updates. Call the returned function to unsubscribe. */
   onState(listener: (state: AppState) => void): () => void
   setIslandVisible(value: boolean): Promise<AppState>
+  /** Rebinds a global shortcut (null restores the default). Fails when another app or Lumi action already uses it. */
+  setShortcut(action: ShortcutAction, accelerator: string | null): Promise<{ ok: true; state: AppState } | { ok: false; message: string }>
   island: {
     /** Island window only: grow into the input panel or shrink back to the pill. */
     setExpanded(expanded: boolean): Promise<void>

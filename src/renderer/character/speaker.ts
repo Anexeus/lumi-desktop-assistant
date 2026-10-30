@@ -13,11 +13,14 @@ interface Sentence {
 export function createSpeaker(setMouth: (level: number | null) => void): {
   onChat(event: ChatEvent): void
   onState(state: AppState): void
-  /** A quick line like "Wheee!" in her voice, unless she is already talking or voice is off. Cached per voice. */
+  /** A quick, cute line like "Yay!" in her voice (higher and quicker), unless she is talking or voice is off. Cached per voice. */
   exclaim(text: string): void
 } {
   const exclaims = new Map<string, Promise<Uint8Array | null>>()
   let voice: VoiceSettings | undefined
+  let ttsKey = '' // the AI voice setup in use; after one failure Lumi stops asking it until the setup changes
+  let ttsFailed: string | null = null
+  let lastExclaim = 0
   let replyId = -1
   let buffer = ''
   let streaming = false
@@ -28,13 +31,17 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
   let ctx: AudioContext | undefined
   let warnedFallback = false
 
-  const synth = (text: string): Promise<Uint8Array | null> =>
-    window.assistant.voice.synthesize(text).then((r) => {
+  const synth = (text: string): Promise<Uint8Array | null> => {
+    if (ttsFailed === ttsKey) return Promise.resolve(null) // e.g. Lumi's built-in engine has no voice: don't wait on it per sentence
+    const key = ttsKey
+    return window.assistant.voice.synthesize(text).then((r) => {
       if (r.ok) return r.audio
-      if (!warnedFallback) console.warn(`Ollama voice unavailable, using the Windows voice: ${r.message}`)
+      if (!warnedFallback) console.warn(`The AI voice is unavailable, using the Windows voice: ${r.message}`)
       warnedFallback = true
+      ttsFailed = key
       return null
     })
+  }
 
   function stop(): void {
     generation++
@@ -84,7 +91,7 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
     else finishIfDone()
   }
 
-  async function playWav(bytes: Uint8Array, gen: number): Promise<void> {
+  async function playWav(bytes: Uint8Array, gen: number, rate = 1): Promise<void> {
     ctx ??= new AudioContext()
     const data = fixWavSizes(bytes)
     const buffer = await ctx.decodeAudioData(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
@@ -94,6 +101,7 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
     const samples = new Float32Array(analyser.fftSize)
     source = ctx.createBufferSource()
     source.buffer = buffer
+    source.playbackRate.value = rate // above 1 also raises the pitch: a cuter voice for exclamations
     source.connect(analyser)
     analyser.connect(ctx.destination)
     const node = source
@@ -118,10 +126,11 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
     setMouth(0)
   }
 
-  function speakWithWindows(text: string, gen: number): Promise<void> {
+  function speakWithWindows(text: string, gen: number, cute = false): Promise<void> {
     return new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text)
-      u.rate = voice?.speed ?? 1
+      u.rate = (voice?.speed ?? 1) * (cute ? 1.1 : 1)
+      if (cute) u.pitch = 1.7
       const named = voice?.voice ? pickVoice(speechSynthesis.getVoices(), voice.voice) : undefined
       if (named) u.voice = named
       // No audio access here, so open the mouth on each word and let it fall shut.
@@ -168,18 +177,24 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
       }
     },
     exclaim(text) {
-      if (!voice || voice.output === 'off' || playing || streaming) return
+      if (!voice || voice.output === 'off' || playing || streaming || speechSynthesis.speaking) return
+      if (performance.now() - lastExclaim < 1200) return // a burst of clicks gets one "Yay!", not five
+      lastExclaim = performance.now()
       const gen = generation
-      if (voice.output === 'system') return void speakWithWindows(text, gen)
-      const key = `${voice.voice}|${text}`
+      if (voice.output === 'system') return void speakWithWindows(text, gen, true)
+      const key = `${ttsKey}|${text}`
       if (!exclaims.has(key)) exclaims.set(key, synth(text))
       void exclaims
         .get(key)!
-        .then((audio) => (audio && gen === generation && !playing ? playWav(audio, gen) : undefined))
+        .then((audio) => {
+          if (gen !== generation || playing) return
+          return audio ? playWav(audio, gen, 1.15) : speakWithWindows(text, gen, true)
+        })
         .catch(() => {})
     },
     onState(state) {
       voice = state.voice
+      ttsKey = `${state.ai.provider}|${state.ai.baseUrl}|${voice.model}|${voice.voice}`
       // Anything that takes her out of SPEAKING (Stop, a new question, an error) cuts the voice off.
       if (state.character !== 'SPEAKING' && (playing || queue.length || streaming)) stop()
     }

@@ -3,6 +3,7 @@ import { PROVIDER_IDS } from './providers'
 import { CHARACTER_IDS } from './characters'
 import { z } from 'zod'
 import { CHARACTER_EVENTS } from './character'
+import { isAccelerator, SHORTCUT_ACTIONS } from './shortcuts'
 import { Invoke, Send } from './ipc'
 
 const coord = z.number().finite().min(-100_000).max(100_000)
@@ -73,6 +74,9 @@ export const toolsSettingsSchema = z
 
 export const graphicsSchema = z.enum(['low', 'balanced', 'high'])
 
+const acceleratorSchema = z.string().max(60).refine(isAccelerator, 'Use Ctrl, Alt or Win with one key')
+export const shortcutsSchema = z.object({ character: acceleratorSchema, island: acceleratorSchema, stop: acceleratorSchema }).strict()
+
 export const settingsFileSchema = z
   .object({
     assistantName: assistantNameSchema,
@@ -85,12 +89,30 @@ export const settingsFileSchema = z
     claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict(),
     character: z.enum(CHARACTER_IDS),
     graphics: graphicsSchema,
-    local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict()
+    local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict(),
+    shortcuts: shortcutsSchema
   })
   .partial()
   .strict()
 
 export type SettingsFile = z.infer<typeof settingsFileSchema>
+
+/**
+ * Validates each setting on its own: one bad or unknown value (e.g. written by another Lumi version) resets only that
+ * setting. Validating the whole file at once used to reset every setting, provider and voice included.
+ */
+export function parseSettingsFile(raw: unknown): SettingsFile {
+  if (!raw || typeof raw !== 'object') return {}
+  const file: Record<string, unknown> = {}
+  for (const [key, schema] of Object.entries(settingsFileSchema.shape)) {
+    const value = (raw as Record<string, unknown>)[key]
+    if (value === undefined) continue
+    const parsed = schema.safeParse(value)
+    if (parsed.success) file[key] = parsed.data
+    else console.warn(`Setting "${key}" was not valid and has been reset to its default`)
+  }
+  return file as SettingsFile
+}
 
 /** Payload schema for every channel main accepts. A channel missing here is rejected. */
 export const invokeSchemas = {
@@ -104,6 +126,8 @@ export const invokeSchemas = {
   [Invoke.chooseModel]: none,
   [Invoke.selectCharacter]: z.object({ id: z.enum(CHARACTER_IDS) }).strict(),
   [Invoke.setGraphics]: z.object({ quality: graphicsSchema }).strict(),
+  // null puts the default back.
+  [Invoke.setShortcut]: z.object({ action: z.enum(SHORTCUT_ACTIONS), accelerator: acceleratorSchema.nullable() }).strict(),
   [Invoke.localDownload]: z.object({ id: z.enum(LOCAL_MODEL_IDS) }).strict(),
   [Invoke.localCancel]: none,
   [Invoke.emergencyStop]: none,

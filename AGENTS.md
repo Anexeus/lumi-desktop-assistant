@@ -1,6 +1,7 @@
 # Instructions for AI coding agents
 
-Start with [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) (what Lumi is, layout, history, how to extend it), then
+Start with [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) (what Lumi is, layout, history, how to extend it) and
+[OTHERAGENT.md](OTHERAGENT.md) (the whole story of the chat that built it, the owner's preferences, testing traps), then
 [README.md](README.md) (exact commands) and [CLAUDE.md](CLAUDE.md) (working rules and security invariants: they apply to
 every agent, not only Claude Code).
 

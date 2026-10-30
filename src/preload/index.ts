@@ -17,6 +17,7 @@ const api: AssistantApi = {
   },
   setIslandVisible: (value) => ipcRenderer.invoke(Invoke.setIslandVisible, { value }),
   setIslandStyle: (style) => ipcRenderer.invoke(Invoke.setIslandStyle, { style }),
+  setIslandModel: (value) => ipcRenderer.invoke(Invoke.setIslandModel, { value }),
   setShortcut: (action, accelerator) => ipcRenderer.invoke(Invoke.setShortcut, { action, accelerator }),
   menu: {
     run: (action) => ipcRenderer.invoke(Invoke.menuRun, { action })

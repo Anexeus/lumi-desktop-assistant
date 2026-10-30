@@ -161,8 +161,7 @@ let perch: Perch = 'none'
 function applyState(state: AppState): void {
   scene.setState(state.character)
   scene.setQuality(state.graphics)
-  // Sitting, she turns toward the middle of the screen.
-  scene.setPerch(state.perch, window.screenX + window.innerWidth / 2 < screen.availWidth / 2 ? 1 : -1)
+  scene.setPerch(state.perch)
   speaker.onState(state)
   document.body.dataset['state'] = state.character
   document.body.dataset['perch'] = state.perch

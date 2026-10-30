@@ -102,6 +102,11 @@ function EnsureTarget {
   Start-Sleep -Milliseconds 250
 }
 
+function StartApps {
+  (New-Object -ComObject Shell.Application).NameSpace('shell:::{4234d49b-0245-4df3-b780-3893943456e1}').Items() |
+    Where-Object { $_.Name -and $_.Name -notmatch 'uninstall' }
+}
+
 function FindWindow($req) {
   if ($req.handle) { return $UIA::FromHandle([IntPtr][int64]$req.handle) }
   if ($req.title) {
@@ -302,6 +307,14 @@ function Handle($req) {
       $f = [LumiNative]::Frame([IntPtr][int64]$req.handle)
       if ($f -eq $null) { return $null }
       return @{ handle = $f[0]; x = $f[1]; y = $f[2]; w = $f[3]; h = $f[4]; max = [bool]$f[5] }
+    }
+    # Installed apps, as in the Start menu (classic and Store apps): names and shell ids, nothing else.
+    'start_apps' { return ,@(StartApps | ForEach-Object { @{ name = $_.Name; id = $_.Path } }) }
+    'start_app' {
+      $app = StartApps | Where-Object { $_.Path -eq [string]$req.id } | Select-Object -First 1
+      if (-not $app) { throw 'That app is not installed.' }
+      $app.InvokeVerb() # its default action, as if clicked in the Start menu
+      return @{ done = 'opened' }
     }
     'ping' { return @{ ok = $true } }
     default { throw "Unknown operation." }

@@ -83,7 +83,8 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `4c503d2` 0.3.0 | Qwen3-VL 4B default, no-approval mode, Settings inside the chat window with tabs, ad blocker, no console windows, DB self-repair, forgiving tool arguments, this summary |
 | `2281387` 0.3.1 | Lumi icon everywhere, choose install location, settings logged at startup |
 | `37918b4` 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
-| (next) 0.5.0 | Pill island (glass optional), Lumi's own menu, guided API keys, 4 more characters + Miku/Teto links, side-on sitting and taskbar seat, smoother wheel resize |
+| `fc615ee` 0.5.0 | Pill island (glass optional), Lumi's own menu, guided API keys, 4 more characters + Miku/Teto links, side-on sitting and taskbar seat, smoother wheel resize |
+| (next) 0.6.0 | AI opens any app, plays videos, WhatsApp, acts without asking; island look for chat/settings; taskbar icon; rollback journal; front-facing sit |
 
 ## 4. How to work on it
 

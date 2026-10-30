@@ -205,6 +205,13 @@ export function Settings(): React.JSX.Element {
             </small>
           </div>
         )}
+        <label className="row">
+          <span>
+            Show the AI model on the island
+            <small>The open island names the AI that answers, e.g. “Qwen3-VL 4B, on this PC”.</small>
+          </span>
+          <input type="checkbox" checked={state.islandModel} onChange={(e) => void window.assistant.setIslandModel(e.target.checked)} />
+        </label>
       </section>
       {keyboard}
       </>

@@ -315,3 +315,37 @@ toward the middle of the screen (thighs along the edge, lower legs over the fron
 viewer: an unmistakable sitting silhouette and nothing to see under a skirt. Dragging her feet below the work area sits
 her on the taskbar's edge (no helper needed); most of the owner's windows are maximised, whose top edge is off limits.
 The window-top drop tolerance widened to hips−40 … feet+60 px.
+
+## ADR-060 The AI acts on its own: any installed app, play_video, WhatsApp, and a "full permission" prompt (2026-10-30)
+The owner's AI kept answering with links or "set it up in Settings → Tools" instead of acting. Causes found by driving
+the real models: `apps_open` only knew allow-listed apps (its refusal sent the model to Settings), and a 4B model often
+stops halfway through multi-step jobs. Now `apps_open` opens anything in the Start menu (the shell's AppsFolder, launched
+with its default verb by id from that list: no command line) and the user's folders (Downloads, Documents…);
+`play_video` searches YouTube and starts the first real video in one call; `whatsapp_message` opens WhatsApp Web's send
+link in the user's browser and presses its Send button through UI Automation. With "Do what I ask without asking first"
+on, the system prompt says the user gave full permission, to act without asking, never to answer with a link when asked to
+open or play something, and to pick something sensible when details are missing. Verified with both local models
+(UPGRADE_PROGRESS 0.6.0). Still no general shell tool (CLAUDE.md invariant): commands can only be typed into a visible
+Terminal through desktop control, where the user sees them and the emergency stop works.
+
+## ADR-061 SQLite rollback journal instead of WAL (2026-10-30)
+Chats and a settings change made after 13:50 were missing from assistant.db after Lumi closed: they had lived only in
+the -wal file, which was gone (and a live -wal once read as "malformed" from another process). One process needs no WAL
+concurrency, so the store uses `journal_mode = DELETE`: every committed change is in assistant.db itself, and a copy of
+the file is always complete. Opening an old WAL database converts it.
+
+## ADR-062 Development runs use their own AppUserModelID (2026-10-30)
+Lumi's taskbar button showed Electron's atom icon. A Start-menu `Electron.lnk` (made by Electron for notifications during
+development runs) carried the same AUMID as the installed `Lumi.lnk`, so Windows took its icon. Unpackaged runs now use
+`dev.desktop-assistant.app.dev`; the stray shortcut on the owner's PC was removed and the icon cache refreshed.
+
+## ADR-063 Chat and Settings in the island's look; Windows' dark theme forced (2026-10-30)
+The owner wanted every panel to look like the island and the menu. One palette replaces light/dark: black glass (80 %
+over the OS Acrylic), white text, white as the only accent (white pills with black text for primary actions, the selected
+tab, switches and checkboxes), pill-shaped buttons and single-line fields. `nativeTheme.themeSource = 'dark'` keeps the
+Acrylic and native controls dark. Status colours (the green "on this PC" dot, red stop, amber warnings) remain.
+
+## ADR-064 Sitting faces the viewer again (2026-10-30)
+Supersedes the side-on pose of ADR-059 at the owner's request ("sit in front of me, on the edge; I don't care how it
+looks"): thighs forward over the window's top edge, lower legs hanging in front of it. The taskbar seat and the wider drop
+tolerance from ADR-059 stay.

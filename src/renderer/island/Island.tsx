@@ -107,7 +107,7 @@ export function Island(): React.JSX.Element {
         <Orb mode={orbMode} />
         <span className="panel-title">
           <strong>{name}</strong>
-          {state && (
+          {state?.islandModel && (
             <small>
               {state.ai.provider === 'builtin' ? `${findLocalModel(state.local.llm)?.name.split(' (')[0] ?? 'Lumi built-in'}, on this PC` : `${state.ai.model}, ${state.ai.local ? 'on this PC' : 'online'}`}
             </small>

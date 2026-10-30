@@ -92,6 +92,9 @@ hints are not trusted for the confirmation decision unless the user marks the se
 - "Do what I ask without asking first" (Settings → Tools, off by default) skips approval cards for act tools. The
   emergency stop, the red island and the plugin switches still apply.
 - Lumi's browser blocks ads and trackers (Ghostery engine, network level).
+- `apps_open` opens Start-menu apps by the id Windows lists for them (shell AppsFolder, default verb) and the user's
+  folders: never a command line. `whatsapp_message` only opens WhatsApp Web's send link (number + text) in the user's
+  browser and presses its Send button. With approvals off, the model is told it has full permission (ADR-060).
 - The character reads other apps' window **positions** (never titles or content) through the helper's read-only
   `frames`/`frame` operations, only after she is dropped and while she sits on a window.
 - Global shortcuts are user-chosen but must include Ctrl, Alt or Win, so they can't capture ordinary typing.

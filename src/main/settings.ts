@@ -65,6 +65,7 @@ export interface Settings {
   local: { llm: string; stt: string }
   shortcuts: Record<ShortcutAction, string>
   islandStyle: IslandStyle
+  islandModel: boolean
 }
 
 export function loadSettings(store: Store): Settings {
@@ -86,7 +87,8 @@ export function loadSettings(store: Store): Settings {
     graphics: file.graphics ?? 'balanced',
     local: file.local ?? DEFAULT_LOCAL,
     shortcuts: file.shortcuts ?? DEFAULT_SHORTCUTS,
-    islandStyle: file.islandStyle ?? 'pill'
+    islandStyle: file.islandStyle ?? 'pill',
+    islandModel: file.islandModel ?? false
   }
 }
 

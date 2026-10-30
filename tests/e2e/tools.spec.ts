@@ -171,12 +171,14 @@ test('"Allow for this chat" stops asking until a new chat', async () => {
   await c.getByRole('alertdialog').getByRole('button', { name: 'Deny' }).click()
 })
 
-test('an app that is not on the list is refused without asking', async () => {
+test('an app that is not on the list is looked up among installed apps (Photoshop is not installed)', async () => {
   const c = await chat()
   await c.evaluate(() => window.assistant.chat.send('(tool:apps) Photoshop'))
-  await expect(c.locator('.activity').last()).toContainText('(not allowed)')
-  await expect(c.getByRole('alertdialog')).toHaveCount(0)
-  expect(seen.at(-1)!.messages.at(-1)!.content).toContain('not on the approved list')
+  const dialog = c.getByRole('alertdialog')
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole('button', { name: 'Allow once' }).click()
+  await expect(c.locator('.activity').last()).toContainText('(failed)', { timeout: 30_000 })
+  expect(seen.at(-1)!.messages.at(-1)!.content).toContain('No installed app is called')
 })
 
 test('a disabled plugin is never offered to the model', async () => {

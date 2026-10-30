@@ -54,8 +54,8 @@ export interface Avatar {
   setHeld(held: boolean): void
   /** The window moved by (dx, dy) screen pixels; the body lags and swings back, and hair and clothes follow. */
   nudge(dx: number, dy: number): void
-  /** Sits on a window edge (facing +1 right or −1 left), peeks in from a screen edge, falls (arms up), or stands. */
-  setPerch(perch: Perch, facing?: number): void
+  /** Sits on a window edge facing the viewer, peeks in from a screen edge, falls (arms up), or stands. */
+  setPerch(perch: Perch): void
   /** Kicks a squash-and-stretch spring: + stretches up, − squashes down; it wobbles back to normal. */
   bounce(amount: number): void
   update(dt: number, elapsed: number): void
@@ -122,7 +122,6 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
   let sit = 0 // 0..1 blend weights, eased like the state poses
   let peek = 0
   let peekSide = 0 // +1: the screen is to her right (left edge), −1: to her left
-  let sitFacing = 1 // sitting, she turns side-on: +1 faces the screen's right, −1 its left
   const jelly = { x: 0, v: 0 } // squash (−) and stretch (+) of the whole body, a damped spring
   const inertia = { x: 0, y: 0, vx: 0, vy: 0 } // world-space offset of the body behind the window
 
@@ -166,10 +165,9 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       inertia.vx -= dx * 0.05
       inertia.vy += dy * 0.05
     },
-    setPerch(next, facing = 1) {
+    setPerch(next) {
       perch = next
       if (next === 'left' || next === 'right') peekSide = next === 'left' ? 1 : -1
-      if (next === 'sit') sitFacing = facing
     },
     bounce(amount) {
       jelly.v += amount * 3
@@ -214,8 +212,8 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
         rLowerY: g.rLowerY + 0.9 * s,
         lLowerY: g.lLowerY - 0.9 * s
       })
-      // Legs dangle and kick while held. Sitting, she is side-on to the viewer (seen from the front, raised thighs lift a
-      // skirt and show what they shouldn't): thighs along the edge, lower legs hanging over it, feet swinging.
+      // Legs dangle and kick while held. Sitting, she faces the viewer on the window's edge: thighs forward over it,
+      // lower legs hanging down in front of the window, feet swinging.
       const kick = Math.sin(t * 7) * 0.25 * h
       const swing = Math.sin(t * 2.4) * 0.18 * s
       turn(lLeg, kick - 1.45 * s, 0, 0.06 * h)
@@ -247,15 +245,13 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       // screen and tilts her head; her legs stay out of sight past the edge.
       const lean = -peekSide * peek
       const breathe = Math.sin(t * 1.7)
-      // Sitting side-on, the body turns ~83° and the spine, neck and head turn most of the way back to the viewer.
-      const sitYaw = sitFacing * s
-      turn(hips, 0, sitYaw * 1.45, lean * 0.2)
-      turn(spine, 0, peekSide * 0.15 * peek - sitYaw * 0.25, lean * 0.22)
-      turn(chest, breathe * 0.015 - pose.lean - g.chest, peekSide * 0.25 * peek - sitYaw * 0.2, lean * (spine ? 0.22 : 0.44))
-      turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4 + peekSide * 0.1 * peek - sitYaw * 0.35, pose.headRoll * 0.4)
+      turn(hips, 0, 0, lean * 0.2)
+      turn(spine, 0, peekSide * 0.15 * peek, lean * 0.22)
+      turn(chest, breathe * 0.015 - pose.lean - g.chest, peekSide * 0.25 * peek, lean * (spine ? 0.22 : 0.44))
+      turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4 + peekSide * 0.1 * peek, pose.headRoll * 0.4)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       const sway = Math.sin(t * 0.7) * 0.02
-      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6 + peekSide * 0.15 * peek - sitYaw * 0.45, pose.headRoll * 0.6 + sway + g.headRoll + lean * 0.15)
+      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6 + peekSide * 0.15 * peek, pose.headRoll * 0.6 + sway + g.headRoll + lean * 0.15)
       if (hips) {
         // A single small hop at the start of a notification, then settle; gestures (the "Yay!" cheer) hop too.
         const since = t - stateSince

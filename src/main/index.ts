@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, globalShortcut, Menu, Notification, screen, shell } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, Menu, nativeTheme, Notification, screen, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
@@ -15,7 +15,7 @@ import { HOOK_PORT, hooksInstalled, installHooks, startHookServer, uninstallHook
 import { ClaudeTasks, findClaude } from './claude/tasks'
 import { PermissionBroker } from './tools/broker'
 import { tool, type Plugin } from './tools/types'
-import { appsPlugin, filesPlugin, notifyPlugin, systemApps, writePlugin } from './tools/builtin'
+import { appsPlugin, filesPlugin, knownFolders, notifyPlugin, systemApps, writePlugin, type InstalledApp } from './tools/builtin'
 import { githubPlugin } from './tools/github'
 import { McpManager, parseCommandLine } from './tools/mcp'
 import { createRegistry, runToolCall } from './tools/registry'
@@ -73,8 +73,11 @@ if (!locked || process.argv.includes('--quit')) {
 
 async function start(): Promise<void> {
   startLog(join(app.getPath('userData'), 'logs'))
-  app.setAppUserModelId('dev.desktop-assistant.app')
+  // Development gets its own id: Electron makes a Start-menu shortcut for dev notifications, and one sharing the installed
+  // app's id made the taskbar show Electron's icon for Lumi.
+  app.setAppUserModelId(app.isPackaged ? 'dev.desktop-assistant.app' : 'dev.desktop-assistant.app.dev')
   Menu.setApplicationMenu(null)
+  nativeTheme.themeSource = 'dark' // the island's black look everywhere, Acrylic included
   // Push-to-talk: the microphone, audio only, for the chat and island windows while voice input is on.
   // Settings may also open it, to test the mic and read device names.
   hardenSession(
@@ -169,6 +172,7 @@ async function start(): Promise<void> {
     model: custom ? modelInfo(custom.meta, 0) : bundledInfo(settings.character, 0),
     islandVisible: settings.islandVisible,
     islandStyle: settings.islandStyle,
+    islandModel: settings.islandModel,
     islandExpanded: false,
     ai: aiStatus(),
     historyEnabled: settings.historyEnabled,
@@ -353,6 +357,21 @@ async function start(): Promise<void> {
 
   const resourcesDir = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources')
   const desktop = new DesktopHelper(() => join(resourcesDir, 'scripts', 'desktop.ps1'))
+  // Installed apps from the Start menu, through the helper; cached for a few minutes (the list takes ~0.3 s).
+  let startApps: { at: number; list: Promise<InstalledApp[]> } | undefined
+  const installedApps = {
+    list(): Promise<InstalledApp[]> {
+      if (!startApps || Date.now() - startApps.at > 5 * 60_000) {
+        const list = desktop.request<InstalledApp[]>('start_apps').catch((error: unknown) => {
+          startApps = undefined
+          throw error
+        })
+        startApps = { at: Date.now(), list }
+      }
+      return startApps.list
+    },
+    launch: (id: string): Promise<void> => desktop.request('start_app', { id }).then(() => undefined)
+  }
   /** Emergency stop: the reply, pending approvals and any desktop action in flight all end now. */
   function emergencyStop(): void {
     conversation.cancel()
@@ -364,7 +383,7 @@ async function start(): Promise<void> {
   const builtins = [
     claudePlugin,
     filesPlugin(() => settings.tools.folders),
-    appsPlugin(() => [...settings.tools.apps, ...systemApps()]),
+    appsPlugin(() => [...settings.tools.apps, ...systemApps(), ...knownFolders()], installedApps),
     writePlugin(
       () => settings.tools.folders,
       () => join(app.getPath('userData'), 'backups')
@@ -471,6 +490,7 @@ async function start(): Promise<void> {
     // With voice on, the character window says when speaking is over (the audio outlasts the text stream).
     onCharacter: (event) => (event === 'done' && settings.voice.output !== 'off' ? undefined : fire(event)),
     name: () => settings.assistantName,
+    fullAccess: () => settings.tools.autoApprove,
     memories: () => store.listMemories().filter((m) => m.kind === 'memory').map((m) => m.text),
     onPersist(message) {
       if (!settings.historyEnabled) return
@@ -542,6 +562,11 @@ async function start(): Promise<void> {
     saveSettings(store, settings)
     windows.setIslandStyle(style, state.islandVisible)
     return setState({ islandStyle: style, islandExpanded: false })
+  })
+  handle(Invoke.setIslandModel, ({ value }) => {
+    settings.islandModel = value
+    saveSettings(store, settings)
+    return setState({ islandModel: value })
   })
 
   const shortcutActions: Record<ShortcutAction, () => void> = {

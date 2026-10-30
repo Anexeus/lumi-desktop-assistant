@@ -1,4 +1,5 @@
 import type { CharacterState } from '@shared/character'
+import { CHARACTERS } from '@shared/characters'
 import type { MenuAction } from '@shared/ipc'
 import { formatAccelerator } from '@shared/shortcuts'
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
@@ -22,7 +23,9 @@ const ICONS: Record<string, string> = {
   hide: 'M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5zM10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
   pin: 'M7 3h6l-1 5 3 3H5l3-3-1-5zM10 11v6',
   stop: 'M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM7.5 7.5h5v5h-5z',
-  quit: 'M10 2.5v7M5.6 5.4a6.5 6.5 0 1 0 8.8 0'
+  quit: 'M10 2.5v7M5.6 5.4a6.5 6.5 0 1 0 8.8 0',
+  character: 'M10 9.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5zM3.5 17.5c.6-3.3 3.3-5 6.5-5s5.9 1.7 6.5 5',
+  back: 'M12 4l-6 6 6 6'
 }
 const Icon = ({ name }: { name: keyof typeof ICONS }): React.JSX.Element => (
   <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
@@ -35,15 +38,19 @@ export function Menu(): React.JSX.Element {
   const state = useAppState()
   const list = useRef<HTMLDivElement>(null)
   const [opened, setOpened] = useState(0) // bumped each time the menu opens: replays the entrance, focuses the first item
+  const [view, setView] = useState<'main' | 'characters'>('main')
 
   useEffect(() => {
-    const onFocus = (): void => setOpened((n) => n + 1)
+    const onFocus = (): void => {
+      setView('main')
+      setOpened((n) => n + 1)
+    }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
   useEffect(() => {
     list.current?.querySelector<HTMLButtonElement>('[role^="menuitem"]')?.focus()
-  }, [opened, state === null])
+  }, [opened, view, state === null])
 
   if (!state) return <div className="menu" />
   const name = state.assistantName
@@ -57,6 +64,37 @@ export function Menu(): React.JSX.Element {
     const i = items.indexOf(document.activeElement as HTMLButtonElement)
     const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
     items[next]?.focus()
+  }
+
+  if (view === 'characters') {
+    return (
+      <div key={opened} ref={list} className="menu" role="menu" aria-label="Characters" onKeyDown={onKeyDown}>
+        <button type="button" role="menuitem" onClick={() => setView('main')}>
+          <Icon name="back" /> Characters
+        </button>
+        <hr />
+        <div className="menu-list">
+          {CHARACTERS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              role="menuitemradio"
+              aria-checked={state.model.id === c.id}
+              onClick={() => {
+                void window.assistant.model.select(c.id)
+                run('close')
+              }}
+            >
+              <span className="check" aria-hidden="true">
+                {state.model.id === c.id ? '✓' : ''}
+              </span>
+              {c.name}
+              <small>{c.voice}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -73,6 +111,9 @@ export function Menu(): React.JSX.Element {
       </button>
       <button type="button" role="menuitem" onClick={() => run('settings')}>
         <Icon name="settings" /> Settings
+      </button>
+      <button type="button" role="menuitem" onClick={() => setView('characters')}>
+        <Icon name="character" /> Change character
       </button>
       <hr />
       <button type="button" role="menuitem" onClick={() => run('character')}>

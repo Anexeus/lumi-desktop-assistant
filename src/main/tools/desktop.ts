@@ -1,6 +1,7 @@
 // Seeing and operating Windows apps: a long-lived helper (resources/scripts/desktop.ps1, fixed and bundled) answers
 // structured requests through Windows UI Automation, Windows OCR and SendInput. The model never sends commands, only
 // these operations, and every action returns the window's new state so the model can check that it worked.
+import { shell } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { z } from 'zod'
@@ -125,6 +126,10 @@ export function describeLook(look: Look): string {
 const target = z.object({ window: z.string().trim().max(200).optional() })
 const windowArgs = (window?: string): Record<string, unknown> => (window ? { title: window } : {})
 
+/** WhatsApp Web's "send" link: opens the chat with the message typed in (`phone` is digits with the country code). */
+export const whatsappUrl = (phone: string, message: string): string =>
+  `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`
+
 export interface Vision {
   /** Why a screenshot can't be described now, or null if it can. */
   unavailable(): string | null
@@ -212,6 +217,41 @@ export function desktopPlugin(helper: DesktopHelper, onControl: (active: boolean
             onControl(false)
           }
           return `Done: ${action}.`
+        }
+      }),
+      tool({
+        name: 'whatsapp_message',
+        description:
+          'Send a WhatsApp message through WhatsApp Web in the user’s own browser (they must be logged in there). Needs the phone number ' +
+          'with country code, e.g. +91 98765 43210: use one the user gave or asked you to remember, or ask for it.',
+        parameters: { type: 'object', properties: { phone: { type: 'string' }, message: { type: 'string' } }, required: ['phone', 'message'] },
+        input: z.object({
+          phone: z
+            .string()
+            .transform((p) => p.replace(/\D/g, ''))
+            .pipe(z.string().regex(/^\d{8,15}$/, 'Give the number with its country code, e.g. +91 98765 43210.')),
+          message: z.string().trim().min(1).max(2000)
+        }),
+        risk: 'act',
+        describe: ({ phone, message }) => `Send “${message.slice(0, 60)}${message.length > 60 ? '…' : ''}” to +${phone} on WhatsApp`,
+        async run({ phone, message }) {
+          await shell.openExternal(whatsappUrl(phone, message))
+          onControl(true)
+          try {
+            // WhatsApp Web takes a while to load and open the chat; then its Send button appears.
+            for (let i = 0; i < 14; i++) {
+              await new Promise((r) => setTimeout(r, 2500))
+              const look = await helper.request<Look>('look', { title: 'WhatsApp', max: 400 }).catch(() => null)
+              const send = look?.elements.find((e) => /^send$/i.test(e.name.trim()) && e.enabled)
+              if (send) {
+                await helper.request('act', { item: send.n, action: 'click' })
+                return `Sent “${message.slice(0, 80)}” to +${phone} with WhatsApp Web.`
+              }
+            }
+          } finally {
+            onControl(false)
+          }
+          return 'WhatsApp Web opened with the message typed in, but no Send button appeared: the user probably has to log in at web.whatsapp.com (scan the QR code with their phone). Tell them.'
         }
       }),
       tool({

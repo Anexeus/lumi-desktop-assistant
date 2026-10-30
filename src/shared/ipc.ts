@@ -224,6 +224,8 @@ export interface AppState {
   islandVisible: boolean
   islandExpanded: boolean
   islandStyle: IslandStyle
+  /** Show which AI answers (model name) in the open island. Off by default. */
+  islandModel: boolean
   ai: AiStatus
   /** Save chats so they survive restarts. Turning it off keeps what is saved until deleted. */
   historyEnabled: boolean
@@ -265,6 +267,7 @@ export const Invoke = {
   localSelect: 'local:select',
   setIslandVisible: 'island:set-visible',
   setIslandStyle: 'island:set-style',
+  setIslandModel: 'island:set-model',
   menuRun: 'menu:run',
   setIslandExpanded: 'island:set-expanded',
   chatGet: 'chat:get',
@@ -346,6 +349,7 @@ export interface AssistantApi {
   onState(listener: (state: AppState) => void): () => void
   setIslandVisible(value: boolean): Promise<AppState>
   setIslandStyle(style: IslandStyle): Promise<AppState>
+  setIslandModel(value: boolean): Promise<AppState>
   /** Rebinds a global shortcut (null restores the default). Fails when another app or Lumi action already uses it. */
   setShortcut(action: ShortcutAction, accelerator: string | null): Promise<{ ok: true; state: AppState } | { ok: false; message: string }>
   menu: {

@@ -48,7 +48,9 @@ export function openStore(file: string, now: () => number = Date.now): Store {
 }
 
 function createStore(db: DatabaseSync, now: () => number) {
-  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;')
+  // A rollback journal, not WAL: every change lands in assistant.db itself. With WAL, recent chats and settings lived in
+  // the -wal file and were lost when it went missing (seen on 2026-10-30); one process needs no WAL concurrency.
+  db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = DELETE;')
   // Damaged indexes (seen after the app was force-killed mid-write) make queries fail; the rows are fine and REINDEX
   // rebuilds the indexes from them. Anything worse still throws, and openStore sets the file aside.
   const check = (): string => Object.values(db.prepare('PRAGMA quick_check').get() as Record<string, string>)[0] ?? ''

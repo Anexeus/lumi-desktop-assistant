@@ -12,7 +12,7 @@ type Page = 'character' | 'island' | 'menu' | WindowName
 
 const ISLAND = { collapsed: { width: 300, height: 36 }, expanded: { width: 440, height: 340 }, top: 10 }
 // The menu window, and where the menu's corner sits inside it (the rest is room for its shadow; see menu.css).
-const MENU = { width: 284, height: 300, cornerX: 10, cornerY: 8 }
+const MENU = { width: 284, height: 334, cornerX: 10, cornerY: 8 }
 
 const secureWebPreferences: BrowserWindowConstructorOptions['webPreferences'] = {
   preload: join(__dirname, '../preload/index.js'),

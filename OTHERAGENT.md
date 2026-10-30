@@ -20,7 +20,7 @@ keys, browse and play videos in her own ad-blocked browser, write notes and code
 project's npm scripts, and hand coding tasks to Claude Code. Electron 45 + React 19 + TypeScript 6 strict + three.js /
 three-vrm + zod 4 + node:sqlite. Repo: https://github.com/Anexeus/lumi-desktop-assistant (private, owner Anexeus).
 
-**Version now:** 0.5.0 (this round). Previous releases: 0.2.0 … 0.4.0 (only the latest release is kept on GitHub;
+**Version now:** 0.6.0 (this round). Previous releases: 0.2.0 … 0.4.0 (only the latest release is kept on GitHub;
 older ones are deleted when a new one is published, at the owner's request; their git tags stay).
 
 ## 2. The owner and how to work with them
@@ -159,6 +159,20 @@ app windows. What was done:
   pixels and the window went click-through mid-scroll. Now it renders on every resize, stays clickable briefly, and
   wobbles like jelly.
 - The settings title and headings lost the template tells ("Lumi · Settings", ALL-CAPS labels).
+
+### 4.10 "The AI does nothing I say; one look everywhere; taskbar icon; sit facing me" → 0.6.0
+- **Why the AI "didn't work":** not permissions (auto-approve was on) but tools and a small model: `apps_open` knew only
+  allow-listed apps and its refusal told the model to send the user to Settings → Tools; multi-step jobs stalled. Fixed
+  with Start-menu apps, `play_video`, `whatsapp_message`, folders, and a "full permission" prompt (ADR-060), then checked
+  by driving both local models (table in UPGRADE_PROGRESS 0.6.0). The owner pasted Gemini advice (LiteLLM, Python,
+  pyautogui, `subprocess(shell=True)`): not needed — Lumi already sends one tool list to every provider — and a shell tool
+  stays out (ADR-060).
+- **Data loss:** chats after 13:50 vanished with a missing -wal file → rollback journal (ADR-061).
+- **Taskbar icon:** a dev `Electron.lnk` with Lumi's app id → separate dev id, shortcut removed (ADR-062).
+- **Look:** chat and Settings use the island's black/white palette; dark theme forced (ADR-063). Island model name is a
+  setting (off). Menu: "Change character". Sitting faces the viewer again (ADR-064).
+- **Trap:** during this round the working tree was reset to the last commit while the agent was paused (a usage limit);
+  edits that scripts had applied vanished silently. After any interruption, grep for your changes before continuing.
 
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 

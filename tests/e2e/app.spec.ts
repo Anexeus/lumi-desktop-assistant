@@ -105,6 +105,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'setAlwaysOnTop',
     'setAssistantName',
     'setCharacterVisible',
+    'setIslandModel',
     'setIslandStyle',
     'setIslandVisible',
     'setShortcut',
@@ -293,6 +294,30 @@ test('the island switches between the pill and frosted glass', async () => {
   await expect.poll(style).toBe('pill')
   await expect.poll(() => app.windows().filter((w) => w.url().endsWith('/island.html')).length).toBe(1)
   await expect(app.windows().find((w) => w.url().endsWith('/island.html'))!.locator('.pill')).toBeVisible()
+})
+
+test('the open island names the AI model only when that setting is on', async () => {
+  const island = app.windows().find((w) => w.url().endsWith('/island.html'))!
+  await island.evaluate(() => window.assistant.island.setExpanded(true))
+  await expect(island.locator('.panel-title strong')).toBeVisible()
+  await expect(island.locator('.panel-title small')).toHaveCount(0)
+  await character.evaluate(() => window.assistant.setIslandModel(true))
+  await expect(island.locator('.panel-title small')).toContainText(/on this PC|online/)
+  await character.evaluate(() => window.assistant.setIslandModel(false))
+  await expect(island.locator('.panel-title small')).toHaveCount(0)
+  await island.evaluate(() => window.assistant.island.setExpanded(false))
+})
+
+test('the menu changes the character', async () => {
+  await character.evaluate(() => window.assistant.character.showMenu())
+  await expect.poll(() => app.windows().some((w) => w.url().endsWith('/menu.html'))).toBe(true)
+  const menu = app.windows().find((w) => w.url().endsWith('/menu.html'))!
+  await menu.getByRole('menuitem', { name: 'Change character' }).click()
+  await menu.getByRole('menuitemradio', { name: /Vita/ }).click()
+  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.model.id))).toBe('vita')
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
+  await character.evaluate(() => window.assistant.model.select('seed-san')) // later tests expect the default character
+  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.model.id))).toBe('seed-san')
 })
 
 test('connecting an online AI: "Get a key" opens that provider’s key page', async () => {

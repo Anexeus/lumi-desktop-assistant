@@ -142,6 +142,14 @@ const LIST_ITEMS = `(() => {
   return items.slice(0, 40).map((it, i) => (it.el.setAttribute('data-lumi-n', String(i + 1)), { n: i + 1, kind: it.kind, text: it.text }))
 })()`
 
+// The first real video of a YouTube search (not a Short or an ad); the page's answer is checked against WATCH_URL.
+const FIRST_VIDEO = `(() => {
+  const a = document.querySelector('ytd-video-renderer a#video-title[href*="/watch?v="]') || document.querySelector('a#video-title[href*="/watch?v="]')
+  return a ? a.href : ''
+})()`
+const WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{6,}/
+const PLAY = `(() => { const v = document.querySelector('video'); if (v && v.paused) v.play().catch(() => {}); return !!v })()`
+
 const clickItem = (n: number): string => `(() => {
   const el = document.querySelector('[data-lumi-n="${n}"]')
   if (!el) return false
@@ -290,6 +298,34 @@ export function webPlugin(notify: (title: string, body: string) => void = () => 
           const target = openTarget(i)
           await shell.openExternal(target)
           return `Opened ${target} in the user's browser.`
+        }
+      }),
+      tool({
+        name: 'play_video',
+        description:
+          'Play a song or video on YouTube in Lumi’s browser window: searches YouTube and starts the first result. Use this for every ' +
+          '"play …" request. If the user names nothing ("play a song"), choose something popular yourself.',
+        parameters: { type: 'object', properties: { query: { type: 'string', description: 'What to play, e.g. "Loser BIGBANG" or "lofi hip hop"' } } },
+        input: z.preprocess(
+          (raw) => (raw && typeof raw === 'object' && !('query' in raw) ? { query: (raw as Record<string, unknown>)['song'] ?? (raw as Record<string, unknown>)['q'] } : raw),
+          z.object({ query: z.string().trim().min(1).max(300).catch('top hits music') })
+        ),
+        risk: 'act',
+        describe: ({ query }) => `Play “${query}” on YouTube in Lumi’s browser`,
+        async run({ query }, signal) {
+          const w = await load(SITE_SEARCH.youtube + encodeURIComponent(query), signal)
+          w.show()
+          let href = ''
+          for (let i = 0; i < 25 && !WATCH_URL.test(href); i++) {
+            await new Promise((r) => setTimeout(r, 300)) // results render after "load"
+            href = String((await w.webContents.executeJavaScript(FIRST_VIDEO, true)) ?? '')
+          }
+          if (!WATCH_URL.test(href)) throw new Error('YouTube showed no video for that search; try other words.')
+          await load(href, signal)
+          w.show()
+          await new Promise((r) => setTimeout(r, 2500))
+          await w.webContents.executeJavaScript(PLAY, true)
+          return `Now playing “${w.webContents.getTitle().replace(/ - YouTube$/, '').slice(0, 150)}” on YouTube in Lumi’s browser window.`
         }
       }),
       tool({

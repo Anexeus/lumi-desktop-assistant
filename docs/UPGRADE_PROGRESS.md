@@ -185,3 +185,22 @@ Root causes found by testing on this PC, not guessed:
   click-through mid-scroll so the scroll went to the app behind), stays clickable 0.7 s after each notch, handles mice
   that report lines, and wobbles like jelly when she grows or shrinks.
 - Typecheck and lint clean; unit 159 pass (2 skipped); E2E 55/55 (new: menu, island look, key page, taskbar seat).
+
+## 0.6.0: the AI does what it's told; one look everywhere; taskbar icon; front-facing sit
+- **AI acting (driven with the real local models, isolated profile, auto-approve on, audio muted, Documents redirected):**
+
+  | Request | Built-in Qwen3-VL 4B | Ollama qwen3:4b |
+  |---|---|---|
+  | Open YouTube and play a song | played a lofi video (15.7 s) | play_video: "1 A.M Study Session" (40 s) |
+  | Open VS Code (not installed here) | said so, offered Visual Studio 2022 | same |
+  | Open my Downloads folder | opened (1.6 s) | opened (7.7 s) |
+  | Write a short paragraph about cats | written, opened in Notepad (4.6 s) | same (18.5 s) |
+
+  Before: links instead of actions, and "set up your project folder in Settings → Tools". `whatsapp_message` is unit
+  tested (link) but was not run against a real account (it would message a real person).
+- **Database:** rollback journal instead of WAL after recent chats were lost with a missing -wal file (ADR-061).
+- **Taskbar icon:** a dev `Electron.lnk` shared Lumi's app id; removed, dev runs now use their own id (ADR-062).
+- **Look:** chat and Settings in the island's black glass with white accents (ADR-063); island hides the model name
+  unless Settings → General → "Show the AI model on the island" is on; the menu has "Change character" (all 9 listed).
+- **Sitting:** facing the viewer on the window's edge again (ADR-064).
+- Typecheck and lint clean; unit 161 pass (2 skipped); E2E 57/57 (new: island model setting, menu character change, installed-app lookup).

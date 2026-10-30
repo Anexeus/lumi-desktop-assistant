@@ -453,5 +453,5 @@
 
 .tabs button[aria-selected='true'] {
   color: var(--accent-text);
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
 }

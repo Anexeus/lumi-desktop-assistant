@@ -183,3 +183,19 @@ describe('auto-approve', () => {
     expect(await broker.approve(act, 'Open Notepad', '{}', new AbortController().signal)).toBe(false) // card, then timeout = no
   })
 })
+
+describe('acting without asking', () => {
+  it('tells the model it has full permission only when approvals are off, and to act instead of linking', async () => {
+    const { systemPrompt } = await import('../../src/main/ai/conversation')
+    const on = systemPrompt([], new Date(0), 'Lumi', ['apps_open', 'play_video'], true)
+    expect(on).toContain('full permission')
+    expect(on).not.toContain('need the user’s OK')
+    expect(on).toContain('play_video')
+    expect(systemPrompt([], new Date(0), 'Lumi', ['apps_open'], false)).toContain('need the user’s OK')
+  })
+
+  it('builds the WhatsApp Web send link from a number and message', async () => {
+    const { whatsappUrl } = await import('../../src/main/tools/desktop')
+    expect(whatsappUrl('919876543210', 'hi & bye?')).toBe('https://web.whatsapp.com/send?phone=919876543210&text=hi%20%26%20bye%3F')
+  })
+})

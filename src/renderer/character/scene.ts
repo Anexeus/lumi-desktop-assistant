@@ -24,8 +24,7 @@ export interface CharacterScene {
   lookAtCursor(x: number, y: number): void
   setHeld(held: boolean): void
   nudge(dx: number, dy: number): void
-  /** `facing`: which way she turns when she sits (+1 right, −1 left). */
-  setPerch(perch: Perch, facing?: number): void
+  setPerch(perch: Perch): void
   /** A jelly wobble when she is resized: + stretches (growing), − squashes (shrinking). */
   bounce(amount: number): void
   setQuality(quality: Graphics): void
@@ -49,7 +48,6 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   let avatar: Avatar | null = null
   let state: CharacterState = 'IDLE'
   let perch: Perch = 'none'
-  let facing = 1
   let cursor: { x: number; y: number } | null = null
   let mouth: number | null = null
   let loadToken = 0
@@ -108,7 +106,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     }
     avatar = next
     avatar.setState(state)
-    avatar.setPerch(perch, facing)
+    avatar.setPerch(perch)
     avatar.setMouth(mouth)
     scene.add(avatar.vrm.scene)
     frame()
@@ -163,10 +161,9 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     nudge(dx, dy) {
       avatar?.nudge(dx, dy)
     },
-    setPerch(next, side = 1) {
+    setPerch(next) {
       perch = next
-      facing = side
-      avatar?.setPerch(next, side)
+      avatar?.setPerch(next)
     },
     bounce(amount) {
       avatar?.bounce(amount)

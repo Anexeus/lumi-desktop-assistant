@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.5.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.6.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -87,7 +87,13 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 - **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
   edge (or drag her down onto the taskbar) and she sits on it, side-on, and rides along when you move the window (she
   hops down when it closes or minimises).
-- **Menu:** right-click the character or the tray icon. **Island look** (Settings → General): Pill or Frosted glass.
+- **Menu:** right-click the character or the tray icon (Chat, Settings, Change character, Hide, Keep on top, Stop,
+  Quit). **Island look** (Settings → General): Pill or Frosted glass; the AI model's name shows on the open island only
+  if you turn on "Show the AI model on the island".
+- **What the AI can do for you:** open any installed app or your folders ("open Brave", "open my Downloads"), play
+  music or videos ("play a song"), click things in its own browser ("open the third video"), write notes and paragraphs
+  (opened in Notepad), type and click in apps, send WhatsApp messages through WhatsApp Web (give it the number with country
+  code; you must be logged in at web.whatsapp.com). With "Do what I ask without asking first" on, it acts without asking.
 - **More characters:** 9 bundled (Settings → Character). For Miku, Teto and others: "Find Miku" / "Find Teto" open
   VRoid Hub; download a model whose terms allow it, then **Use my own .vrm file…**.
 

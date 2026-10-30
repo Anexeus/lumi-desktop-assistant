@@ -91,7 +91,8 @@ export const settingsFileSchema = z
     graphics: graphicsSchema,
     local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict(),
     shortcuts: shortcutsSchema,
-    islandStyle: z.enum(['pill', 'glass'])
+    islandStyle: z.enum(['pill', 'glass']),
+    islandModel: z.boolean()
   })
   .partial()
   .strict()
@@ -136,6 +137,7 @@ export const invokeSchemas = {
   [Invoke.localSelect]: z.object({ kind: z.enum(['llm', 'stt']), id: z.enum(LOCAL_MODEL_IDS) }).strict(),
   [Invoke.setIslandVisible]: z.object({ value: z.boolean() }).strict(),
   [Invoke.setIslandStyle]: z.object({ style: z.enum(['pill', 'glass']) }).strict(),
+  [Invoke.setIslandModel]: z.object({ value: z.boolean() }).strict(),
   [Invoke.menuRun]: z.object({ action: z.enum(MENU_ACTIONS) }).strict(),
   [Invoke.setIslandExpanded]: z.object({ expanded: z.boolean() }).strict(),
   [Invoke.chatGet]: none,

@@ -136,39 +136,54 @@ export function findApp(apps: ApprovedApp[], name: string): ApprovedApp | undefi
   )
 }
 
-export function appsPlugin(apps: () => ApprovedApp[]): Plugin {
+/** The user's own folders, always openable by name. */
+export function knownFolders(): ApprovedApp[] {
+  const names = { Downloads: 'downloads', Documents: 'documents', Desktop: 'desktop', Pictures: 'pictures', Music: 'music', Videos: 'videos' } as const
+  return Object.entries(names).map(([name, key]) => ({ name, path: app.getPath(key) }))
+}
+
+/** An app from the Start menu: its name and shell id (opened through Windows, never as a command line). */
+export interface InstalledApp {
+  name: string
+  id: string
+}
+
+export function appsPlugin(apps: () => ApprovedApp[], installed?: { list(): Promise<InstalledApp[]>; launch(id: string): Promise<void> }): Plugin {
   return {
     id: 'core.apps',
     name: 'Apps and folders',
-    version: '1.0.0',
-    description: 'Open apps and folders from your allow-list. Asks you first, every time (or once per chat).',
+    version: '1.1.0',
+    description: 'Open any app installed on this PC (as in the Start menu) and your folders, by name.',
     permissions: ['apps.launch'],
     tools: [
       tool({
         name: 'apps_open',
-        description: 'Open an app or folder the user has approved (Windows apps like Notepad, Terminal and Calculator are always available).',
-        // A getter, so the model always sees the current allow-list.
-        get parameters() {
-          return {
-            type: 'object',
-            properties: { name: { type: 'string', description: `One of: ${apps().map((a) => a.name).join(', ') || '(none approved yet)'}` } },
-            required: ['name']
-          }
+        description:
+          'Open any app installed on this PC by name (anything in the Start menu: browsers, Spotify, Discord, Steam, Settings, Notepad, Terminal…) ' +
+          'or a folder (Downloads, Documents, Desktop, Pictures, Music, Videos).',
+        parameters: {
+          type: 'object',
+          properties: { name: { type: 'string', description: 'The app or folder, e.g. "Spotify", "Chrome", "Downloads"' } },
+          required: ['name']
         },
         input: z.object({ name: z.string().trim().min(1).max(120) }),
         risk: 'act',
         describe: ({ name }) => `Open ${findApp(apps(), name)?.name ?? name}`,
-        check: ({ name }) =>
-          findApp(apps(), name)
-            ? null
-            : `“${name}” is not on the approved list. Approved: ${apps().map((a) => a.name).join(', ') || 'none yet'}. The user can add it in Settings → Tools.`,
         async run({ name }) {
-          const app = findApp(apps(), name)!
-          // No arguments and no shell: only the exact approved path is opened.
-          const error = await shell.openPath(app.path)
-          if (error) throw new Error(`Windows could not open ${app.name}: ${error}`)
           // Say what can happen next: small models otherwise stop here and tell the user to do the rest.
-          return `Opened ${app.name}; it is now the window in front. To type into it, call ui_type with the text (no item needed); to see it, call screen_look.`
+          const next = 'it is now the window in front. To type into it, call ui_type with the text (no item needed); to see it, call screen_look.'
+          const own = findApp(apps(), name)
+          if (own) {
+            // No arguments and no shell: only the exact path is opened.
+            const error = await shell.openPath(own.path)
+            if (error) throw new Error(`Windows could not open ${own.name}: ${error}`)
+            return `Opened ${own.name}; ${next}`
+          }
+          const list = (await installed?.list()) ?? []
+          const hit = findApp(list.map((a) => ({ name: a.name, path: a.id })), name)
+          if (!hit) throw new Error(`No installed app is called “${name}”. Installed: ${list.map((a) => a.name).slice(0, 60).join(', ')}.`)
+          await installed!.launch(hit.path)
+          return `Opened ${hit.name}; ${next}`
         }
       })
     ]

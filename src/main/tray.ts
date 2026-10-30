@@ -1,4 +1,5 @@
-import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from 'electron'
+import { Menu, Tray, type MenuItemConstructorOptions } from 'electron'
+import { appIcon } from './icon'
 import type { AppState } from '@shared/ipc'
 
 export interface TrayActions {
@@ -8,24 +9,6 @@ export interface TrayActions {
   openSettings(): void
   stop(): void
   quit(): void
-}
-
-/** 32×32 BGRA bitmap: a violet disc with two eyes, drawn in code so no asset is needed yet. */
-function icon(): Electron.NativeImage {
-  const size = 32
-  const buf = Buffer.alloc(size * size * 4)
-  const inside = (x: number, y: number, cx: number, cy: number, r: number): boolean =>
-    (x - cx) ** 2 + (y - cy) ** 2 <= r * r
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4
-      const px = x + 0.5
-      const py = y + 0.5
-      if (inside(px, py, 11.5, 14, 2.6) || inside(px, py, 20.5, 14, 2.6)) buf.set([255, 255, 255, 255], i)
-      else if (inside(px, py, 16, 16, 14.5)) buf.set([240, 108, 124, 255], i) // B, G, R, A = #7C6CF0
-    }
-  }
-  return nativeImage.createFromBitmap(buf, { width: size, height: size, scaleFactor: 2 })
 }
 
 export function menuTemplate(state: AppState, actions: TrayActions): MenuItemConstructorOptions[] {
@@ -48,7 +31,7 @@ export function menuTemplate(state: AppState, actions: TrayActions): MenuItemCon
 }
 
 export function createTray(actions: TrayActions): { update(state: AppState): void } {
-  const tray = new Tray(icon())
+  const tray = new Tray(appIcon().resize({ width: 32, height: 32, quality: 'best' }))
   tray.on('click', actions.toggleCharacter)
   return {
     update(state) {

@@ -25,6 +25,7 @@ import { projectsPlugin } from './tools/projects'
 import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
 import { startLog } from './log'
+import { appIcon } from './icon'
 import { findCharacter } from '@shared/characters'
 import { findLocalModel, LOCAL_MODELS } from '@shared/localModels'
 import { findProvider } from '@shared/providers'
@@ -88,6 +89,8 @@ async function start(): Promise<void> {
   const store = openStore(join(app.getPath('userData'), 'assistant.db'))
   const saved = loadWindowState(store)
   const settings = loadSettings(store)
+  // Which AI setup this start uses: makes "my settings changed by themselves" diagnosable from the log.
+  console.warn(`Settings: ai=${settings.ai.provider} model=${settings.ai.provider === 'builtin' ? settings.local.llm : settings.ai.model} stt=${settings.voice.stt} autoApprove=${settings.tools.autoApprove}`)
   saveSettings(store, settings) // persists generated defaults (e.g. the hook token) on first run
   // One encrypted key per provider. A key saved before providers existed belongs to the service in use then.
   const keyFor = (provider: string): string => `ai.key.${provider}`
@@ -396,7 +399,7 @@ async function start(): Promise<void> {
   }
   function notify(title: string, body: string): void {
     if (!settings.tools.notifications || !Notification.isSupported()) return
-    const n = new Notification({ title, body: body.slice(0, 200) })
+    const n = new Notification({ title, body: body.slice(0, 200), icon: appIcon() })
     n.on('click', () => showPanel('chat'))
     n.show()
   }

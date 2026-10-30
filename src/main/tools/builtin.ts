@@ -5,6 +5,7 @@ import { basename, join } from 'node:path'
 import { z } from 'zod'
 import type { ApprovedApp } from '@shared/ipc'
 import { createScopedFiles } from './files'
+import { appIcon } from '../icon'
 import { tool, type Plugin } from './types'
 
 export function filesPlugin(folders: () => string[]): Plugin {
@@ -195,7 +196,7 @@ export function notifyPlugin(enabled: () => boolean): Plugin {
         describe: ({ title }) => `Notified you: ${title}`,
         async run({ title, message }) {
           if (!enabled()) return 'Notifications are turned off in Settings.'
-          new Notification({ title, body: message }).show()
+          new Notification({ title, body: message, icon: appIcon() }).show()
           return 'Notification shown.'
         }
       })

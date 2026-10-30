@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 export function TitleBar({ title, children }: { title: string; children?: ReactNode }): React.JSX.Element {
   return (
     <header className="titlebar">
-      <span className="titlebar-mark" aria-hidden="true" />
+      <img className="titlebar-mark" src="./icon.png" alt="" />
       <h1 className="titlebar-title">{title}</h1>
       <div className="titlebar-actions">{children}</div>
       <div className="titlebar-controls">

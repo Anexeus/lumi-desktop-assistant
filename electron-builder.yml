@@ -27,3 +27,5 @@ win:
 nsis:
   oneClick: false
   perMachine: false
+  # The installer shows a "Choose install location" page (default %LOCALAPPDATA%\Programs\Lumi).
+  allowToChangeInstallationDirectory: true

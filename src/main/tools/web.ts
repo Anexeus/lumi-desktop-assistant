@@ -1,4 +1,5 @@
 import { FiltersEngine, Request } from '@ghostery/adblocker'
+import { appIcon } from '../icon'
 import { app, BrowserWindow, session, shell, type Session } from 'electron'
 import { createWriteStream, existsSync } from 'node:fs'
 import { readFile, rename, rm, writeFile } from 'node:fs/promises'
@@ -71,6 +72,7 @@ function browser(): BrowserWindow {
   ses.setPermissionCheckHandler(() => false)
   ses.on('will-download', (event) => event.preventDefault())
   win = new BrowserWindow({
+    icon: appIcon(),
     width: 1000,
     height: 760,
     title: 'Lumi — Browser',

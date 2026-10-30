@@ -141,3 +141,13 @@ Root causes found by testing on this PC, not guessed:
    window with tabs. **Ad blocker** in Lumi's browser (doubleclick and YouTube ad pings blocked; pages and video
    streams allowed — checked against the real filter lists).
 5. New: `PROJECT_SUMMARY.md` (whole-project summary and handoff) and `AGENTS.md` (for any AI coding agent).
+
+## 0.3.1: one icon everywhere, install location, settings diagnosis
+- The Lumi icon (build/icon.png, same art as the exe and installer) is now used by every window (taskbar, Alt+Tab),
+  the tray, notifications and the title-bar mark.
+- The installer has a "Choose Install Location" page (`allowToChangeInstallationDirectory`); verified on screen.
+- Slowness report: the owner's settings had reverted to Ollama (slow thinking model, GPU model swaps, approval cards),
+  cause not found. Restored, and each start now logs `Settings: ai=… model=… stt=… autoApprove=…` to lumi.log.
+  Timed on a copy of the real profile: reply 1.6 s (0.5 s with voice off). Measurements taken while forcing Chromium
+  accessibility (for UI Automation testing) were 10× slower and are not representative.
+- Unit 146 pass, E2E 50/50.

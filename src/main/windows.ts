@@ -1,3 +1,4 @@
+import { appIcon } from './icon'
 import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions } from 'electron'
 import { release } from 'node:os'
 import { join } from 'node:path'
@@ -55,6 +56,7 @@ export class WindowManager {
   ) {
     const { all, primary } = workAreas()
     this.character = new BrowserWindow({
+      icon: appIcon(),
       ...fitToDisplays(saved, all, primary),
       title: 'Lumi',
       show: false,
@@ -84,6 +86,7 @@ export class WindowManager {
     void loadPage(this.character, 'character')
 
     this.island = new BrowserWindow({
+      icon: appIcon(),
       ...this.islandBounds(false),
       title: 'Lumi — Island',
       show: false,
@@ -243,6 +246,7 @@ export class WindowManager {
     // own title bar (native title buttons turn Acrylic off). Not `transparent` and resizable on purpose:
     // that keeps Windows 11's rounded corners and shadow, and a non-resizable frameless window loses Acrylic.
     const win = new BrowserWindow({
+      icon: appIcon(),
       title: spec.title,
       width: spec.width,
       height: spec.height,

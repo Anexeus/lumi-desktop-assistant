@@ -2,6 +2,16 @@
 
 export const CHARACTERS = [
   {
+    id: 'miku',
+    name: 'Hatsune Miku',
+    file: 'Hatsune-Miku-RemiX3.vrm',
+    authors: ['RemiX3'],
+    license: 'VRoid Hub licence: redistribution allowed with credit, non-commercial, unmodified. Hatsune Miku © Crypton Future Media, INC. www.piapro.net',
+    licenseUrl:
+      'https://hub.vroid.com/license?allowed_to_use_user=everyone&characterization_allowed_user=everyone&corporate_commercial_use=disallow&credit=necessary&modification=disallow&personal_commercial_use=disallow&redistribution=allow&sexual_expression=disallow&version=1&violent_expression=allow',
+    voice: 'female'
+  },
+  {
     id: 'seed-san',
     name: 'Seed-san',
     file: 'Seed-san.vrm',

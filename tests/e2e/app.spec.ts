@@ -284,6 +284,26 @@ test('the menu opens from the character, runs an item and closes; only it may ru
   await expect(character.evaluate(() => window.assistant.menu.run('quit'))).rejects.toThrow(/not the menu window/)
 })
 
+test('one click on her only waves; a double click opens Settings; neither opens the menu', async () => {
+  const view = (): Promise<string> => character.evaluate(() => window.assistant.getState().then((s) => s.panelView))
+  await character.evaluate(() => window.assistant.openWindow('chat'))
+  await expect.poll(view).toBe('chat')
+  const menuShown = (): Promise<boolean> =>
+    app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().some((w) => w.webContents.getURL().endsWith('/menu.html') && w.isVisible()))
+  // A point on her body (elsewhere the window lets clicks through): her middle.
+  const { width, height } = await character.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+  const [x, y] = [Math.round(width / 2), Math.round(height * 0.5)]
+  await character.mouse.move(x, y)
+  await expect(character.locator('body')).toHaveClass(/hover/)
+  await character.mouse.click(x, y)
+  await character.waitForTimeout(800)
+  expect(await menuShown()).toBe(false)
+  expect(await view()).toBe('chat')
+  await character.mouse.dblclick(x, y)
+  await expect.poll(view).toBe('settings')
+  expect(await menuShown()).toBe(false)
+})
+
 test('the island switches between the pill and frosted glass', async () => {
   const style = (): Promise<string> => character.evaluate(() => window.assistant.getState().then((s) => s.islandStyle))
   expect(await style()).toBe('pill')
@@ -316,8 +336,8 @@ test('the menu changes the character', async () => {
   await menu.getByRole('menuitemradio', { name: /Vita/ }).click()
   await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.model.id))).toBe('vita')
   await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
-  await character.evaluate(() => window.assistant.model.select('seed-san')) // later tests expect the default character
-  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.model.id))).toBe('seed-san')
+  await character.evaluate(() => window.assistant.model.select('miku')) // later tests expect the default character
+  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.model.id))).toBe('miku')
 })
 
 test('connecting an online AI: "Get a key" opens that provider’s key page', async () => {
@@ -334,7 +354,7 @@ test('connecting an online AI: "Get a key" opens that provider’s key page', as
   await settings.getByRole('radio', { name: /Lumi built-in/ }).click()
 })
 
-test('dropped onto the taskbar she sits on it; picked up, she stands', async () => {
+test('dropped onto the taskbar she sits on it, knees up; picked up, she stands', async () => {
   const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea)
   const b = await characterWindow((w) => w.getContentBounds())
   await character.evaluate(
@@ -346,8 +366,8 @@ test('dropped onto the taskbar she sits on it; picked up, she stands', async () 
     },
     [area.x + 200 - b.x, area.y + area.height - b.height * 0.5 - b.y]
   )
-  await expect(character.locator('body')).toHaveAttribute('data-perch', 'sit', { timeout: 15_000 })
-  // Hips on the taskbar's top edge once she has slid down onto it.
+  await expect(character.locator('body')).toHaveAttribute('data-perch', 'floor', { timeout: 15_000 })
+  // Her seat line on the taskbar's top edge once she has slid down onto it (the knees-up pose lifts her hips above it).
   const hips = (): Promise<number> => characterWindow((w) => w.getContentBounds()).then((r) => Math.round(r.y + r.height * 0.62))
   await expect.poll(async () => Math.abs((await hips()) - (area.y + area.height))).toBeLessThanOrEqual(2)
   await character.evaluate(() => {
@@ -400,7 +420,7 @@ test('only the character window may read the model bytes', async () => {
 
 test('settings credits the model, switches characters with a matching voice, loads a custom .vrm', async () => {
   const settings = await panel('settings', 'Character')
-  await expect(settings.getByText(/© VirtualCast, Inc. · VRM Public License 1.0/)).toBeVisible()
+  await expect(settings.getByText(/© RemiX3 · VRoid Hub licence: redistribution allowed with credit/)).toBeVisible()
   const characters = settings.getByRole('radiogroup', { name: 'Characters' })
   await characters.getByRole('radio', { name: /Sendagaya Shino/ }).click()
   await expect(characters.getByRole('radio', { name: /Sendagaya Shino/ })).toHaveAttribute('aria-checked', 'true')

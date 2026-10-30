@@ -92,6 +92,8 @@ hints are not trusted for the confirmation decision unless the user marks the se
 - "Do what I ask without asking first" (Settings → Tools, off by default) skips approval cards for act tools. The
   emergency stop, the red island and the plugin switches still apply.
 - Lumi's browser blocks ads and trackers (Ghostery engine, network level).
+- `app_install` runs only winget with an argument list: a search for the given name, then `install --id <id from
+  winget's own results> -e --silent`. Approvals are off by default since 0.7.0 (ADR-065).
 - `apps_open` opens Start-menu apps by the id Windows lists for them (shell AppsFolder, default verb) and the user's
   folders: never a command line. `whatsapp_message` only opens WhatsApp Web's send link (number + text) in the user's
   browser and presses its Send button. With approvals off, the model is told it has full permission (ADR-060).

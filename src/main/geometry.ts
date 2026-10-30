@@ -82,7 +82,7 @@ export function placeBeside(anchor: Rect, size: { width: number; height: number 
 }
 
 const PEEK_ZONE = 0.25 // drop her centre this close to an outer screen edge (× her width) and she peeks in from it
-const PEEK_PAST = 0.12 // her centre ends past the edge: only her leaning head and shoulder show
+const PEEK_PAST = 0 // her centre line on the edge: half of her and her leaning head show
 const FEET_LINE = 0.96 // her feet, as a fraction of her window height from the top
 
 /**

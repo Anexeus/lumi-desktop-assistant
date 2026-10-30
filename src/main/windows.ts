@@ -325,7 +325,7 @@ export class WindowManager {
     this.scaleBase = undefined
     const b = this.characterBounds()
     if (this.seat?.handle === 0) this.seat = taskbarSeat(screen.getDisplayMatching(b).workArea) // the taskbar may have moved
-    if (this.seat) return this.place(seatedBounds(b, this.seat.rect.y), 'sit')
+    if (this.seat) return this.place(seatedBounds(b, this.seat.rect.y), this.seat.handle === 0 ? 'floor' : 'sit')
     const display = screen.getDisplayMatching(b)
     const others = screen.getAllDisplays().filter((d) => d.id !== display.id).map((d) => d.bounds)
     const peek = peekPlacement(b, display.bounds, others)
@@ -390,7 +390,7 @@ export class WindowManager {
     const seat = seatPlacement(b, frames, screen.getDisplayMatching(b).workArea)
     if (!seat) return
     this.seat = seat.frame
-    this.place(seat.bounds, 'sit', true)
+    this.place(seat.bounds, seat.frame.handle === 0 ? 'floor' : 'sit', true) // handle 0: the taskbar
     if (seat.frame.handle !== 0) this.followSeat(token) // the taskbar doesn't move
   }
 

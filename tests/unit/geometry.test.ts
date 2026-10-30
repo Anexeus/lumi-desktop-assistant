@@ -82,14 +82,14 @@ describe('peekPlacement', () => {
   const display = { x: 0, y: 0, width: 1920, height: 1080 }
   const size = { width: 300, height: 400 }
 
-  it('peeks from an outer edge when dropped close to it, centre just past the edge', () => {
+  it('peeks from an outer edge when dropped close to it, centre line on the edge', () => {
     const left = peekPlacement({ x: -100, y: 300, ...size }, display, [])
     expect(left?.side).toBe('left')
-    expect(left!.bounds.x + size.width / 2).toBeLessThan(0)
+    expect(left!.bounds.x + size.width / 2).toBe(0)
     expect(left!.bounds.x + size.width).toBeGreaterThan(64) // still grabbable
     const right = peekPlacement({ x: 1800, y: 300, ...size }, display, [])
     expect(right?.side).toBe('right')
-    expect(right!.bounds.x + size.width / 2).toBeGreaterThan(1920)
+    expect(right!.bounds.x + size.width / 2).toBe(1920)
     expect(right!.bounds.y).toBe(300)
   })
 

@@ -180,7 +180,7 @@ test('chat streams a reply, hides reasoning and animates the character', async (
   expect(last.model).toBe('fake-model')
   expect(last.messages[0]!.role).toBe('system')
   expect(last.messages.at(-1)).toEqual({ role: 'user', content: 'hi there' })
-  await expect(chat.locator('.badge')).toHaveText('fake-model, on this PC')
+  await expect(chat.locator('.titlebar-orb')).toHaveText('fake-model, on this PC')
 })
 
 test('the island sits at the top centre, expands, answers and shares the conversation', async () => {
@@ -258,6 +258,21 @@ test('API keys are encrypted at rest, sent as a bearer token, and dropped when t
   expect(samePath.ai.hasApiKey).toBe(true)
   const other = await chat.evaluate(() => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: 'http://localhost:9/v1', model: 'x' }))
   expect(other.ai.hasApiKey).toBe(false)
+  await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url, model: 'fake-model' }), baseUrl)
+})
+
+test('a saved key that can no longer be decrypted is dropped, and the chat says to paste it again', async () => {
+  const chat = await openPanel('chat')
+  await chat.evaluate(() =>
+    window.assistant.ai.setSettings({ provider: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash' })
+  )
+  const file = join(userData, 'secrets.json')
+  const secrets = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
+  writeFileSync(file, JSON.stringify({ ...secrets, 'ai.key.gemini': Buffer.from('v10' + 'x'.repeat(40)).toString('base64') }))
+  await chat.evaluate(() => window.assistant.chat.send('hello'))
+  await expect(chat.locator('.bubble.error').last()).toHaveText('Error: Lumi has no API key for Google Gemini. Paste it in Settings → AI.')
+  expect(readFileSync(file, 'utf8')).not.toContain('ai.key.gemini')
+  expect((await chat.evaluate(() => window.assistant.getState())).ai.hasApiKey).toBe(false)
   await chat.evaluate((url) => window.assistant.ai.setSettings({ provider: 'custom', baseUrl: url, model: 'fake-model' }), baseUrl)
 })
 

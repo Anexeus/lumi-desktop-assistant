@@ -9,15 +9,17 @@ const scene = createScene(canvas)
 const speaker = createSpeaker((level) => scene.setMouth(level))
 
 const CLICK_SLOP = 4 // px of movement before a press becomes a drag
+const DOUBLE_CLICK_MS = 450 // a second click this soon opens Settings (Windows' default double-click time is 500 ms)
 const KEY_RESIZE_STEP = 0.1
 // Cute lines for little moments. Windows voices say "Hee hee" more clearly than "Hehe".
 const TAP_LINES = ['Hi hi!', 'Yay!', 'Hee hee!']
-const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
+const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', floor: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
 const pick = (lines: string[]): string => lines[Math.floor(Math.random() * lines.length)]!
 
 let interactive = false
 let mode: 'idle' | 'pressing' | 'dragging' = 'idle'
 let droppedAt = -Infinity // when she was last put down, so "Peekaboo!" follows a drop, not a restart
+let clickedAt = -Infinity
 let wheelUntil = 0 // while scrolling, she stays clickable even when the cursor ends up past her shrinking outline
 let pressX = 0
 let pressY = 0
@@ -75,10 +77,17 @@ canvas.addEventListener('pointermove', (e) => {
 })
 
 canvas.addEventListener('pointerup', (e) => {
+  // One click: she waves with a cute line. A double click opens Settings. The menu is on right-click only.
   if (mode === 'pressing') {
-    scene.play('wave')
-    speaker.exclaim(pick(TAP_LINES))
-    void window.assistant.openWindow('chat')
+    const now = performance.now()
+    if (now - clickedAt < DOUBLE_CLICK_MS) {
+      clickedAt = -Infinity
+      void window.assistant.openWindow('settings')
+    } else {
+      clickedAt = now
+      scene.play('wave')
+      speaker.exclaim(pick(TAP_LINES))
+    }
   }
   endPress() // before releasing capture, which fires lostpointercapture
   canvas.releasePointerCapture(e.pointerId)

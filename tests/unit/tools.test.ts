@@ -199,3 +199,19 @@ describe('acting without asking', () => {
     expect(whatsappUrl('919876543210', 'hi & bye?')).toBe('https://web.whatsapp.com/send?phone=919876543210&text=hi%20%26%20bye%3F')
   })
 })
+
+describe('installing apps with winget', () => {
+  it('reads the first package from winget search output, spinner and all', async () => {
+    const { parseWingetSearch } = await import('../../src/main/tools/winget')
+    const out = [
+      '   -' + String.fromCharCode(13) + '   |' + String.fromCharCode(13),
+      'Name                         Id                           Version  Match         Source',
+      '----------------------------------------------------------------------------------------',
+      'Microsoft Visual Studio Code Microsoft.VisualStudioCode   1.95.3   Moniker: code winget',
+      'VSCodium                     VSCodium.VSCodium            1.95.3                 winget'
+    ].join('\r\n')
+    expect(parseWingetSearch(out)).toEqual({ name: 'Microsoft Visual Studio Code', id: 'Microsoft.VisualStudioCode' })
+    expect(parseWingetSearch('No package found matching input criteria.')).toBeNull()
+    expect(parseWingetSearch('Name  Id  Version\n------------------\nBad   x;calc  1')).toBeNull() // ids are only letters, digits, . + - _
+  })
+})

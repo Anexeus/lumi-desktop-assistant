@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.6.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.7.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -85,16 +85,25 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 - **Projects** (Settings → Tools → folders): Lumi runs only the scripts in an approved project's `package.json`.
 - **Character size:** scroll the mouse wheel over the character (or `+`/`−` with it focused). Drag it to move.
 - **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
-  edge (or drag her down onto the taskbar) and she sits on it, side-on, and rides along when you move the window (she
-  hops down when it closes or minimises).
+  edge and she sits on it facing you, legs over the edge, and rides along when you move the window (she hops down when
+  it closes or minimises). Drag her down onto the taskbar and she sits on it with her knees drawn up, so her legs stay
+  on screen.
 - **Menu:** right-click the character or the tray icon (Chat, Settings, Change character, Hide, Keep on top, Stop,
   Quit). **Island look** (Settings → General): Pill or Frosted glass; the AI model's name shows on the open island only
   if you turn on "Show the AI model on the island".
 - **What the AI can do for you:** open any installed app or your folders ("open Brave", "open my Downloads"), play
   music or videos ("play a song"), click things in its own browser ("open the third video"), write notes and paragraphs
-  (opened in Notepad), type and click in apps, send WhatsApp messages through WhatsApp Web (give it the number with country
-  code; you must be logged in at web.whatsapp.com). With "Do what I ask without asking first" on, it acts without asking.
-- **More characters:** 9 bundled (Settings → Character). For Miku, Teto and others: "Find Miku" / "Find Teto" open
+  (opened in Notepad), type and click in apps, install apps (winget), send WhatsApp messages through WhatsApp Web (give it
+  the number with country code; you must be logged in at web.whatsapp.com). It acts without asking (Settings → Tools →
+  "Do what I ask without asking first", on by default).
+- **Clicking her:** one click and she waves with a cute line, a double click opens Settings, a right-click opens the
+  menu; drag to pick her up (she dangles and swings), scroll to resize.
+- **Google Gemini:** the default model is `gemini-3.6-flash`. Google serves the 2.5 models only to projects that used
+  them before, so a new key gets "doesn't offer the model" with them; pick another model in Settings → AI.
+- **Lumi needs 64-bit Windows 10 or 11.** If a download says "This app can't run on your PC", check the file size
+  (about 274 million bytes; Windows shows about 261 MB) and its SHA-256 on the release page; a partial download gives
+  that error.
+- **More characters:** 10 bundled, Hatsune Miku by default (Settings → Character). For Miku, Teto and others: "Find Miku" / "Find Teto" open
   VRoid Hub; download a model whose terms allow it, then **Use my own .vrm file…**.
 
 ## Docs

@@ -49,7 +49,7 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 
 ## 2. What the user gets
 
-- **Character:** 9 bundled CC0/licensed VRM characters with matching male/female voices; idle animations, waving,
+- **Character:** 10 bundled VRM characters (Hatsune Miku by RemiX3 is the default) with matching male/female voices; idle animations, waving,
   picked-up "wheee" reaction with hair/cloth physics; scroll the wheel over her to resize; drag to move; peeks in from
   a screen edge; sits on an app window's top edge and rides along; cute lines ("Yay!", "Hee hee!") and a cheer
   when an action worked.
@@ -84,7 +84,8 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `2281387` 0.3.1 | Lumi icon everywhere, choose install location, settings logged at startup |
 | `37918b4` 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
 | `fc615ee` 0.5.0 | Pill island (glass optional), Lumi's own menu, guided API keys, 4 more characters + Miku/Teto links, side-on sitting and taskbar seat, smoother wheel resize |
-| (next) 0.6.0 | AI opens any app, plays videos, WhatsApp, acts without asking; island look for chat/settings; taskbar icon; rollback journal; front-facing sit |
+| `b9c8840` 0.6.0 | AI opens any app, plays videos, WhatsApp, acts without asking; island look for chat/settings; taskbar icon; rollback journal; front-facing sit |
+| (next) 0.7.0 | Gemini fixed (voice, unreadable keys, gemini-3.6-flash), Miku default, dangling pick-up, knees-up taskbar sit, click to wave / double-click Settings, app_install, never asks, 64-bit installer check |
 
 ## 4. How to work on it
 

@@ -54,7 +54,8 @@ export function systemPrompt(memories: string[] = [], now = new Date(), name = '
           : 'Some actions need the user’s OK first; if they decline, accept it and don’t retry. ') +
         'Never tell the user to do something you can do with your tools, and never answer with a link when they asked you to open or ' +
         'play something: open it or play it. To play music or a video use play_video; to open any program or folder use apps_open; ' +
-        'to write a paragraph or letter for the user use notes_write; to message someone use whatsapp_message. In Lumi’s browser the ' +
+        'to install an app use app_install; to write a paragraph or letter for the user use notes_write; to message someone use ' +
+        'whatsapp_message. In Lumi’s browser the ' +
         'videos are listed first, so "the third video" is item 3. ' +
         'If a request leaves out details (e.g. "play a song"), choose something sensible yourself and do it. ' +
         // Small models otherwise announce the next step ("now I will type…") and stop.

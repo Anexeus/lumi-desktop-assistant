@@ -22,6 +22,7 @@ import { createRegistry, runToolCall } from './tools/registry'
 import { webPlugin } from './tools/web'
 import { DesktopHelper, desktopPlugin } from './tools/desktop'
 import { projectsPlugin } from './tools/projects'
+import { wingetPlugin } from './tools/winget'
 import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
 import { startLog } from './log'
@@ -100,6 +101,7 @@ async function start(): Promise<void> {
     await setSecret(keyFor(settings.ai.provider), (await getSecret(API_KEY)) ?? null)
     await setSecret(API_KEY, null)
   }
+  await getSecret(keyFor(settings.ai.provider)) // drops a key Windows can no longer decrypt, so Settings asks for it again
   const aiStatus = (): AppState['ai'] => ({
     ...settings.ai,
     hasApiKey: hasSecret(keyFor(settings.ai.provider)),
@@ -144,7 +146,13 @@ async function start(): Promise<void> {
     if (settings.ai.provider === 'builtin') {
       return { baseUrl: await localUrl(llmServer, settings.local.llm, 'the chat model'), model: settings.local.llm, apiKey: llmServer.key }
     }
-    return { baseUrl: settings.ai.baseUrl, model: settings.ai.model, apiKey: await getSecret(keyFor(settings.ai.provider)) }
+    const apiKey = await getSecret(keyFor(settings.ai.provider))
+    const provider = findProvider(settings.ai.provider)
+    if (!apiKey && provider.needsKey) {
+      setState({ ai: aiStatus() }) // a key that could not be read was just removed
+      throw new ProviderError('auth', `Lumi has no API key for ${provider.name}. Paste it in Settings → AI.`)
+    }
+    return { baseUrl: settings.ai.baseUrl, model: settings.ai.model, apiKey }
   }
   const custom = await readCustomModel()
   const modelInfo = (meta: VrmMeta, revision: number): AppState['model'] => ({
@@ -406,7 +414,8 @@ async function start(): Promise<void> {
       where: () => (settings.ai.provider === 'builtin' ? 'Lumi’s built-in model (on this PC)' : findProvider(settings.ai.provider).name),
       describe: async (png, question) => describeImage(await aiConfig(), png, question)
     }),
-    projectsPlugin(() => settings.tools.folders)
+    projectsPlugin(() => settings.tools.folders),
+    wingetPlugin()
   ]
   const registry = createRegistry(() => [...builtins, ...mcp.plugins()], () => settings.tools.disabled)
   const integrationsState = (): AppState['integrations'] => ({ githubToken: hasSecret(GITHUB_TOKEN), mcp: mcp.info() })
@@ -809,10 +818,12 @@ async function start(): Promise<void> {
     const allowed = settings.voice.input && (windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)
     if (!allowed) throw new Error('Rejected voice:transcribe: voice input is off or not allowed from this window')
     try {
+      // Gemini, Anthropic, OpenRouter and Lumi's own engine have no speech-to-text: they always use Lumi's Whisper.
+      const noStt = ['builtin', 'gemini', 'anthropic', 'openrouter'].includes(settings.ai.provider)
       const text =
-        settings.voice.stt === 'builtin'
+        settings.voice.stt === 'builtin' || noStt
           ? await transcribe({ baseUrl: await localUrl(sttServer, settings.local.stt, 'the speech model'), model: 'whisper' }, wav)
-          : await withOllama(async () => transcribe(await voiceConfig(), wav))
+          : await withOllama(async () => transcribe({ ...(await voiceConfig()), model: findProvider(settings.ai.provider).stt ?? settings.voice.model }, wav))
       return { ok: true as const, text }
     } catch (error) {
       return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not understand the recording.' }

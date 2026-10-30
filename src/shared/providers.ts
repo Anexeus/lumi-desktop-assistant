@@ -48,8 +48,9 @@ export const PROVIDERS = [
     vision: true,
     name: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-2.5-flash',
-    models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro'],
+    // Google serves the 2.5 models only to projects that used them before; newer -latest aliases can be overloaded.
+    model: 'gemini-3.6-flash',
+    models: ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest'],
     local: false,
     needsKey: true,
     keyUrl: 'https://aistudio.google.com/apikey',

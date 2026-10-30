@@ -349,3 +349,61 @@ Acrylic and native controls dark. Status colours (the green "on this PC" dot, re
 Supersedes the side-on pose of ADR-059 at the owner's request ("sit in front of me, on the edge; I don't care how it
 looks"): thighs forward over the window's top edge, lower legs hanging in front of it. The taskbar seat and the wider drop
 tolerance from ADR-059 stay.
+
+## ADR-065 Lumi acts without asking by default; app installs through winget (2026-10-31)
+The owner wants the assistant never to ask for permission. "Do what I ask without asking first" is now on for new
+installs too (ADR-048 had it off by default); it can still be turned off in Settings → Tools, and the emergency stop and
+plugin switches remain. New tool `app_install`: winget searches its catalog for the name the model gives and installs the
+package id winget reports (`-e --silent`), with an argument list and no shell. Risk accepted by the owner: with approvals
+off, text the model reads (a web page) could talk it into installing software from winget's catalog. On a PC whose winget
+is broken (this one: "Data required by the source is missing") the tool says how to repair it.
+
+## ADR-066 Hatsune Miku (RemiX3) is the default character; the owner's other models stay personal (2026-10-31)
+The owner asked to ship `2951434776750077865.vrm` (by KuroG) as the default. Its embedded VRoid Hub licence says
+redistribution: disallow, so it cannot be in the installer; it is the owner's personal model on their PC instead. Of the
+other two, "Hatsune Miku!" by RemiX3 allows redistribution with credit (non-commercial, unmodified): it is bundled,
+credited (plus "Hatsune Miku © Crypton Future Media, INC. www.piapro.net") and is the default for new installs. The third
+(`7423572281241392855.vrm`) allows redistribution with credit but names no author and isn't on VRoid Hub's API, so it
+can't be credited and isn't bundled.
+
+## ADR-067 Speech-to-text falls back to Lumi's Whisper; providers' errors are shown (2026-10-31)
+With Gemini selected and voice input on "AI service", every recording failed with "Transcription failed (404)": Gemini,
+Anthropic, OpenRouter and Lumi's engine have no `/audio/transcriptions`. Those providers now always use Lumi's Whisper;
+providers that have one use their own speech model (Groq `whisper-large-v3`, OpenAI `whisper-1`; before, every service
+was asked for Ollama's `lfm3-audio`). Gemini returns errors as a JSON list, which Lumi used to drop; the message is now
+shown (e.g. "Please pass a valid API key").
+
+## ADR-068 Desktop Mate–style poses, clicks and the title-bar orb (2026-10-31)
+Picked up, she dangles (tipped forward, arms reaching down, legs hanging apart, looking up); sitting, she sits upright
+facing the viewer with her hands on her knees, on a window's top edge or the taskbar. Peeking puts her body's centre
+line on the screen edge (half of her shows). One click on her opens the menu (with a wave and a cute line), a double
+click opens Settings. The chat window's coloured status dot became the animated orb. A 32-bit Windows gets a clear
+installer message ("Lumi needs 64-bit Windows") instead of a later "This app can't run on your PC".
+
+## ADR-069 A saved key that can't be decrypted is deleted (2026-10-31)
+The owner's Gemini key was saved but could no longer be decrypted, so Lumi sent requests without it and Google's
+"Missing or invalid Authorization header" was all they saw, while Settings still said "A key is saved". Such a key
+can never be read again (Windows' key for it is gone), so Lumi now deletes it when reading fails (checked at start
+for the selected service, and on every use). Settings then asks for it, and a chat with a service that needs a key
+and has none says "Lumi has no API key for <service>. Paste it in Settings → AI." instead of sending the request.
+
+## ADR-070 Gemini defaults to gemini-3.6-flash; a cloud "model not found" points to Settings (2026-10-31)
+With a new key Gemini answered 404 for `gemini-2.5-flash` and Lumi showed "For Ollama, run: ollama pull …". Google's
+model page lists the 2.5 models as legacy, served only to projects that used them before; the owner's project is new.
+Checked through Lumi itself with the owner's saved key (on a copy of the profile; the key never left the app):
+`gemini-3.6-flash` and `gemini-flash-lite-latest` answered in 1–3 s, while `gemini-3.8-flash` (what
+`gemini-flash-latest` points to now) hung ~80 s and then returned 503 "high demand". So the default is the pinned
+`gemini-3.6-flash`, with the lite alias and the newest alias as suggestions. A 404 about the model now names the
+Ollama fix only for Ollama (port 11434); any other service gets "doesn't offer the model … Pick another model in
+Settings → AI."
+
+## ADR-071 Clicks, picking up and the taskbar seat, second pass (2026-10-31)
+Supersedes the click and taskbar parts of ADR-068, after the owner's screenshots. One click no longer opens the menu
+(it popped up whenever they meant to grab her): she waves with a cute line; a double click (within 450 ms, close to
+Windows' 500 ms default) opens Settings; the menu stays on right-click. Held, the idle gestures had kept playing (a
+"stretch" put both arms overhead); now no gesture starts or runs while she is held, and sitting or peeking only allows
+the head-only ones. Held, she hangs from the top of her head and swings behind the cursor like a pendulum (at most
+0.22 rad, so her feet stay inside her window), legs kicking in turn with toes pointed, arms loose. On the taskbar her
+legs used to hang below the screen (a taskbar is ~48 px tall): sitting there is now the `floor` perch, knees drawn up,
+and she rises by an amount computed from the model's own thigh, shin and sole so her soles rest on the taskbar's top
+edge (checked with Miku and the owner's model: on the line within ~6 px; long hair and sashes still hang lower).

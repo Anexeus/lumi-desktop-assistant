@@ -68,7 +68,7 @@ export const toolsSettingsSchema = z
     disabled: z.array(z.string().max(100)).max(100),
     notifications: z.boolean(),
     screenshots: z.boolean().default(false),
-    autoApprove: z.boolean().default(false)
+    autoApprove: z.boolean().default(true)
   })
   .strict()
 

@@ -100,6 +100,9 @@ test.beforeAll(async () => {
     p.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()))
   })
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('/character.html'))).toBe(true)
+  // New installs act without asking; this suite checks the approval cards, so it turns them back on.
+  const character = app.windows().find((w) => w.url().endsWith('/character.html'))!
+  await character.evaluate(() => window.assistant.tools.setAutoApprove(false))
   documents = mkdtempSync(join(tmpdir(), 'lumi-documents-'))
   await app.evaluate(({ app: electronApp }, d) => electronApp.setPath('documents', d), documents)
   // Record launches instead of opening anything for real.
@@ -199,7 +202,7 @@ test('settings lists folders, apps and plugins with their permissions', async ()
   await expect(s.getByRole('region', { name: 'Tools' }).getByText(folder, { exact: true })).toBeVisible()
   const tools = s.getByRole('region', { name: 'Tools' })
   await expect(tools.locator('.data-list li', { hasText: 'Test App' })).toBeVisible()
-  await expect(s.getByText('Can: opens approved apps (asks first)')).toBeVisible()
+  await expect(s.getByText('Can: opens installed apps and your folders')).toBeVisible()
 })
 
 test('an MCP server you add becomes tools that ask first', async () => {

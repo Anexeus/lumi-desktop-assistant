@@ -204,3 +204,26 @@ Root causes found by testing on this PC, not guessed:
   unless Settings → General → "Show the AI model on the island" is on; the menu has "Change character" (all 9 listed).
 - **Sitting:** facing the viewer on the window's edge again (ADR-064).
 - Typecheck and lint clean; unit 161 pass (2 skipped); E2E 57/57 (new: island model setting, menu character change, installed-app lookup).
+
+## 0.7.0: Gemini voice fix, Miku by default, Desktop Mate–style poses, install apps, never asks
+- **Gemini:** "Transcription failed (404)" fixed (Whisper fallback). Gemini's error messages are now shown. In the
+  installed app Gemini then said "Missing or invalid Authorization header": the owner's saved key can't be decrypted
+  (it wasn't encrypted with the key in their profile's `Local State`, which encrypts and decrypts new keys across
+  restarts), so no key was sent. Lumi now drops such a key and the chat says to paste it again (ADR-069).
+- **Characters:** Hatsune Miku (RemiX3) bundled and the default; the owner's KuroG model is their personal model (its
+  licence forbids redistribution, so it cannot ship).
+- **Poses** checked on screen with Miku: picked up (dangling), sitting on a window and on the taskbar (hips on the edge,
+  y 182 and 664), peeking (half shown). Title-bar orb checked.
+- **Clicks:** single → menu, double → Settings. **app_install** (winget; parser unit-tested; winget on this PC is broken
+  and reports how to repair it). Approvals off by default. Installer refuses 32-bit Windows with a message.
+- Typecheck and lint clean; unit 162 pass (2 skipped). E2E 58 tests: 57 passed in the full run; the shortcut-reset test
+  failed only because the installed Lumi held `Alt+Shift+Space`, and passed when re-run with it closed. New E2E: an
+  undecryptable saved key is dropped and the chat asks for it again.
+- **Second pass (owner's screenshots):** Gemini with a new key → "not available, ollama pull": the 2.5 models are legacy
+  at Google; default now `gemini-3.6-flash`, checked live through Lumi with the owner's saved key ("ok" in 2.6 s), and
+  a cloud 404 says to pick another model (ADR-070). Held: no idle gestures (a "stretch" had put her arms overhead),
+  pendulum swing, kicking legs. One click waves, double click opens Settings, right-click opens the menu. Taskbar:
+  knees-up `floor` perch; measured with Miku and the owner's model, soles on the taskbar line (0 and ~6 px below);
+  hair and a sash hang lower (ADR-071).
+- Typecheck and lint clean; unit 162 pass (2 skipped); E2E 59/59 with the installed Lumi closed (new: one click only
+  waves, a double click opens Settings, neither opens the menu; the taskbar seat is `floor`).

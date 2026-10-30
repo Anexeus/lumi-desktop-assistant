@@ -2,7 +2,7 @@ import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from '@pix
 import { Box3, Object3D, Vector3, type PerspectiveCamera } from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { SEAT_LINE, type CharacterState, type Perch } from '@shared/character'
-import { addOffsets, gestureOffsets, GESTURE_SECONDS, IDLE_GESTURES, talkingOffsets, ZERO, type Gesture } from './gestures'
+import { addOffsets, gestureOffsets, GESTURE_SECONDS, HEAD_GESTURES, IDLE_GESTURES, talkingOffsets, ZERO, type Gesture } from './gestures'
 
 // Procedural animation for a VRM: one blended pose per state, plus additive blink, breathing,
 // gaze and mouth layers. Every state writes the same parameters, so states crossfade instead
@@ -36,6 +36,13 @@ const BLEND_RATE = 6 // per second; ~0.4 s to settle into a new state
 // Relaxed standing: arms hang close to the body (not the A-pose most models are rigged in), elbows softly bent.
 const REST_ARM = 1.36
 const REST_ELBOW = 0.22
+// Seated, the thighs and knees bend this far (radians from standing): on a window's edge the lower legs hang over it;
+// on the floor (the taskbar) the knees are drawn up so nothing goes below it.
+const SIT_THIGH = 1.45
+const SIT_KNEE = 1.5
+const FLOOR_THIGH = 2.35
+const FLOOR_KNEE = 2.55
+const MAX_HANG = 0.22 // radians a held body swings behind the cursor; more would swing her feet out of the window
 
 export interface Avatar {
   readonly vrm: VRM
@@ -50,11 +57,11 @@ export interface Avatar {
   setMouth(level: number | null): void
   /** Point the eyes at a world-space position; null returns to looking at the viewer. */
   lookAt(world: Vector3 | null): void
-  /** Picked up by the mouse: arms up, legs dangle, a surprised smile. */
+  /** Picked up by the mouse: she hangs from her head and swings, arms loose, legs kicking, surprised. */
   setHeld(held: boolean): void
   /** The window moved by (dx, dy) screen pixels; the body lags and swings back, and hair and clothes follow. */
   nudge(dx: number, dy: number): void
-  /** Sits on a window edge facing the viewer, peeks in from a screen edge, falls (arms up), or stands. */
+  /** Sits on a window edge or the taskbar facing the viewer, peeks in from a screen edge, falls, or stands. */
   setPerch(perch: Perch): void
   /** Kicks a squash-and-stretch spring: + stretches up, − squashes down; it wobbles back to normal. */
   bounce(amount: number): void
@@ -110,16 +117,27 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
   const hips = bone('hips')
   const hipsRestY = hips?.position.y ?? 0
   const hipsWorld = hips ? hips.getWorldPosition(new Vector3()) : bounds.getCenter(new Vector3())
+  const top = bounds.max.y - vrm.scene.position.y // the top of her head above the scene's origin: where she hangs from
   const lLeg = bone('leftUpperLeg')
   const rLeg = bone('rightUpperLeg')
   const lKnee = bone('leftLowerLeg')
   const rKnee = bone('rightLowerLeg')
+  const lFoot = bone('leftFoot')
+  const rFoot = bone('rightFoot')
+  // Knees drawn up, her soles end up this far below her hips (from this model's own thigh, shin and sole):
+  // that is how far she rises on the floor so they rest on the edge instead of sinking below it.
+  const at = (b: Object3D | null): Vector3 => (b ? b.getWorldPosition(new Vector3()) : hipsWorld.clone())
+  const [legJoint, knee, ankle] = [at(lLeg), at(lKnee), at(lFoot)]
+  const floorLift =
+    hipsWorld.y - legJoint.y + legJoint.distanceTo(knee) * Math.cos(FLOOR_THIGH) +
+    knee.distanceTo(ankle) * Math.cos(FLOOR_THIGH - FLOOR_KNEE) + (ankle.y - bounds.min.y)
   const rootRest = vrm.scene.position.clone()
   const hipsOnScreen = new Vector3()
   let held = false
   let heldWeight = 0
   let perch: Perch = 'none'
   let sit = 0 // 0..1 blend weights, eased like the state poses
+  let floor = 0 // the part of `sit` that is on the floor (the taskbar): knees up instead of legs over an edge
   let peek = 0
   let peekSide = 0 // +1: the screen is to her right (left edge), −1: to her left
   const jelly = { x: 0, v: 0 } // squash (−) and stretch (+) of the whole body, a damped spring
@@ -152,13 +170,14 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       stateSince = elapsedNow
     },
     play(name) {
-      gesture = { name, start: elapsedNow }
+      if (!held) gesture = { name, start: elapsedNow } // a wave or stretch would fight the dangling arms
     },
     setMouth(level) {
       mouth = level === null ? null : Math.min(1, Math.max(0, level))
     },
     setHeld(next) {
       held = next
+      if (held) gesture = undefined
     },
     nudge(dx, dy) {
       // A quick flick swings her noticeably; the clamps below keep her in the window.
@@ -184,9 +203,10 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       const k = 1 - Math.exp(-dt * BLEND_RATE)
       for (const key of Object.keys(pose) as (keyof Pose)[]) pose[key] += (target[key] - pose[key]) * k
 
-      // Idle life: every so often, a random small action.
-      if (state === 'IDLE' && !gesture && t >= nextIdleGesture) {
-        gesture = { name: IDLE_GESTURES[Math.floor(Math.random() * IDLE_GESTURES.length)]!, start: t }
+      // Idle life: every so often, a random small action. None while held; perched, only head moves (her arms are busy).
+      if (state === 'IDLE' && !gesture && !held && t >= nextIdleGesture) {
+        const choices = perch === 'none' ? IDLE_GESTURES : HEAD_GESTURES
+        gesture = { name: choices[Math.floor(Math.random() * choices.length)]!, start: t }
       }
       if (gesture && t - gesture.start >= GESTURE_SECONDS[gesture.name]) {
         gesture = undefined
@@ -194,7 +214,8 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       }
       talk += ((state === 'SPEAKING' ? 1 : 0) - talk) * k
       heldWeight += ((held || perch === 'fall' ? 1 : 0) - heldWeight) * Math.min(1, dt * 8)
-      sit += ((perch === 'sit' ? 1 : 0) - sit) * k
+      sit += ((perch === 'sit' || perch === 'floor' ? 1 : 0) - sit) * k
+      floor += ((perch === 'floor' ? 1 : 0) - floor) * k
       peek += ((perch === 'left' || perch === 'right' ? 1 : 0) - peek) * k
       const g = addOffsets(
         talkingOffsets(t, talk),
@@ -202,24 +223,31 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       )
       const h = heldWeight
       const s = sit
-      // Held: both arms up in a cheerful V with bent elbows ("wheee!"). Sitting: hands forward over the lap.
+      const f = floor
+      // Held: arms a little out and flapping, forearms hanging limp. Seated: hands on the knees (higher with knees up).
+      const flap = Math.sin(t * 7) * 0.1 * h
       applyArms({
         ...g,
-        rUpperZ: g.rUpperZ - 1.8 * h + 0.06 * s,
-        lUpperZ: g.lUpperZ + 1.8 * h - 0.06 * s,
-        rLowerZ: g.rLowerZ - 0.7 * h,
-        lLowerZ: g.lLowerZ + 0.7 * h,
-        rLowerY: g.rLowerY + 0.9 * s,
-        lLowerY: g.lLowerY - 0.9 * s
+        rUpperZ: g.rUpperZ - (0.3 + flap) * h + 0.06 * s,
+        lUpperZ: g.lUpperZ + (0.3 + flap) * h - 0.06 * s,
+        rLowerZ: g.rLowerZ + 0.25 * h,
+        lLowerZ: g.lLowerZ - 0.25 * h,
+        rLowerY: g.rLowerY + 0.2 * h + 1.05 * s + 0.4 * f,
+        lLowerY: g.lLowerY - 0.2 * h - 1.05 * s - 0.4 * f
       })
-      // Legs dangle and kick while held. Sitting, she faces the viewer on the window's edge: thighs forward over it,
-      // lower legs hanging down in front of the window, feet swinging.
-      const kick = Math.sin(t * 7) * 0.25 * h
-      const swing = Math.sin(t * 2.4) * 0.18 * s
-      turn(lLeg, kick - 1.45 * s, 0, 0.06 * h)
-      turn(rLeg, -kick - 1.45 * s, 0, -0.06 * h)
-      turn(lKnee, (1.5 + swing) * s, 0, 0)
-      turn(rKnee, (1.5 - swing) * s, 0, 0)
+      // Held: legs dangle apart, kicking in turn (the forward leg bends at the knee), toes pointing down. On a window's
+      // edge: thighs forward over it, lower legs hanging in front of the window, feet swinging. On the taskbar: knees
+      // drawn up and feet tucked in, so nothing goes below it.
+      const kick = Math.sin(t * 6) * 0.35 * h
+      const swing = Math.sin(t * 2.4) * 0.18 * (s - f)
+      const thigh = SIT_THIGH * s + (FLOOR_THIGH - SIT_THIGH) * f
+      const bend = SIT_KNEE * s + (FLOOR_KNEE - SIT_KNEE) * f
+      turn(lLeg, kick - 0.2 * h - thigh, 0, 0.12 * h - 0.04 * s + 0.1 * f)
+      turn(rLeg, -kick - 0.2 * h - thigh, 0, -0.12 * h + 0.04 * s - 0.1 * f)
+      turn(lKnee, 0.6 * h - kick + bend + swing * s, 0, 0)
+      turn(rKnee, 0.6 * h + kick + bend - swing * s, 0, 0)
+      turn(lFoot, 0.6 * h, 0, 0)
+      turn(rFoot, 0.6 * h, 0, 0)
 
       // Damped spring: the body trails the window's motion, then settles.
       const clampDt = Math.min(dt, 0.05)
@@ -233,9 +261,16 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
         hipsOnScreen.copy(hipsWorld).project(camera)
         const hipsLine = (1 - hipsOnScreen.y) / 2 // 0 at the top of the window, 1 at the bottom
         const visible = 2 * (camera.position.z - hipsWorld.z) * Math.tan((camera.fov * Math.PI) / 360)
-        seatShift = (hipsLine - SEAT_LINE) * visible * s
+        seatShift = (hipsLine - SEAT_LINE) * visible * s + floorLift * f
       }
-      vrm.scene.position.set(rootRest.x + inertia.x, rootRest.y + inertia.y + seatShift, rootRest.z)
+      // Held, she hangs from the top of her head and swings behind the cursor like a pendulum (instead of sliding).
+      const hang = ((inertia.x / 0.14) * MAX_HANG * 0.85 + Math.sin(t * 2.2) * MAX_HANG * 0.15) * h
+      vrm.scene.rotation.z = hang * m // a VRM 0.x scene is turned 180° about Y, which mirrors a turn about Z
+      vrm.scene.position.set(
+        rootRest.x + inertia.x * (1 - h) + top * Math.sin(hang),
+        rootRest.y + inertia.y + seatShift + top * (1 - Math.cos(hang)),
+        rootRest.z
+      )
       // Jelly: stretched taller and thinner (or squashed) from the feet, keeping her volume roughly the same.
       jelly.v += (-180 * jelly.x - 12 * jelly.v) * clampDt
       jelly.x = Math.max(-0.08, Math.min(0.08, jelly.x + jelly.v * clampDt))
@@ -245,13 +280,13 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       // screen and tilts her head; her legs stay out of sight past the edge.
       const lean = -peekSide * peek
       const breathe = Math.sin(t * 1.7)
-      turn(hips, 0, 0, lean * 0.2)
+      turn(hips, -0.25 * heldWeight, 0, lean * 0.2) // held: tipped a little forward, as if lifted by the back
       turn(spine, 0, peekSide * 0.15 * peek, lean * 0.22)
-      turn(chest, breathe * 0.015 - pose.lean - g.chest, peekSide * 0.25 * peek, lean * (spine ? 0.22 : 0.44))
+      turn(chest, breathe * 0.015 - pose.lean - g.chest - 0.12 * sit, peekSide * 0.25 * peek, lean * (spine ? 0.22 : 0.44))
       turn(neck, pose.headPitch * 0.4, g.headYaw * 0.4 + peekSide * 0.1 * peek, pose.headRoll * 0.4)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       const sway = Math.sin(t * 0.7) * 0.02
-      turn(head, pose.headPitch * 0.6 + nod + g.headPitch, g.headYaw * 0.6 + peekSide * 0.15 * peek, pose.headRoll * 0.6 + sway + g.headRoll + lean * 0.15)
+      turn(head, pose.headPitch * 0.6 + nod + g.headPitch - 0.25 * heldWeight, g.headYaw * 0.6 + peekSide * 0.15 * peek, pose.headRoll * 0.6 + sway + g.headRoll + lean * 0.15)
       if (hips) {
         // A single small hop at the start of a notification, then settle; gestures (the "Yay!" cheer) hop too.
         const since = t - stateSince

@@ -39,6 +39,8 @@ export const GESTURE_SECONDS: Record<Gesture, number> = { wave: 2.2, nod: 1.1, s
 
 /** The idle repertoire, picked at random while nothing else is happening. */
 export const IDLE_GESTURES: Gesture[] = ['lookAround', 'tilt', 'stretch', 'nod', 'wave']
+/** The idle gestures that leave the arms alone, for while she sits or peeks. */
+export const HEAD_GESTURES: Gesture[] = ['lookAround', 'tilt', 'nod']
 
 /** Fades a gesture in over its first 20% and out over its last 20%. */
 export function envelope(p: number): number {

@@ -1,5 +1,5 @@
 // OpenAI-compatible audio endpoints (Ollama 0.40+, OpenAI, Groq for transcription…).
-import { ProviderError, type ProviderConfig } from './provider'
+import { modelMissing, ProviderError, type ProviderConfig } from './provider'
 
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // the OpenAI API's own upload limit
 export const MAX_SPEECH_CHARS = 1000 // per request; replies are spoken sentence by sentence
@@ -15,9 +15,7 @@ async function failure(res: Response, cfg: ProviderConfig, what: string): Promis
   } catch {
     // not JSON
   }
-  if (res.status === 404 && /model/i.test(detail)) {
-    return new ProviderError('model', `The ${what} model "${cfg.model}" is not installed. For Ollama, run: ollama pull ${cfg.model}`)
-  }
+  if (res.status === 404 && /model/i.test(detail)) return modelMissing(cfg, what)
   if (res.status === 401 || res.status === 403) return new ProviderError('auth', 'The AI service rejected the API key.')
   return new ProviderError('http', `${what[0]!.toUpperCase()}${what.slice(1)} failed (${res.status})${detail ? `: ${detail}` : '.'}`)
 }

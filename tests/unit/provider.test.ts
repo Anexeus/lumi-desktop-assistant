@@ -84,6 +84,12 @@ describe('streamChat', () => {
     const e1 = await errorOf(collect(streamChat(cfg, [], { fetchImpl: missing.impl })))
     expect(e1.kind).toBe('model')
     expect(e1.message).toContain('ollama pull qwen3:4b')
+    // A cloud service (Gemini here) can't pull models: the message points to Settings instead.
+    const gone = sseFetch([], { status: 404, body: JSON.stringify([{ error: { message: 'models/gemini-2.5-flash is not found for API version v1beta' } }]) })
+    const google = { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash' }
+    const e2 = await errorOf(collect(streamChat(google, [], { fetchImpl: gone.impl })))
+    expect(e2.kind).toBe('model')
+    expect(e2.message).toBe(`This AI service doesn't offer the model "gemini-2.5-flash" to your account. Pick another model in Settings → AI.`)
 
     const auth = sseFetch([], { status: 401 })
     expect((await errorOf(collect(streamChat(cfg, [], { fetchImpl: auth.impl })))).kind).toBe('auth')

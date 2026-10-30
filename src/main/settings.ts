@@ -49,7 +49,7 @@ export interface ToolsSettings {
   screenshots: boolean
   autoApprove: boolean
 }
-export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true, screenshots: false, autoApprove: false }
+export const DEFAULT_TOOLS: ToolsSettings = { folders: [], apps: [], disabled: [], notifications: true, screenshots: false, autoApprove: true }
 
 export interface Settings {
   assistantName: string
@@ -83,7 +83,7 @@ export function loadSettings(store: Store): Settings {
     tools: file.tools ?? DEFAULT_TOOLS,
     mcp: file.mcp ?? [],
     claude: file.claude ?? { path: '', hookToken: randomBytes(24).toString('hex') },
-    character: file.character ?? 'seed-san',
+    character: file.character ?? 'miku',
     graphics: file.graphics ?? 'balanced',
     local: file.local ?? DEFAULT_LOCAL,
     shortcuts: file.shortcuts ?? DEFAULT_SHORTCUTS,
@@ -130,6 +130,9 @@ export async function getSecret(name: string): Promise<string | undefined> {
     if (shouldReEncrypt) await setSecret(name, result) // the OS rotated the key
     return result
   } catch {
-    return undefined // e.g. copied from another machine or user: unreadable by design
+    // Unreadable (another machine or user, or Windows' encryption key for Lumi changed): drop it so Settings asks again.
+    console.warn(`A saved secret (${name}) could not be decrypted and was removed; it has to be entered again`)
+    await setSecret(name, null)
+    return undefined
   }
 }

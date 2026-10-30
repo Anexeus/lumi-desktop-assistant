@@ -20,7 +20,7 @@ keys, browse and play videos in her own ad-blocked browser, write notes and code
 project's npm scripts, and hand coding tasks to Claude Code. Electron 45 + React 19 + TypeScript 6 strict + three.js /
 three-vrm + zod 4 + node:sqlite. Repo: https://github.com/Anexeus/lumi-desktop-assistant (private, owner Anexeus).
 
-**Version now:** 0.6.0 (this round). Previous releases: 0.2.0 … 0.4.0 (only the latest release is kept on GitHub;
+**Version now:** 0.7.0 (this round). Previous releases: 0.2.0 … 0.4.0 (only the latest release is kept on GitHub;
 older ones are deleted when a new one is published, at the owner's request; their git tags stay).
 
 ## 2. The owner and how to work with them
@@ -173,6 +173,29 @@ app windows. What was done:
   setting (off). Menu: "Change character". Sitting faces the viewer again (ADR-064).
 - **Trap:** during this round the working tree was reset to the last commit while the agent was paused (a usage limit);
   edits that scripts had applied vanished silently. After any interruption, grep for your changes before continuing.
+
+### 4.11 Gemini, Miku by default, Desktop Mate poses, installs, never asks → 0.7.0
+- The owner pasted a Gemini key in chat (they were told to rotate it) and saw "Transcription failed (404)": voice went to
+  Gemini, which has no speech-to-text → Whisper fallback (ADR-067). Gemini errors are a JSON list; now shown.
+- Google then said "Missing or invalid Authorization header": the owner's saved Gemini key couldn't be decrypted (not
+  encrypted with the key in their `Local State`; a test key saved with that `Local State` decrypts after restarts), so
+  Lumi sent none. Lumi now drops an undecryptable key and asks for it again (ADR-069). The owner has to paste the key
+  in Settings → AI themselves: never type or store a key for them.
+- **Testing trap:** close the installed Lumi before E2E. It holds `Alt+Shift+Space`, so "a global shortcut can be
+  rebound … and reset" fails while it runs.
+- Owner's models: only RemiX3's Miku may be redistributed (bundled, default); KuroG's is personal (ADR-066).
+- Poses like the Desktop Mate screenshots the owner sent: dangling when picked up, sitting upright on edges, peek shows
+  half (ADR-068). `app_install` via winget; approvals off by default (ADR-065).
+- Second pass (the owner's screenshots): idle gestures kept playing while she was held (a "stretch" put both arms
+  overhead); one click opened the menu; on the taskbar her legs hung below the screen; Gemini said "model not
+  available, ollama pull …". Now: no arm gestures while held or perched, she hangs from her head and swings (ADR-071);
+  one click waves, double click = Settings, right-click = menu; the taskbar is the `floor` perch (knees up, lifted by
+  the model's own leg lengths); Gemini defaults to `gemini-3.6-flash` and a cloud 404 says to pick another model
+  (ADR-070). The owner's key was checked through Lumi itself on a copy of the profile (the key never left the app).
+- **Pose checks:** capture only Lumi's own window (`webContents.capturePage()`, with alpha) and measure her lowest drawn
+  row against the taskbar line; no backdrop needed and nothing private on screen gets captured. The owner may drag the
+  test copy while it runs (it appears on their desktop): trust a capture only if the window stayed where the script
+  put it.
 
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 

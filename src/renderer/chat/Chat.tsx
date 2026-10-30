@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { MicButton } from '../ui/MicButton'
+import { Orb } from '../ui/Orb'
 import { RichText } from '../ui/RichText'
 import { Approvals } from './Approvals'
 import { TasksPanel } from './TasksPanel'
@@ -57,8 +58,9 @@ export function Chat(): React.JSX.Element {
     <main className="chat">
       <TitleBar title={state?.assistantName ?? 'Lumi'}>
         {ai && (
-          <span className={`badge dot ${ai.local ? 'local' : 'cloud'}`} title={`${ai.model}: ${ai.local ? 'runs on this PC' : `cloud (${ai.baseUrl})`}`}>
-            <span className="visually-hidden">{ai.model}{ai.local ? ', on this PC' : ', cloud'}</span>
+          <span className="titlebar-orb" title={`${ai.model}: ${ai.local ? 'runs on this PC' : `online (${ai.baseUrl})`}`}>
+            <Orb mode={status === 'idle' ? 'idle' : status} />
+            <span className="visually-hidden">{ai.model}{ai.local ? ', on this PC' : ', online'}</span>
           </span>
         )}
         <button type="button" className="ghost" onClick={() => setShowTasks((v) => !v)} aria-pressed={showTasks}>

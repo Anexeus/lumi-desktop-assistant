@@ -299,3 +299,14 @@
 .badge.dot::before {
   margin: 0;
 }
+
+/* The orb in the title bar: swirls while Lumi thinks or answers (the same orb as the island). */
+.titlebar-orb {
+  display: inline-flex;
+  margin-right: auto;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-orb .orb {
+  --size: 18px;
+}

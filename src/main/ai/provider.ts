@@ -91,19 +91,27 @@ export function createThinkFilter(): (chunk: string) => string {
   }
 }
 
+/** A 404 about the model. Ollama (its port is 11434) can download it; a cloud service only offers its own list. */
+export function modelMissing(cfg: ProviderConfig, what = ''): ProviderError {
+  const model = `${what ? `${what} ` : ''}model "${cfg.model}"`
+  return new URL(cfg.baseUrl).port === '11434'
+    ? new ProviderError('model', `The ${model} is not installed. For Ollama, run: ollama pull ${cfg.model}`)
+    : new ProviderError('model', `This AI service doesn't offer the ${model} to your account. Pick another model in Settings → AI.`)
+}
+
 async function describeHttpError(res: Response, cfg: ProviderConfig): Promise<ProviderError> {
   let detail = ''
   try {
-    const body = (await res.json()) as { error?: { message?: string } | string }
-    detail = typeof body.error === 'string' ? body.error : (body.error?.message ?? '')
+    const json = (await res.json()) as unknown
+    // Google (Gemini) wraps its error in a list: [{ "error": { "message": … } }].
+    const body = (Array.isArray(json) ? json[0] : json) as { error?: { message?: string } | string } | undefined
+    detail = typeof body?.error === 'string' ? body.error : (body?.error?.message ?? '')
   } catch {
     // body was not JSON
   }
   detail = detail.slice(0, 300)
   if (res.status === 401 || res.status === 403) return new ProviderError('auth', 'The AI service rejected the API key.')
-  if (res.status === 404 && /model/i.test(detail)) {
-    return new ProviderError('model', `Model "${cfg.model}" is not available. For Ollama, run: ollama pull ${cfg.model}`)
-  }
+  if (res.status === 404 && /model/i.test(detail)) return modelMissing(cfg)
   if (res.status === 429) return new ProviderError('http', 'The AI service is rate limiting requests. Try again in a moment.')
   return new ProviderError('http', `The AI service returned an error (${res.status})${detail ? `: ${detail}` : '.'}`)
 }

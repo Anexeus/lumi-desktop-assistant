@@ -2,6 +2,7 @@ import type { ProviderId } from './providers'
 // IPC contract shared by main, preload and renderers. Types and channel names only:
 // the preload imports this file, so it must stay free of runtime dependencies.
 import type { CharacterEvent, CharacterState, Perch } from './character'
+import type { MateLibrary } from './mate'
 import type { ShortcutAction } from './shortcuts'
 
 export type WindowName = 'chat' | 'settings'
@@ -10,7 +11,7 @@ export type WindowName = 'chat' | 'settings'
 export type IslandStyle = 'pill' | 'glass'
 
 /** What the character's and tray's menu can do. */
-export const MENU_ACTIONS = ['chat', 'settings', 'character', 'alwaysOnTop', 'stop', 'quit', 'close'] as const
+export const MENU_ACTIONS = ['chat', 'settings', 'character', 'alwaysOnTop', 'dance', 'stop', 'quit', 'close'] as const
 export type MenuAction = (typeof MENU_ACTIONS)[number]
 
 export interface ChatItem {
@@ -196,12 +197,12 @@ export interface AiStatus extends AiSettings {
 export type Graphics = 'low' | 'balanced' | 'high'
 
 export interface ModelInfo {
-  /** A bundled character's id, or 'custom' for the user's own .vrm. */
+  /** A bundled character's id, or 'mine:…' for one of the user's own models. */
   id: string
   name: string
   authors: string[]
   licenseUrl: string | null
-  /** True when the user loaded their own .vrm; false for a bundled character. */
+  /** True for one of the user's own models; false for a bundled character. */
   custom: boolean
   /** The bundled .vrm file to load (null for a custom model, whose bytes come from model.get()). */
   file: string | null
@@ -209,6 +210,21 @@ export interface ModelInfo {
   /** Bumped on every model change so the character window knows to reload. */
   revision: number
 }
+
+/** Mate Engine's animations, sounds and avatars, imported from the user's own copy for personal use. */
+export interface MateState {
+  /** Converted clips and copied sounds; both 0 when nothing is imported. */
+  clips: number
+  sounds: number
+  /** Bumped on every import or removal, so the character window reloads the library. */
+  revision: number
+  /** While an import runs. */
+  progress: { done: number; total: number } | null
+}
+
+export type MateImportResult =
+  | { ok: true; state: AppState; clips: number; sounds: number; models: string[]; skipped: string[] }
+  | { ok: false; canceled: boolean; message?: string }
 
 export interface AppState {
   /** True when the OS draws frosted glass (Windows 11 22H2+ Acrylic) behind the panels. */
@@ -221,6 +237,8 @@ export interface AppState {
   shortcuts: Record<ShortcutAction, { accelerator: string; registered: boolean }>
   character: CharacterState
   model: ModelInfo
+  /** The user's own models (Settings → Character → "Add my own .vrm file…"), listed after the bundled characters. */
+  myModels: { id: string; name: string; authors: string[] }[]
   islandVisible: boolean
   islandExpanded: boolean
   islandStyle: IslandStyle
@@ -242,6 +260,9 @@ export interface AppState {
   panelView: 'chat' | 'settings'
   /** Peeking in from a screen edge, sitting on a window, falling off one, or just standing. */
   perch: Perch
+  mate: MateState
+  /** Dancing to Mate Engine's dances (the menu's "Dance"; picking her up stops it). */
+  dancing: boolean
 }
 
 export type ListModelsResult = { ok: true; models: string[] } | { ok: false; message: string }
@@ -258,6 +279,12 @@ export const Invoke = {
   getModel: 'model:get',
   chooseModel: 'model:choose',
   selectCharacter: 'model:select',
+  removeModel: 'model:remove',
+  mateImport: 'mate:import',
+  mateRemove: 'mate:remove',
+  mateLibrary: 'mate:library',
+  mateClip: 'mate:clip',
+  mateSound: 'mate:sound',
   setGraphics: 'graphics:set',
   setShortcut: 'shortcuts:set',
   emergencyStop: 'app:emergency-stop',
@@ -443,11 +470,25 @@ export interface AssistantApi {
     /** The user's model bytes, or null to use the bundled default. Character window only. */
     get(): Promise<Uint8Array | null>
     choose(): Promise<ChooseModelResult>
-    /** Switches to a bundled character (dropping any custom model) and matches the voice to it. */
+    /** Switches to a bundled character (matching the voice to it) or to one of the user's own models. */
     select(id: string): Promise<AppState>
+    /** Deletes one of the user's own models; the default character takes over if it was in use. Settings only. */
+    remove(id: string): Promise<AppState>
     setGraphics(quality: Graphics): Promise<AppState>
     /** Opens a VRoid Hub search for more characters (Lumi can't bundle Miku or Teto: their licences forbid it). */
     openSite(site: 'miku' | 'teto' | 'browse'): Promise<void>
+  }
+  mate: {
+    /** Asks for a Mate Engine folder and imports from it, replacing an earlier import. Settings only. */
+    import(): Promise<MateImportResult>
+    /** Deletes the imported animations and sounds (its avatars stay in the user's own models). Settings only. */
+    remove(): Promise<AppState>
+    /** The imported clip and sound ids, or null. Character window only. */
+    library(): Promise<MateLibrary | null>
+    /** A converted clip as JSON (MateClip). Character window only. */
+    clip(id: string): Promise<string>
+    /** A sound file's bytes (mp3 or wav). Character window only. */
+    sound(id: string): Promise<Uint8Array>
   }
   character: {
     setIgnoreMouse(ignore: boolean): void

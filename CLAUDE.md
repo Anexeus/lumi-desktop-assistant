@@ -40,13 +40,17 @@ models in userData `models/local`). Desktop control: `src/main/tools/desktop.ts`
 Project scripts: `src/main/tools/projects.ts` (package.json scripts only; this is the allow-list, not a shell).
 Peeking/sitting: `windows.ts` + pure `geometry.ts`; window positions from the helper's read-only `frames`/`frame` ops.
 Global shortcuts: `src/shared/shortcuts.ts` (validation + key recording), registered in `index.ts`. History: `OTHERAGENT.md`.
+Mate Engine import: `src/main/mate/` (Unity muscle clips → VRM rotations in `muscles.ts`/`anim.ts`, the importer in
+`library.ts`); the character plays the clips with three's AnimationMixer in `avatar.ts`. App icon: `npx electron scripts/make-icon.mjs`.
 Progress of the 2026-10-30 upgrade: `docs/UPGRADE_PROGRESS.md`. Logs: userData `logs/lumi.log`.
 E2E fakes the Claude CLI and hook config with `DESKTOP_ASSISTANT_FAKE_CLAUDE`, `_NODE`, `_CLAUDE_SETTINGS`, `_HOOK_PORT`
 (unpackaged only): never point tests at the real `~/.claude/settings.json`.
 
 ## Assets and licenses
 No third-party models, motions, or audio without a license that allows redistribution. YUI is
-PolyForm-Noncommercial and Lala is AGPL: take ideas only, never code.
+PolyForm-Noncommercial and Lala is AGPL: take ideas only, never code. Mate Engine (the git-ignored `Mate-Engine-*`
+folder; copyleft MateEngine Pro License, assets © Shiny): never copy its code or ship its assets; Lumi imports them at
+runtime from the user's own copy for personal use (`src/main/mate/`, ADR-075).
 
 ## graphify
 

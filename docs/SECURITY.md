@@ -149,3 +149,13 @@ hints are not trusted for the confirmation decision unless the user marks the se
 
 Pin with a lockfile. Run `npm audit` at each milestone. New dependencies need a reason in
 `DECISIONS.md` if they are runtime (not dev) dependencies. Review postinstall scripts.
+
+## Mate Engine import (ADR-075)
+
+- The importer reads a folder the user picks (or `--import-mate=<folder>`) as **untrusted files**: `.anim` text is read
+  with fixed regular expressions (no YAML engine, nothing evaluated), each file is capped (64 MB clips, 8 MB sounds),
+  only a fixed list of paths inside the folder is read, and VRMs go through the same validation as "Add my own .vrm".
+- The import writes only into `userData/mate` (replaced atomically) and the user's own models.
+- `mate:clip` / `mate:sound` answer only the character window, and only for ids the import listed; ids are file names
+  (`^[\w.-]{1,120}$`, zod), never paths. Import and removal are accepted only from the settings panel.
+- Nothing of Mate Engine is shipped or committed: its licence forbids redistribution (the folder is git-ignored).

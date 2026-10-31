@@ -277,7 +277,7 @@ kbd {
   background: rgb(245 245 247 / 92%);
 }
 
-.panel form button:hover:not(:disabled) {
+.panel form button:not(.mic):hover:not(:disabled) {
   background: #fff;
 }
 
@@ -295,6 +295,11 @@ kbd {
   background: rgb(255 255 255 / 10%);
   border-color: var(--line);
   padding: 7px 10px;
+}
+
+/* Its own hover: the white one of the Send button would hide the white mic icon. */
+.panel .mic:not(.recording):hover:not(:disabled) {
+  background: rgb(255 255 255 / 18%);
 }
 
 .panel .mic.recording {

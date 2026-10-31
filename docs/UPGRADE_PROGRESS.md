@@ -227,3 +227,44 @@ Root causes found by testing on this PC, not guessed:
   hair and a sash hang lower (ADR-071).
 - Typecheck and lint clean; unit 162 pass (2 skipped); E2E 59/59 with the installed Lumi closed (new: one click only
   waves, a double click opens Settings, neither opens the menu; the taskbar seat is `floor`).
+
+## 0.8.0 (first part, built as 0.7.1, not released): legs in front of the taskbar, the first pick-up back, own models, Gemini tools, Mate Engine ideas, island fixes
+- **Gemini tools:** "400 Function call is missing a thought_signature" after a tool call (the owner's `apps_open`): Lumi
+  now returns Gemini 3's `extra_content` signature with each tool call (ADR-072). Checked live through Lumi with the
+  owner's saved key on a throwaway profile copy, windows hidden: `files_search` → its result → a reply, 8.3 s, no error.
+- **Taskbar:** she sits on its edge with her legs hanging in front of it again; her window is at `pop-up-menu`, above the
+  taskbar (Electron's `floating` is below it). Checked with the owner's model: perch `sit`, window bottom at y 1064 over
+  the taskbar top at 912, on top; a crop of only the taskbar strip shows her legs over it.
+- **Picked up:** the first dangling pose is back (no pendulum), as the owner asked.
+- **Own models:** any number, in Settings → Character and the right-click menu, removable; the old `custom.vrm` joins
+  them at start. On the owner's PC: KuroG's model, 止丸式初音ミクNT and "Miku 2" (all personal: their licences forbid
+  redistribution). `HatsuneMikuNT.vrm` was taken out of the bundled models (ADR-073).
+- **Mate Engine ideas, own code (ADR-073):** head, neck and chest follow the cursor; stroking her head is a head pat;
+  after 3 idle minutes she naps and wakes with a stretch. Captured on screen (Miku): looking left-up and right-down,
+  petted (eyes-closed smile, tilt), asleep (eyes shut, head drooped), waking stretch. No Mate Engine code or assets.
+- **Island:** a tap while she thinks or talks stops her; the speech detector hears softer voices (0.01 RMS); a Windows
+  voice can no longer leave her stuck "speaking"; transcription failures are logged (ADR-074). With the name check on,
+  the island says it is listening for "Lumi, …" and reports ignored speech. The quick-ask mic button no longer turns
+  white (icon invisible) on hover; measured in the built app: 18 % white with the light icon, Send unchanged.
+- **Two profiles found:** a Lumi started from Claude's tools used a copy of the profile inside Claude's MSIX package.
+  The owner's real profile (Start menu) is on Ollama with the name check on, the likely cause of "the island doesn't
+  hear me". Whisper was hard-linked into the real profile, so voice works there with Gemini. Installed at
+  `C:\Users\Admin\Documents\Lumi`; the real Start-menu and desktop shortcuts and the uninstall entry show 0.7.1.
+- Typecheck and lint clean; unit 165 pass (2 skipped); E2E 62/62 with the installed Lumi closed (new: head pat and nap,
+  tapping the island stops her, the name-check hints).
+
+## 0.8.0: Mate Engine's animations, sounds and avatars; one icon; voice answers without her name
+- **Voice ("Got it…" and then nothing):** the owner's real profile has the name check on; tapping the island now counts
+  as addressing her for the first sentence and for follow-ups within 30 s of her answer (ADR-077). Their real log had no
+  transcription errors, which pointed at the check, not speech-to-text.
+- **Icon:** the UI's orb is now the icon of the exe, installer, taskbar, tray and windows (ADR-076).
+- **Mate Engine (ADR-075):** imported from the owner's copy, never shipped: 56 clips (19 idles, male idles, picked up,
+  two edge sits, sleeping, head pat, six reactions, 12 dances), 14 sounds, 3 avatars. Converter calibrated against the
+  clips' own hand/foot goals (mean 0.08 of centre-of-mass height; under 0.1 in a unit test). Checked on screen with Miku:
+  idles natural and on the ground; picked up (lifted, limp); sitting on the taskbar facing the viewer with the legs
+  hanging; a click reaction; dancing; asleep on the floor; peeking keeps Lumi's lean. "Dance" in the menu.
+- **Found while testing:** a Lumi started from Claude's tools runs on a copy of the profile inside Claude's MSIX package;
+  the owner's real profile is reached via Explorer (OTHERAGENT 4.12).
+- Typecheck and lint clean; unit 172 pass (2 skipped; new: the muscle converter, including the local calibration
+  check); E2E 66/66 with the installed Lumi closed (new: `mate.spec.ts`, a made-up Mate Engine folder imported at launch,
+  clips per situation, Dance, the clip/sound access rules, Settings; the API-surface test lists the new `mate` API).

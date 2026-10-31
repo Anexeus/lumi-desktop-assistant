@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { randomBytes } from 'node:crypto'
-import type { CharacterId } from '@shared/characters'
+import type { CharacterChoice } from '@shared/characters'
 import { DEFAULT_SHORTCUTS, type ShortcutAction } from '@shared/shortcuts'
 import { providerForUrl } from '@shared/providers'
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -60,7 +60,7 @@ export interface Settings {
   tools: ToolsSettings
   mcp: McpServerConfig[]
   claude: { path: string; hookToken: string }
-  character: CharacterId
+  character: CharacterChoice
   graphics: Graphics
   local: { llm: string; stt: string }
   shortcuts: Record<ShortcutAction, string>

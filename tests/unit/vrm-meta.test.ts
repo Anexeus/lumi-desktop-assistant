@@ -31,6 +31,12 @@ describe('readVrmMeta', () => {
     expect(meta).toEqual({ name: 'Old', authors: ['Someone'], licenseUrl: 'https://x', specVersion: '0.x' })
   })
 
+  it('names a model without a title after its author', () => {
+    const name = (meta: unknown): string => readVrmMeta(glb({ extensions: { VRM: { meta } } })).name
+    expect(name({ title: 'null', author: 'KuroG' })).toBe("KuroG's model") // some exporters write "null"
+    expect(name({ title: '', author: '' })).toBe('Unnamed model')
+  })
+
   it('trims and caps untrusted strings', () => {
     const meta = readVrmMeta(glb({ extensions: { VRMC_vrm: { meta: { name: '  ' + 'x'.repeat(500), authors: [1, '', 'A'] } } } }))
     expect(meta.name).toHaveLength(200)

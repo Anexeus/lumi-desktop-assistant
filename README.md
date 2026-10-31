@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.7.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.8.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -76,7 +76,9 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
   see screenshots) needs ~4.5 GB of GPU memory (or ~6 GB RAM on CPU); Qwen3 4B and 1.7B are alternatives.
 - **Microphone and speech** (Settings → Voice): microphone, push-to-talk, Whisper or the AI service for speech-to-text,
   Windows or AI-service voice, optional "only respond when I say the name".
-- **Hands-free voice:** tap the island at the top of the screen ("Tap to talk"); tap again to stop.
+- **Hands-free voice:** tap the island at the top of the screen ("Tap to talk"); tap again to stop. A tap while she is
+  thinking or talking stops her. With "Only respond when I say the name" on, the first sentence after a tap (and
+  follow-ups within 30 s of her answer) count without her name; after a quiet half minute, start with "Lumi, …".
 - **Keyboard shortcuts** (Settings → General): click the keys and press new ones; Reset restores the default.
 - **Screen access and computer control** (Settings → Tools → plugins): turn the "Screen and desktop control" plugin off
   to disable it entirely. "Do what I ask without asking first" removes the approval cards. While it acts, the island's orb turns red. **Emergency stop: Ctrl+Alt+Shift+X**, the tray menu, or
@@ -86,10 +88,10 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 - **Character size:** scroll the mouse wheel over the character (or `+`/`−` with it focused). Drag it to move.
 - **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
   edge and she sits on it facing you, legs over the edge, and rides along when you move the window (she hops down when
-  it closes or minimises). Drag her down onto the taskbar and she sits on it with her knees drawn up, so her legs stay
-  on screen.
-- **Menu:** right-click the character or the tray icon (Chat, Settings, Change character, Hide, Keep on top, Stop,
-  Quit). **Island look** (Settings → General): Pill or Frosted glass; the AI model's name shows on the open island only
+  it closes or minimises). Drag her down onto the taskbar and she sits on its edge the same way, legs hanging in front
+  of it.
+- **Menu:** right-click the character or the tray icon (Chat, Settings, Change character, Hide, Keep on top, Dance
+  once Mate Engine's animations are imported, Stop, Quit). **Island look** (Settings → General): Pill or Frosted glass; the AI model's name shows on the open island only
   if you turn on "Show the AI model on the island".
 - **What the AI can do for you:** open any installed app or your folders ("open Brave", "open my Downloads"), play
   music or videos ("play a song"), click things in its own browser ("open the third video"), write notes and paragraphs
@@ -97,14 +99,21 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
   the number with country code; you must be logged in at web.whatsapp.com). It acts without asking (Settings → Tools →
   "Do what I ask without asking first", on by default).
 - **Clicking her:** one click and she waves with a cute line, a double click opens Settings, a right-click opens the
-  menu; drag to pick her up (she dangles and swings), scroll to resize.
+  menu; drag to pick her up (she dangles and kicks), scroll to resize. Her head follows your cursor; stroke her head
+  with the cursor for a head pat. Leave her alone for 3 minutes and she naps until you move the mouse.
 - **Google Gemini:** the default model is `gemini-3.6-flash`. Google serves the 2.5 models only to projects that used
   them before, so a new key gets "doesn't offer the model" with them; pick another model in Settings → AI.
 - **Lumi needs 64-bit Windows 10 or 11.** If a download says "This app can't run on your PC", check the file size
   (about 274 million bytes; Windows shows about 261 MB) and its SHA-256 on the release page; a partial download gives
   that error.
+- **Mate Engine animations** (Settings → Character → "Import from Mate Engine…", then pick your Mate Engine folder):
+  Lumi moves with Mate Engine's motion-captured animations (standing, picked up, sitting on an edge, sleeping, head
+  pats, reactions, dances), plays its sounds and adds its three characters to your models. They are imported from
+  your own copy for personal use (Mate Engine by Shiny; its licence forbids sharing them, so Lumi never ships them).
 - **More characters:** 10 bundled, Hatsune Miku by default (Settings → Character). For Miku, Teto and others: "Find Miku" / "Find Teto" open
-  VRoid Hub; download a model whose terms allow it, then **Use my own .vrm file…**.
+  VRoid Hub; download a model whose terms allow it, then **Add my own .vrm file…**. Your own models stay in the list (and in the
+  right-click menu → Change character) until you remove them. Only models whose licence allows redistribution can be
+  bundled for everyone; the rest stay personal.
 
 ## Docs
 

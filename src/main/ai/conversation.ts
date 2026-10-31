@@ -216,7 +216,12 @@ export class Conversation {
         messages.push({
           role: 'assistant',
           content: stepText,
-          tool_calls: calls.map((c, i) => ({ id: c.id || `call_${round}_${i}`, type: 'function', function: { name: c.name, arguments: c.arguments } }))
+          tool_calls: calls.map((c, i) => ({
+            id: c.id || `call_${round}_${i}`,
+            type: 'function',
+            function: { name: c.name, arguments: c.arguments },
+            ...(c.extra_content ? { extra_content: c.extra_content } : {}) // e.g. Gemini's thought signature, sent back as is
+          }))
         })
         this.status = 'thinking'
         this.deps.onCharacter('work')

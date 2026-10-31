@@ -407,3 +407,86 @@ the head-only ones. Held, she hangs from the top of her head and swings behind t
 legs used to hang below the screen (a taskbar is ~48 px tall): sitting there is now the `floor` perch, knees drawn up,
 and she rises by an amount computed from the model's own thigh, shin and sole so her soles rest on the taskbar's top
 edge (checked with Miku and the owner's model: on the line within ~6 px; long hair and sashes still hang lower).
+
+## ADR-072 Taskbar sit, picking up, own models and Gemini tool calls, third pass (2026-10-31)
+Supersedes the held and taskbar parts of ADR-071, which the owner found ugly. Held, she dangles as in ADR-068 again
+(tipped forward, arms reaching down and out, legs kicking; no pendulum). On the taskbar she sits on its top edge with her
+legs hanging in front of it, as on a window (`sit`; the knees-up `floor` perch is gone). Her legs used to vanish
+behind the taskbar: Electron's `floating`…`status` levels put a window *below* the Windows taskbar, so her window now
+uses `pop-up-menu` and re-asserts it every 1.5 s while she sits there (not while her own menu is open). The island
+stays on `floating`.
+Own models: Lumi kept one (`models/custom.vrm`, always shown when present and missing from the menu). Now any number
+live in `models/mine/<sha256-12>.vrm` with the id `mine:<hash>`, are listed in Settings → Character and the right-click
+menu, and can be removed; the old file moves in at start. A model without a title (some exporters write "null") is
+named after its author, or else after its file name.
+Gemini 3 and tools: Gemini's OpenAI-compatible endpoint puts a `thought_signature` in each tool call's `extra_content`
+and answers 400 "Function call is missing a thought_signature" when the next request doesn't send it back. Lumi keeps
+`extra_content` on tool calls and returns it unchanged; for Google only, a tool call that has none (one Lumi made
+itself) gets Google's documented placeholder `skip_thought_signature_validator`.
+
+## ADR-073 Ideas from Mate Engine, not its code or assets; personal-only models (2026-10-31)
+The owner put Mate Engine X3.3.0 (a Unity desktop mate) in the project folder and asked to use its models, animations
+and voices. Its code is under the "MateEngine Pro License" (any derivative must take that licence; non-commercial; no
+binary distribution platforms), its assets are "© Shiny, strictly copyrighted" and may not be redistributed separately,
+and its default avatar is All Rights Reserved. Copying either would put Lumi under that licence or break it, so, as
+with YUI and Lala, Lumi takes only ideas, written fresh:
+- The head, neck and chest follow the cursor (at most ±0.6 rad sideways and ±0.35 rad up or down, eased).
+- Stroking her head with the cursor is a head pat: a big smile and a head tilt, with a "Hee hee!".
+- After 3 minutes with no cursor movement, clicks or chat she naps (eyes shut, head drooping, slow breaths), and any
+  activity wakes her with a stretch.
+
+The folder is git-ignored and lint-ignored and was never committed.
+The owner also added `HatsuneMikuNT.vrm` (止丸式初音ミクNT) to the bundled models. Its readme and VRM licence forbid
+redistribution and commercial use, so it can't ship. It stays one of the owner's own models on their PC, and the file
+went back next to its readme in Downloads.
+
+## ADR-074 The island's voice: tap to stop, a more sensitive ear, logged failures (2026-10-31)
+The owner said tapping the island didn't hear them, while push-to-talk worked. Push-to-talk records whatever is said.
+Voice mode has to detect speech first, and its floor of 0.02 RMS is louder than a soft voice on a laptop mic with
+noise suppression. The floor is now 0.01; the adaptive 3× room-noise rule still rejects fans. A Windows voice could
+leave her in SPEAKING forever if Chromium never fired `onend`, and voice mode ignores the mic while she talks. So the
+utterance is kept referenced, and a watchdog finishes it once nothing is speaking. Transcription failures now go to
+the log. A tap on the island while she thinks or talks stops her, and stops voice mode too.
+The likeliest cause on the owner's PC turned up later. Their real profile has "Only respond when I say the name" on,
+and push-to-talk ignores that setting. Voice mode dropped every sentence without "Lumi" without a word, so it looked
+deaf. Now, with the name check on, the island says "Listening for “Lumi, …”", and an ignored sentence gets "Heard
+you, but only “Lumi, …” is sent (Settings → Voice)". The owner's mic was not available for testing.
+
+## ADR-075 Mate Engine's animations, sounds and avatars, imported from the user's own copy (2026-10-31)
+Partly supersedes ADR-073. The owner asked again for Mate Engine's animations, voices and models, "copy the whole
+project". Two limits stay. Its code is Unity C# under the copyleft MateEngine Pro License, so it is neither copied
+nor ported. Its assets are "© Shiny": personal and non-commercial use is allowed with credit, redistribution is not.
+So nothing of it ships in Lumi's installer or repository. Instead, Settings → Character → "Import from Mate Engine…"
+(or `Lumi.exe --import-mate=<folder>`) reads the user's own copy into their profile (`userData/mate`):
+- 56 clips are converted once: 19 idles, a male set, picked up, two edge sits, sleeping, head pat, six reactions and
+  12 dances.
+- The voice pack and reaction sounds are copied.
+- Its three VRM avatars (each "Redistribution_Prohibited", usable by everyone) join the user's own models.
+
+Settings credits Shiny. The clips are Unity humanoid "muscle" curves, which a VRM can't play directly.
+`src/main/mate/` converts them with Unity's swing-twist model (local = neutral × swing × twist). Unity's own axis
+tables are internal, so the axes and signs come from the muscles' names. The neutral ("motorcycle") pose, the share
+of the spine bend inside Unity's body rotation (65%) and the foot-goal offset were fitted against the hand and foot
+positions every clip also stores. Mean error: 0.08 of the centre-of-mass height across idle, sit and drag clips, and
+a unit test keeps it under 0.1 where Mate Engine is present. The hips are placed from Unity's centre of mass with a
+segment-mass model, and each clip is centred and turned to face the viewer.
+
+The character window plays the clips with three's AnimationMixer and picks one for what she is doing:
+- **Roles:** standing (a new idle every ~12 s, as Mate Engine does), picked up, sitting on an edge, asleep, petted,
+  a click reaction, or dancing (the menu's "Dance"; picking her up stops it).
+- **Kept from Lumi:** her face, blinking, mouth, gaze and cursor-following are added on top.
+- **Peeking:** stays Lumi's own lean-in pose, because Mate Engine's "hide" clips are a bow.
+
+Without an import, Lumi animates exactly as before. Clip and sound reads are limited to the character window and to
+ids listed by the import (zod-validated file names, never paths).
+
+## ADR-076 One icon everywhere: the UI's orb (2026-10-31)
+The exe, installer, taskbar, tray and window icons showed the 0.3 violet face, while the island, chat and menu show the
+gradient orb. The owner asked for one look everywhere. `scripts/make-icon.mjs` renders the UI's orb (orb.css, frozen)
+with Electron into `build/icon.png` and a PNG-entry `build/icon.ico` (16–256 px); `make-icon.py` is gone. Mate
+Engine's icons were not used: they are its branding.
+
+## ADR-077 With the name check on, a conversation doesn't need her name every time (2026-10-31)
+The owner's "Got it…" and then nothing was the name check (ADR-074): every sentence without "Lumi" was dropped. Tapping
+the island, or her finishing an answer, now opens a 30-second window in which sentences count without her name. The
+name is needed again only after a quiet half minute, which is what the check is for (a TV in the background).

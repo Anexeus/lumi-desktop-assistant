@@ -1,7 +1,7 @@
 import { DirectionalLight, AmbientLight, PerspectiveCamera, Scene, Timer, Vector3, WebGLRenderer } from 'three'
 import type { CharacterState, Perch } from '@shared/character'
 import type { Graphics } from '@shared/ipc'
-import { loadAvatar, type Avatar } from './avatar'
+import { loadAvatar, type Avatar, type MateSource } from './avatar'
 import type { Gesture } from './gestures'
 
 // Graphics presets: render resolution and frame rate (Balanced is the old default budget).
@@ -14,6 +14,13 @@ const QUALITY: Record<Graphics, { pixelRatio: number; fps: number }> = {
 export interface CharacterScene {
   /** True when the pixel under (clientX, clientY) belongs to the character. */
   hitTest(clientX: number, clientY: number): boolean
+  /** True when (clientX, clientY) is over her head. */
+  overHead(clientX: number, clientY: number): boolean
+  setPetted(petted: boolean): void
+  setAsleep(asleep: boolean): void
+  /** Mate Engine's clips for the body, or null for Lumi's own poses. */
+  setMate(source: MateSource | null): void
+  setDancing(dancing: boolean): void
   /** Loads the user's model bytes, or the bundled `file` (also the fallback if the bytes don't load). */
   setModel(bytes: ArrayBuffer | null, file: string | null): Promise<'custom' | 'default'>
   setState(state: CharacterState): void
@@ -50,6 +57,10 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   let perch: Perch = 'none'
   let cursor: { x: number; y: number } | null = null
   let mouth: number | null = null
+  let petted = false
+  let asleep = false
+  let mate: MateSource | null = null
+  let dancing = false
   let loadToken = 0
 
   const frame = (): void => {
@@ -108,6 +119,10 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     avatar.setState(state)
     avatar.setPerch(perch)
     avatar.setMouth(mouth)
+    avatar.setPetted(petted)
+    avatar.setAsleep(asleep)
+    avatar.setMate(mate)
+    avatar.setDancing(dancing)
     scene.add(avatar.vrm.scene)
     frame()
     applyGaze()
@@ -117,6 +132,8 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   const gl = renderer.getContext()
   const pixel = new Uint8Array(4)
   const ndc = new Vector3()
+  const edge = new Vector3()
+  const toClient = (v: Vector3): { x: number; y: number } => ({ x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight })
 
   return {
     hitTest(clientX, clientY) {
@@ -126,6 +143,32 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
       if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return false
       gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
       return pixel[3]! > 16
+    },
+    overHead(clientX, clientY) {
+      const node = avatar?.vrm.humanoid.getRawBoneNode('head')
+      if (!node) return false
+      // The skull's centre is about 9 cm above the head bone (at the neck), and the head about 12 cm in radius.
+      node.getWorldPosition(ndc).y += 0.09
+      edge.copy(ndc).x += 0.12
+      const centre = toClient(ndc.project(camera))
+      const side = toClient(edge.project(camera))
+      return Math.hypot(clientX - centre.x, clientY - centre.y) < Math.abs(side.x - centre.x)
+    },
+    setPetted(next) {
+      petted = next
+      avatar?.setPetted(next)
+    },
+    setAsleep(next) {
+      asleep = next
+      avatar?.setAsleep(next)
+    },
+    setMate(source) {
+      mate = source
+      avatar?.setMate(source)
+    },
+    setDancing(next) {
+      dancing = next
+      avatar?.setDancing(next)
     },
     async setModel(bytes, file) {
       if (bytes) {
@@ -193,6 +236,6 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     ndc.set((cursor.x / canvas.clientWidth) * 2 - 1, -(cursor.y / canvas.clientHeight) * 2 + 1, 0.5).unproject(camera)
     const dir = ndc.sub(camera.position).normalize()
     const distance = camera.position.z - b.max.z
-    avatar.lookAt(camera.position.clone().add(dir.multiplyScalar(distance / Math.max(0.2, -dir.z))))
+    avatar.lookAt(camera.position.clone().add(dir.multiplyScalar(distance / Math.max(0.2, -dir.z))), true)
   }
 }

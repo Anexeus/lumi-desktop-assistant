@@ -15,3 +15,6 @@ Thumbs.db
 *.tsbuildinfo
 graphify-out/graph.html
 resources/runtimes/
+
+# Third-party material the owner keeps here for reference; its licences forbid redistribution.
+Mate-Engine-Public-Release-X3.3.0/

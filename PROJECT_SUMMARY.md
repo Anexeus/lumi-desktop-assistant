@@ -85,7 +85,8 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `37918b4` 0.4.0 | Acrylic island + Siri orb, rebindable shortcuts, peeking and sitting on windows, cute lines, per-setting validation, OTHERAGENT.md |
 | `fc615ee` 0.5.0 | Pill island (glass optional), Lumi's own menu, guided API keys, 4 more characters + Miku/Teto links, side-on sitting and taskbar seat, smoother wheel resize |
 | `b9c8840` 0.6.0 | AI opens any app, plays videos, WhatsApp, acts without asking; island look for chat/settings; taskbar icon; rollback journal; front-facing sit |
-| (next) 0.7.0 | Gemini fixed (voice, unreadable keys, gemini-3.6-flash), Miku default, dangling pick-up, knees-up taskbar sit, click to wave / double-click Settings, app_install, never asks, 64-bit installer check |
+| `e0fe020` 0.7.0 | Gemini fixed (voice, unreadable keys, gemini-3.6-flash), Miku default, dangling pick-up, knees-up taskbar sit, click to wave / double-click Settings, app_install, never asks, 64-bit installer check |
+| (next) 0.8.0 | Mate Engine's animations, sounds and avatars imported from the user's copy (muscle-clip converter), Dance, one orb icon everywhere, voice answers without her name after a tap, Gemini tool calls, legs in front of the taskbar, own models, head follows the cursor, head pats, naps, island tap stops her |
 
 ## 4. How to work on it
 

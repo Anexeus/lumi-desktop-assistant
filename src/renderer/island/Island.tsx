@@ -52,11 +52,11 @@ export function Island(): React.JSX.Element {
 
   const label =
     status === 'thinking'
-      ? 'Thinking…'
+      ? 'Thinking… tap to stop'
       : status === 'streaming' && lastReply
         ? tail(lastReply.text, 46)
         : talking
-          ? (voice.error ?? VOICE_LABEL[voice.phase as Exclude<VoicePhase, 'off'>])
+          ? (voice.error ?? (voice.phase === 'listening' && state?.voice.wake && voice.needsName ? `Listening for “${name}, …” · tap to stop` : VOICE_LABEL[voice.phase as Exclude<VoicePhase, 'off'>]))
           : voice.error
             ? voice.error
             : state?.voice.input
@@ -81,14 +81,23 @@ export function Island(): React.JSX.Element {
   if (!expanded) {
     const canTalk = !!state?.voice.input
     const island = state?.shortcuts.island
+    // A tap while she thinks or talks stops her, and voice mode with her; otherwise it starts or stops listening.
+    const tap = (): void => {
+      if (busy) {
+        void window.assistant.chat.cancel()
+        if (talking) void voice.toggle()
+      } else if (canTalk) void voice.toggle()
+      else setExpanded(true)
+    }
+    const action = busy ? 'stop' : canTalk ? (talking ? 'stop' : 'talk') : 'type'
     return (
       <div className={`pill${talking ? ' talking' : ''}${glass}`}>
         <button
           type="button"
           className="pill-main"
-          onClick={() => void (canTalk ? voice.toggle() : setExpanded(true))}
+          onClick={tap}
           aria-pressed={canTalk ? talking : undefined}
-          aria-label={canTalk ? `Voice mode${talking ? ' on' : ''}: ${label}. Click to ${talking ? 'stop' : 'talk'}.` : `Assistant: ${label}. Click to type.`}
+          aria-label={`${canTalk ? `Voice mode${talking ? ' on' : ''}` : 'Assistant'}: ${label}. Click to ${action}.`}
         >
           {/* A new key when voice mode starts or stops, so the orb pops in again like Siri's. */}
           <Orb key={talking ? 'voice' : 'quiet'} mode={orbMode} level={talking ? voice.level : 0} />

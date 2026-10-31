@@ -1,5 +1,6 @@
-import type { Perch } from '@shared/character'
+import type { CharacterState, Perch } from '@shared/character'
 import type { AppState } from '@shared/ipc'
+import type { MateClip, MateLibrary, MateSound } from '@shared/mate'
 import { createScene } from './scene'
 import { createSpeaker } from './speaker'
 
@@ -11,9 +12,10 @@ const speaker = createSpeaker((level) => scene.setMouth(level))
 const CLICK_SLOP = 4 // px of movement before a press becomes a drag
 const DOUBLE_CLICK_MS = 450 // a second click this soon opens Settings (Windows' default double-click time is 500 ms)
 const KEY_RESIZE_STEP = 0.1
+const SLEEP_AFTER_MS = 3 * 60_000 // no cursor movement, clicks or chat for this long and she naps
 // Cute lines for little moments. Windows voices say "Hee hee" more clearly than "Hehe".
 const TAP_LINES = ['Hi hi!', 'Yay!', 'Hee hee!']
-const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', floor: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
+const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
 const pick = (lines: string[]): string => lines[Math.floor(Math.random() * lines.length)]!
 
 let interactive = false
@@ -33,11 +35,92 @@ function setInteractive(next: boolean): void {
   api.setIgnoreMouse(!next)
 }
 
+// Mate Engine material the user imported: its clips play her body, its sounds her reactions (ADR-075).
+let mateKey = ''
+let library: MateLibrary | null = null
+const clipCache = new Map<string, Promise<MateClip>>()
+const soundCache = new Map<string, Promise<Uint8Array>>()
+function loadClip(id: string): Promise<MateClip> {
+  let clip = clipCache.get(id)
+  if (!clip) clipCache.set(id, (clip = window.assistant.mate.clip(id).then((json) => JSON.parse(json) as MateClip)))
+  return clip
+}
+async function applyMate(state: AppState): Promise<void> {
+  const male = /^male/.test(state.voice.voice) // a male character's voice picks Mate Engine's male animations
+  const key = `${state.mate.revision}|${state.mate.clips}|${male}`
+  if (key === mateKey) return
+  const reload = !mateKey.startsWith(`${state.mate.revision}|`)
+  mateKey = key
+  if (reload) {
+    clipCache.clear()
+    soundCache.clear()
+    library = state.mate.clips ? await window.assistant.mate.library().catch(() => null) : null
+  }
+  scene.setMate(library ? { library, load: loadClip, male, played: (role, id) => (document.body.dataset['mate'] = `${role}:${id}`) } : null)
+  if (!library) document.body.dataset['mate'] = ''
+}
+/** Plays one of Mate Engine's sounds for this moment; false when there is none (she says a line instead). */
+function mateSound(kind: MateSound): boolean {
+  const ids = library?.sounds[kind]
+  if (!ids?.length) return false
+  const id = ids[Math.floor(Math.random() * ids.length)]!
+  let bytes = soundCache.get(id)
+  if (!bytes) soundCache.set(id, (bytes = window.assistant.mate.sound(id)))
+  void bytes.then((b) => speaker.sound(b)).catch(() => {})
+  return true
+}
+
+// Stroking her head with the cursor is a head pat: she leans into it, smiling, for as long as the strokes continue.
+let petted = false
+let pettedAt = -Infinity
+let headSince = -1 // when the cursor started moving over her head; a quick pass on the way elsewhere is not a pat
+let petTimer = 0
+function setPetted(next: boolean): void {
+  if (next === petted) return
+  petted = next
+  scene.setPetted(next)
+  document.body.dataset['petted'] = String(next)
+  if (!next) return
+  wake()
+  if (performance.now() - pettedAt > 10_000 && !mateSound('pat')) speaker.exclaim('Hee hee!')
+  pettedAt = performance.now()
+}
+function strokeHead(): void {
+  const now = performance.now()
+  if (headSince < 0) headSince = now
+  clearTimeout(petTimer)
+  petTimer = window.setTimeout(() => {
+    headSince = -1
+    setPetted(false)
+  }, 700)
+  if (now - headSince > 300) setPetted(true)
+}
+
+// Left alone, she naps; any activity wakes her with a stretch.
+let activeAt = performance.now()
+let asleep = false
+let character: CharacterState = 'IDLE'
+function wake(): void {
+  activeAt = performance.now()
+  if (!asleep) return
+  asleep = false
+  scene.setAsleep(false)
+  document.body.dataset['asleep'] = 'false'
+  scene.play(perch === 'none' ? 'stretch' : 'nod') // perched, her arms are busy
+}
+setInterval(() => {
+  if (asleep || character !== 'IDLE' || mode !== 'idle' || performance.now() - activeAt < SLEEP_AFTER_MS) return
+  asleep = true
+  scene.setAsleep(true)
+  document.body.dataset['asleep'] = 'true'
+}, 5000)
+
 /** Ends a press or drag. Also runs when the release was never delivered, so the window can't stay click-blocking. */
 function endPress(): void {
   if (mode === 'dragging') {
     api.dragEnd()
     scene.setHeld(false)
+    mateSound('drop')
     droppedAt = performance.now()
   }
   mode = 'idle'
@@ -48,11 +131,13 @@ window.addEventListener('mousemove', (e) => {
   if (mode !== 'idle' && e.buttons === 0) endPress() // the button was released somewhere we didn't hear about
   if (mode !== 'idle') return
   setInteractive(scene.hitTest(e.clientX, e.clientY) || performance.now() < wheelUntil)
+  if (scene.overHead(e.clientX, e.clientY)) strokeHead()
 })
 document.addEventListener('mouseleave', () => mode === 'idle' && setInteractive(false))
 
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 || !scene.hitTest(e.clientX, e.clientY)) return
+  wake()
   canvas.setPointerCapture(e.pointerId)
   mode = 'pressing'
   pressX = e.screenX
@@ -66,7 +151,7 @@ canvas.addEventListener('pointermove', (e) => {
     lastX = pressX
     lastY = pressY
     scene.setHeld(true)
-    speaker.exclaim('Wheee!')
+    if (!mateSound('grab')) speaker.exclaim('Wheee!')
   }
   if (mode === 'dragging') {
     api.dragMove(e.screenX, e.screenY)
@@ -86,7 +171,7 @@ canvas.addEventListener('pointerup', (e) => {
     } else {
       clickedAt = now
       scene.play('wave')
-      speaker.exclaim(pick(TAP_LINES))
+      if (!mateSound('laugh')) speaker.exclaim(pick(TAP_LINES))
     }
   }
   endPress() // before releasing capture, which fires lostpointercapture
@@ -129,6 +214,7 @@ window.addEventListener(
   (e) => {
     e.preventDefault() // never page zoom (Ctrl+wheel) or scroll
     if (mode !== 'idle') return
+    wake()
     wheelUntil = performance.now() + 700
     scaleBy(-(e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY) * WHEEL_RATE) // some mice report lines, not pixels
   },
@@ -136,6 +222,7 @@ window.addEventListener(
 )
 
 canvas.addEventListener('keydown', (e) => {
+  wake()
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
     void window.assistant.openWindow('chat')
@@ -172,10 +259,16 @@ function applyState(state: AppState): void {
   scene.setQuality(state.graphics)
   scene.setPerch(state.perch)
   speaker.onState(state)
+  void applyMate(state)
+  scene.setDancing(state.dancing)
+  document.body.dataset['dancing'] = String(state.dancing)
   document.body.dataset['state'] = state.character
   document.body.dataset['perch'] = state.perch
+  character = state.character
+  if (character !== 'IDLE') wake() // a question, a reply or a notification
   if (state.perch !== perch) {
     perch = state.perch
+    wake()
     const line = PERCH_LINES[perch]
     if (line && (perch === 'fall' || performance.now() - droppedAt < 6000)) speaker.exclaim(line) // sitting can wait ~2 s for the helper
   }
@@ -189,7 +282,10 @@ function applyState(state: AppState): void {
 
 void window.assistant.getState().then(applyState)
 window.assistant.onState(applyState)
-api.onCursor((x, y) => scene.lookAtCursor(x, y))
+api.onCursor((x, y) => {
+  scene.lookAtCursor(x, y)
+  wake() // main sends only moves
+})
 
 // Wave back when the user greets her.
 const GREETING = /^\s*(hi|hii+|hello|hey|heya|yo|hola|namaste|good (morning|afternoon|evening))\b/i

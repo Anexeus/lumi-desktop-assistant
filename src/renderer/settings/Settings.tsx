@@ -4,6 +4,7 @@ import { DEFAULT_SHORTCUTS, formatAccelerator, SHORTCUT_ACTIONS, toAccelerator, 
 import { useState, type KeyboardEvent } from 'react'
 import { useAppState } from '../ui/useAppState'
 import { AiSettings } from './AiSettings'
+import { MateSettings } from './MateSettings'
 import { MemorySettings } from './MemorySettings'
 import { ClaudeSettings } from './ClaudeSettings'
 import { IntegrationsSettings } from './IntegrationsSettings'
@@ -221,6 +222,7 @@ export function Settings(): React.JSX.Element {
       {tab === 'Voice' && <VoiceSettings voice={state.voice} local={state.local} />}
 
       {tab === 'Character' && (
+      <>
       <section aria-labelledby="model-heading">
         <h2 id="model-heading">Character model</h2>
         <div className="model">
@@ -239,7 +241,7 @@ export function Settings(): React.JSX.Element {
             </p>
           )}
           <div className="characters" role="radiogroup" aria-label="Characters">
-            {CHARACTERS.map((c) => (
+            {[...CHARACTERS.map((c) => ({ id: c.id as string, name: c.name, note: `${c.voice} voice` })), ...state.myModels.map((m) => ({ ...m, note: 'your model' }))].map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -250,20 +252,25 @@ export function Settings(): React.JSX.Element {
                 onClick={() => void window.assistant.model.select(c.id)}
               >
                 <strong>{c.name}</strong>
-                <small>{c.voice} voice</small>
+                <small>{c.note}</small>
               </button>
             ))}
           </div>
           <div className="model-actions">
             <button type="button" className="secondary" onClick={() => void chooseModel()} disabled={busy}>
-              Use my own .vrm file…
+              Add my own .vrm file…
             </button>
+            {model.custom && (
+              <button type="button" className="secondary" onClick={() => void window.assistant.model.remove(model.id)} disabled={busy}>
+                Remove this model
+              </button>
+            )}
           </div>
           <div className="find-more">
             <span>
               Want Hatsune Miku, Kasane Teto or someone else? Their creators don’t allow apps to include them, but you can download a free
               model for yourself on VRoid Hub (sign in with pixiv, open a model whose terms allow it, press Download), then choose
-              “Use my own .vrm file…”.
+              “Add my own .vrm file…”.
             </span>
             <span className="model-actions">
               <button type="button" className="secondary small" onClick={() => void window.assistant.model.openSite('miku')}>
@@ -302,6 +309,8 @@ export function Settings(): React.JSX.Element {
           <p className="model-license">Only use models whose license allows it. Your file is copied; the original is never changed.</p>
         </div>
       </section>
+      <MateSettings mate={state.mate} />
+      </>
       )}
 
       {tab === 'Tools' && <ToolsSettings tools={state.tools} />}

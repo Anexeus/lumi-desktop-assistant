@@ -39,11 +39,8 @@ const table: Record<CharacterState, Partial<Record<CharacterEvent, Target>>> = {
 
 export const initialSnapshot: CharacterSnapshot = { state: 'IDLE', resume: 'IDLE' }
 
-/**
- * How the character is placed: standing, peeking in from the left or right screen edge, sitting on a window's edge,
- * sitting on the taskbar (knees up: her legs can't hang below the screen), falling.
- */
-export type Perch = 'none' | 'left' | 'right' | 'sit' | 'floor' | 'fall'
+/** How the character is placed: standing, peeking in from the left or right screen edge, sitting on a window or the taskbar, falling. */
+export type Perch = 'none' | 'left' | 'right' | 'sit' | 'fall'
 
 /** Where her hips are while she sits on a window's top edge, as a fraction of her window height from the top. */
 export const SEAT_LINE = 0.62

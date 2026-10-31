@@ -22,6 +22,13 @@ describe('vad', () => {
     expect(feed(v, 0.004, VAD.endMs + 100)).toEqual(['end'])
   })
 
+  it('hears a soft voice in a quiet room', () => {
+    const v = vadInit()
+    expect(feed(v, 0.002, 2000)).toEqual([])
+    expect(feed(v, 0.015, 600)).toEqual(['start'])
+    expect(feed(v, 0.002, VAD.endMs + 100)).toEqual(['end'])
+  })
+
   it('adapts to a noisy room so steady noise is not speech', () => {
     const v = vadInit()
     for (let i = 0; i < 20; i++) feed(v, 0.015, 1000)

@@ -236,6 +236,18 @@ test('Stop cancels a streaming reply and keeps what arrived', async () => {
   await expect(chat.getByRole('button', { name: 'Send' })).toBeVisible()
 })
 
+test('tapping the island while she answers stops her', async () => {
+  const chat = await openPanel('chat')
+  await chat.getByRole('textbox', { name: 'Message' }).fill('tell me another long story') // still the slow model
+  await chat.keyboard.press('Enter')
+  await expect(chat.locator('.bubble.assistant').last()).toContainText('word1')
+  const island = await page('island')
+  await island.getByRole('button', { name: /Click to stop\.$/ }).click()
+  await expect.poll(characterState).toBe('IDLE')
+  await expect(chat.getByRole('button', { name: 'Send' })).toBeVisible()
+  await expect(island.getByRole('button', { name: /Click to talk\.$/ })).toBeVisible()
+})
+
 test('settings tests the connection and lists models', async () => {
   const settings = await openPanel('settings', 'AI')
   await settings.getByRole('button', { name: 'Test connection' }).click()
@@ -420,6 +432,24 @@ test('voice mode: clicking the island listens hands-free until clicked again', a
   const after = transcriptions
   await island.waitForTimeout(3500) // a full burst + pause: nothing is heard while it's off
   expect(transcriptions).toBe(after)
+  await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
+})
+
+test('with the name check on, the first sentence after tapping the island is answered without her name', async () => {
+  const island = await page('island')
+  const chat = await openPanel('chat')
+  const voice = (await chat.evaluate(() => window.assistant.getState())).voice
+  await chat.evaluate((v) => window.assistant.voice.setSettings({ ...v, wake: true }), voice)
+  const sent = await chat.locator('.bubble.user').count()
+  const talk = island.getByRole('button', { name: /^Voice mode/ })
+  await talk.click()
+  await expect(island.locator('.pill-text')).toHaveText('Listening… tap to stop') // the tap counts as addressing her
+  // "hello from the mic" has no "Lumi" in it, and is still sent and answered.
+  await expect.poll(() => chat.locator('.bubble.user').count(), { timeout: 15_000 }).toBeGreaterThan(sent)
+  await expect(chat.locator('.bubble.user').last()).toHaveText('You: hello from the mic')
+  await talk.click()
+  await expect(talk).toHaveAttribute('aria-pressed', 'false')
+  await chat.evaluate((v) => window.assistant.voice.setSettings(v), voice)
   await expect.poll(characterState, { timeout: 10_000 }).toBe('IDLE')
 })
 

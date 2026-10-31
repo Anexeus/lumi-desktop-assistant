@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint'
 import globals from 'globals'
 
 export default tseslint.config(
-  { ignores: ['out/**', 'dist/**', 'release/**', 'node_modules/**', '.claude/**', 'graphify-out/**'] },
+  { ignores: ['out/**', 'dist/**', 'release/**', 'node_modules/**', '.claude/**', 'graphify-out/**', 'Mate-Engine-*/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

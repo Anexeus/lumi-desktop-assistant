@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test, type ElectronApplication, type Page } from '@playwright/test'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -96,6 +96,7 @@ test('renderer has no Node access and only the typed API', async () => {
     'integrations',
     'island',
     'local',
+    'mate',
     'memory',
     'menu',
     'model',
@@ -304,6 +305,40 @@ test('one click on her only waves; a double click opens Settings; neither opens 
   expect(await menuShown()).toBe(false)
 })
 
+test('stroking her head is a head pat; left alone she naps, and a cursor move wakes her', async () => {
+  const data = (key: string): Promise<string | undefined> => character.evaluate((k) => document.body.dataset[k], key)
+  await expect.poll(() => data('state')).toBe('IDLE')
+  // Where her head is depends on the model and her size: stroke down the centre line until she reacts.
+  const { width, height } = await character.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+  let petted = false
+  for (let y = 10; y < height * 0.6 && !petted; y += 12) {
+    for (let i = 0; i < 5; i++) {
+      await character.mouse.move(width / 2 + (i % 2) * 6, y)
+      await character.waitForTimeout(90)
+    }
+    petted = (await data('petted')) === 'true'
+  }
+  expect(petted).toBe(true)
+  await expect.poll(() => data('petted')).toBe('false') // the strokes stopped
+  // Main's feed of the real cursor would keep waking her: hold it back, and move her clock past the nap delay.
+  await characterWindow((w) => {
+    const g = globalThis as unknown as { realSend: Electron.WebContents['send'] }
+    g.realSend = w.webContents.send.bind(w.webContents)
+    w.webContents.send = (channel: string, ...args: unknown[]) => (channel === 'character:cursor' ? undefined : g.realSend(channel, ...args))
+  })
+  await character.evaluate(() => {
+    const now = performance.now.bind(performance)
+    performance.now = () => now() + 600_000
+  })
+  await expect.poll(() => data('asleep'), { timeout: 10_000 }).toBe('true')
+  await characterWindow((w) => {
+    const g = globalThis as unknown as { realSend: Electron.WebContents['send'] }
+    w.webContents.send = g.realSend
+    w.webContents.send('character:cursor', 1, 1)
+  })
+  await expect.poll(() => data('asleep')).toBe('false')
+})
+
 test('the island switches between the pill and frosted glass', async () => {
   const style = (): Promise<string> => character.evaluate(() => window.assistant.getState().then((s) => s.islandStyle))
   expect(await style()).toBe('pill')
@@ -354,7 +389,7 @@ test('connecting an online AI: "Get a key" opens that provider’s key page', as
   await settings.getByRole('radio', { name: /Lumi built-in/ }).click()
 })
 
-test('dropped onto the taskbar she sits on it, knees up; picked up, she stands', async () => {
+test('dropped onto the taskbar she sits on it, in front of it; picked up, she stands', async () => {
   const area = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea)
   const b = await characterWindow((w) => w.getContentBounds())
   await character.evaluate(
@@ -366,8 +401,9 @@ test('dropped onto the taskbar she sits on it, knees up; picked up, she stands',
     },
     [area.x + 200 - b.x, area.y + area.height - b.height * 0.5 - b.y]
   )
-  await expect(character.locator('body')).toHaveAttribute('data-perch', 'floor', { timeout: 15_000 })
-  // Her seat line on the taskbar's top edge once she has slid down onto it (the knees-up pose lifts her hips above it).
+  await expect(character.locator('body')).toHaveAttribute('data-perch', 'sit', { timeout: 15_000 })
+  // Hips on the taskbar's top edge once she has slid down onto it, and drawn above the taskbar (legs over it).
+  expect(await characterWindow((w) => w.isAlwaysOnTop())).toBe(true)
   const hips = (): Promise<number> => characterWindow((w) => w.getContentBounds()).then((r) => Math.round(r.y + r.height * 0.62))
   await expect.poll(async () => Math.abs((await hips()) - (area.y + area.height))).toBeLessThanOrEqual(2)
   await character.evaluate(() => {
@@ -418,7 +454,7 @@ test('only the character window may read the model bytes', async () => {
   expect(outcome).toBe('rejected')
 })
 
-test('settings credits the model, switches characters with a matching voice, loads a custom .vrm', async () => {
+test('settings credits the model, switches characters with a matching voice, keeps the user’s own models', async () => {
   const settings = await panel('settings', 'Character')
   await expect(settings.getByText(/© RemiX3 · VRoid Hub licence: redistribution allowed with credit/)).toBeVisible()
   const characters = settings.getByRole('radiogroup', { name: 'Characters' })
@@ -435,21 +471,30 @@ test('settings credits the model, switches characters with a matching voice, loa
 
   // A file that is not a VRM is refused with a message and changes nothing.
   await stubDialog(join(process.cwd(), 'package.json'))
-  await settings.getByRole('button', { name: 'Use my own .vrm file…' }).click()
+  await settings.getByRole('button', { name: 'Add my own .vrm file…' }).click()
   await expect(settings.getByRole('alert')).toHaveText(/Not a VRM/)
   expect((await character.evaluate(() => window.assistant.getState())).model.custom).toBe(false)
 
-  // A real VRM is copied into the profile and the character reloads it.
+  // A real VRM is copied into the profile, listed as "your model", and the character reloads it.
   await stubDialog(join(process.cwd(), 'src/renderer/public/models/Seed-san.vrm'))
-  await settings.getByRole('button', { name: 'Use my own .vrm file…' }).click()
-  await expect(characters.getByRole('radio', { checked: true })).toHaveCount(0)
+  await settings.getByRole('button', { name: 'Add my own .vrm file…' }).click()
+  const mine = characters.getByRole('radio', { name: /your model/ })
+  await expect(mine).toHaveAttribute('aria-checked', 'true')
   await expect(character.locator('body')).toHaveAttribute('data-model', 'custom', { timeout: 20_000 })
-  expect(readFileSync(join(userData, 'models', 'custom.vrm')).byteLength).toBeGreaterThan(1_000_000)
+  const kept = (): string[] => (existsSync(join(userData, 'models', 'mine')) ? readdirSync(join(userData, 'models', 'mine')) : [])
+  expect(kept()).toEqual([expect.stringMatching(/^[0-9a-f]{12}\.vrm$/)])
 
+  // Picking another character keeps it (in Settings and the menu) until it is removed.
   await characters.getByRole('radio', { name: /Sakurada Fumiriya/ }).click()
   await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
   expect((await character.evaluate(() => window.assistant.getState())).voice.voice).toBe('male')
-  expect(existsSync(join(userData, 'models', 'custom.vrm'))).toBe(false)
+  expect(kept()).toHaveLength(1)
+  await mine.click()
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'custom', { timeout: 20_000 })
+  await settings.getByRole('button', { name: 'Remove this model' }).click()
+  await expect(mine).toHaveCount(0)
+  await expect(character.locator('body')).toHaveAttribute('data-model', 'default', { timeout: 20_000 })
+  expect(kept()).toEqual([])
 })
 
 // Runs late on purpose: Playwright treats the blocked navigation as still pending, which

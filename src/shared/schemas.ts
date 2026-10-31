@@ -1,14 +1,19 @@
 import { LOCAL_MODEL_IDS } from './localModels'
 import { PROVIDER_IDS } from './providers'
-import { CHARACTER_IDS } from './characters'
+import { CHARACTER_IDS, MY_MODEL_ID } from './characters'
 import { z } from 'zod'
 import { CHARACTER_EVENTS } from './character'
 import { isAccelerator, SHORTCUT_ACTIONS } from './shortcuts'
 import { Invoke, MENU_ACTIONS, Send } from './ipc'
 
+const myModelIdSchema = z.string().regex(MY_MODEL_ID).transform((id) => id as `mine:${string}`)
+/** A bundled character or one of the user's own models. */
+const characterChoiceSchema = z.union([z.enum(CHARACTER_IDS), myModelIdSchema])
+
 const coord = z.number().finite().min(-100_000).max(100_000)
 const point = z.object({ screenX: coord, screenY: coord }).strict()
 const none = z.undefined()
+const mateIdSchema = z.string().regex(/^[\w.-]{1,120}$/) // a clip or sound id: a file name, never a path
 
 const parseUrl = (v: string): URL | null => {
   try {
@@ -87,7 +92,7 @@ export const settingsFileSchema = z
     tools: toolsSettingsSchema,
     mcp: z.array(mcpServerSchema).max(30),
     claude: z.object({ path: z.string().max(1000), hookToken: z.string().regex(/^[a-f0-9]{48}$/) }).strict(),
-    character: z.enum(CHARACTER_IDS),
+    character: characterChoiceSchema,
     graphics: graphicsSchema,
     local: z.object({ llm: z.enum(LOCAL_MODEL_IDS), stt: z.enum(LOCAL_MODEL_IDS) }).strict(),
     shortcuts: shortcutsSchema,
@@ -126,7 +131,13 @@ export const invokeSchemas = {
   [Invoke.characterEvent]: z.object({ event: z.enum(CHARACTER_EVENTS).exclude(['timeout']) }).strict(),
   [Invoke.getModel]: none,
   [Invoke.chooseModel]: none,
-  [Invoke.selectCharacter]: z.object({ id: z.enum(CHARACTER_IDS) }).strict(),
+  [Invoke.selectCharacter]: z.object({ id: characterChoiceSchema }).strict(),
+  [Invoke.removeModel]: z.object({ id: myModelIdSchema }).strict(),
+  [Invoke.mateImport]: none,
+  [Invoke.mateRemove]: none,
+  [Invoke.mateLibrary]: none,
+  [Invoke.mateClip]: z.object({ id: mateIdSchema }).strict(),
+  [Invoke.mateSound]: z.object({ id: mateIdSchema }).strict(),
   [Invoke.setGraphics]: z.object({ quality: graphicsSchema }).strict(),
   // null puts the default back.
   [Invoke.setShortcut]: z.object({ action: z.enum(SHORTCUT_ACTIONS), accelerator: acceleratorSchema.nullable() }).strict(),

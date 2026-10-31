@@ -6,12 +6,14 @@ export interface ToolCall {
   name: string
   /** Raw JSON text from the model; parse and validate before use. */
   arguments: string
+  /** Provider data that must go back with the call unchanged (Gemini 3's thought signature). */
+  extra_content?: unknown
 }
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
-  tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string } }[]
+  tool_calls?: { id: string; type: 'function'; function: { name: string; arguments: string }; extra_content?: unknown }[]
   tool_call_id?: string
 }
 
@@ -125,6 +127,20 @@ export const wellFormedJson = (value: unknown): string =>
   // JSON.stringify writes a lone surrogate as the escape "\udXXX" (a backslash and 5 characters); swap those for U+FFFD.
   JSON.stringify(value).replace(/\\ud[89ab][0-9a-f]{2}(?!\\ud[c-f][0-9a-f]{2})|(?<!\\ud[89ab][0-9a-f]{2})\\ud[c-f][0-9a-f]{2}/gi, '\\ufffd')
 
+/**
+ * Gemini 3 rejects a replayed tool call that lacks the thought signature it came with (400 "Function call is missing a
+ * thought_signature"). Signatures it sent are passed back as received; a call it didn't make (written as text, or from
+ * another model) gets the placeholder Google accepts. Only the first of parallel calls carries one.
+ */
+function withThoughtSignatures(cfg: ProviderConfig, messages: ChatMessage[]): ChatMessage[] {
+  if (new URL(cfg.baseUrl).hostname !== 'generativelanguage.googleapis.com') return messages
+  const skip = { google: { thought_signature: 'skip_thought_signature_validator' } }
+  return messages.map((m) => {
+    const [first, ...rest] = m.tool_calls ?? []
+    return first && !first.extra_content ? { ...m, tool_calls: [{ ...first, extra_content: skip }, ...rest] } : m
+  })
+}
+
 export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], opts: StreamOptions = {}): AsyncGenerator<StreamEvent> {
   const { signal, fetchImpl = fetch, firstTokenTimeoutMs = 120_000, idleTimeoutMs = 60_000, tools } = opts
   const controller = new AbortController()
@@ -155,7 +171,7 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
       res = await fetchImpl(endpoint(cfg, '/chat/completions'), {
         method: 'POST',
         headers: headers(cfg),
-        body: wellFormedJson({ model: cfg.model, messages, stream: true, ...(tools?.length ? { tools } : {}) }),
+        body: wellFormedJson({ model: cfg.model, messages: withThoughtSignatures(cfg, messages), stream: true, ...(tools?.length ? { tools } : {}) }),
         signal: controller.signal
       })
     } catch (error) {
@@ -200,7 +216,7 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
           choices?: {
             delta?: {
               content?: string | null
-              tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[]
+              tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string }; extra_content?: unknown }[]
             }
           }[]
           error?: { message?: string }
@@ -217,6 +233,7 @@ export async function* streamChat(cfg: ProviderConfig, messages: ChatMessage[], 
           if (part.id) call.id = part.id
           if (part.function?.name) call.name += part.function.name
           if (part.function?.arguments) call.arguments += part.function.arguments
+          if (part.extra_content) call.extra_content = part.extra_content
           calls.set(i, call)
           arm(idleTimeoutMs)
         }

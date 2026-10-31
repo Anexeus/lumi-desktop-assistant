@@ -10,6 +10,9 @@ import { APP_HOST, APP_SCHEME } from './policy'
 
 type Page = 'character' | 'island' | 'menu' | WindowName
 
+// Electron puts 'floating' to 'status' windows below the Windows taskbar and 'pop-up-menu' and higher above it: she
+// sits on the taskbar with her legs in front of it.
+const CHARACTER_LEVEL = 'pop-up-menu'
 const ISLAND = { collapsed: { width: 300, height: 36 }, expanded: { width: 440, height: 340 }, top: 10 }
 // The menu window, and where the menu's corner sits inside it (the rest is room for its shadow; see menu.css).
 const MENU = { width: 284, height: 334, cornerX: 10, cornerY: 8 }
@@ -103,7 +106,7 @@ export class WindowManager {
     // At 125 % the window is created a few pixels wider than asked, and that size was saved: she grew a little on every
     // launch. Setting the content bounds again gives the exact size.
     this.character.setContentBounds(initial)
-    this.character.setAlwaysOnTop(alwaysOnTop, 'floating')
+    this.character.setAlwaysOnTop(alwaysOnTop, CHARACTER_LEVEL)
     // Empty space clicks through; the renderer turns this off while the cursor is over the body.
     this.character.setIgnoreMouseEvents(true, { forward: true })
     this.character.on('close', (event) => {
@@ -268,7 +271,7 @@ export class WindowManager {
   }
 
   setAlwaysOnTop(value: boolean): void {
-    this.character.setAlwaysOnTop(value, 'floating')
+    this.character.setAlwaysOnTop(value, CHARACTER_LEVEL)
   }
 
   setIgnoreMouse(ignore: boolean): void {
@@ -325,7 +328,7 @@ export class WindowManager {
     this.scaleBase = undefined
     const b = this.characterBounds()
     if (this.seat?.handle === 0) this.seat = taskbarSeat(screen.getDisplayMatching(b).workArea) // the taskbar may have moved
-    if (this.seat) return this.place(seatedBounds(b, this.seat.rect.y), this.seat.handle === 0 ? 'floor' : 'sit')
+    if (this.seat) return this.place(seatedBounds(b, this.seat.rect.y), 'sit')
     const display = screen.getDisplayMatching(b)
     const others = screen.getAllDisplays().filter((d) => d.id !== display.id).map((d) => d.bounds)
     const peek = peekPlacement(b, display.bounds, others)
@@ -390,8 +393,9 @@ export class WindowManager {
     const seat = seatPlacement(b, frames, screen.getDisplayMatching(b).workArea)
     if (!seat) return
     this.seat = seat.frame
-    this.place(seat.bounds, seat.frame.handle === 0 ? 'floor' : 'sit', true) // handle 0: the taskbar
-    if (seat.frame.handle !== 0) this.followSeat(token) // the taskbar doesn't move
+    this.place(seat.bounds, 'sit', true)
+    if (seat.frame.handle !== 0) this.followSeat(token)
+    else this.keepAboveTaskbar(token) // the taskbar doesn't move, but it comes back on top whenever it is clicked
   }
 
   /** Polls the seat window: quickly while it moves, slowly while it doesn't. She falls when it goes away. */
@@ -415,6 +419,14 @@ export class WindowManager {
       this.seatTimer = setTimeout(() => void poll(), moved ? 30 : 300)
     }
     this.seatTimer = setTimeout(() => void poll(), 300)
+  }
+
+  /** Sitting on the taskbar: raises her above it now and again, so her legs show in front of it (Desktop Mate–style). */
+  private keepAboveTaskbar(token: number): void {
+    if (token !== this.perchToken) return
+    // Re-asserting raises her (not over her own open menu).
+    if (this.character.isAlwaysOnTop() && !this.menuWin?.isVisible()) this.character.setAlwaysOnTop(true, CHARACTER_LEVEL)
+    this.seatTimer = setTimeout(() => this.keepAboveTaskbar(token), 1500)
   }
 
   /** Her window went away: she drops to the bottom of the screen. */

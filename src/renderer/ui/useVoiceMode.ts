@@ -6,6 +6,9 @@ export type VoicePhase = 'off' | 'listening' | 'hearing' | 'transcribing'
 
 const FRAME = 2048
 const PRE_ROLL_FRAMES = 6 // ~250 ms kept from before speech was detected, so first syllables aren't clipped
+// With the name check on, her name is needed only after this long without a conversation: tapping the island, or her
+// last answer, already means you are talking to her (the owner's "Got it…" and then nothing).
+const FOLLOW_UP_MS = 30_000
 
 /**
  * Hands-free voice mode: while on, the mic stays open and each pause in speech sends what was said.
@@ -20,18 +23,33 @@ export function useVoiceMode(
   phase: VoicePhase
   level: number
   error: string | null
+  /** True when the next sentence needs her name first (the name check is on and the conversation went quiet). */
+  needsName: boolean
   toggle(): Promise<void>
 } {
   const [phase, setPhase] = useState<VoicePhase>('off')
   const [level, setLevel] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [needsName, setNeedsName] = useState(!!wakeWord)
   const session = useRef<{ stream: MediaStream; ctx: AudioContext } | null>(null)
   const pausedRef = useRef(paused)
   const busy = useRef(false) // transcribing
   const lastSent = useRef({ text: '', at: 0 })
   const wake = useRef(wakeWord)
+  const quietTimer = useRef(0)
   wake.current = wakeWord
+  // Talking to her: no name needed until FOLLOW_UP_MS after this.
+  const engage = useCallback(() => {
+    setNeedsName(false)
+    clearTimeout(quietTimer.current)
+    quietTimer.current = window.setTimeout(() => setNeedsName(true), FOLLOW_UP_MS)
+  }, [])
   pausedRef.current = paused
+  useEffect(() => {
+    if (!paused && session.current) engage() // she just finished answering: a follow-up needs no name
+  }, [paused, engage])
+  const needsNameRef = useRef(needsName)
+  needsNameRef.current = needsName
 
   const stop = useCallback(() => {
     const s = session.current
@@ -64,8 +82,12 @@ export function useVoiceMode(
     }
     if (wake.current) {
       const at = text.toLowerCase().indexOf(wake.current.toLowerCase())
-      if (at < 0) return void window.assistant.characterEvent('cancel') // not addressed to her
-      text = (text.slice(0, at) + text.slice(at + wake.current.length)).replace(/^[\s,.!?]+|[\s,]+$/g, '').trim() || 'Hi'
+      if (at < 0 && needsNameRef.current) {
+        // Not addressed to her. Say so: ignoring it silently looked like the mic was broken.
+        void window.assistant.characterEvent('cancel')
+        return setError(`Heard you, but only “${wake.current}, …” is sent (Settings → Voice)`)
+      }
+      if (at >= 0) text = (text.slice(0, at) + text.slice(at + wake.current.length)).replace(/^[\s,.!?]+|[\s,]+$/g, '').trim() || 'Hi'
     }
     // The same sentence twice in a row within a few seconds is an echo or a double detection, not a new request.
     if (text === lastSent.current.text && Date.now() - lastSent.current.at < 5000) return
@@ -123,11 +145,18 @@ export function useVoiceMode(
     processor.connect(ctx.destination) // required for onaudioprocess to fire; the output is silent
     session.current = { stream, ctx }
     setPhase('listening')
-  }, [micId, send])
+    engage() // the tap itself means "I'm talking to you"
+  }, [micId, send, engage])
 
   const toggle = useCallback(async () => (session.current ? stop() : start()), [start, stop])
 
-  useEffect(() => stop, [stop])
+  useEffect(
+    () => () => {
+      stop()
+      clearTimeout(quietTimer.current)
+    },
+    [stop]
+  )
 
-  return { phase, level, error, toggle }
+  return { phase, level, error, needsName, toggle }
 }

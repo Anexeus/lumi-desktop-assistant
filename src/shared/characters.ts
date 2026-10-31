@@ -97,3 +97,8 @@ export const CHARACTERS = [
 export type CharacterId = (typeof CHARACTERS)[number]['id']
 export const CHARACTER_IDS = CHARACTERS.map((c) => c.id) as [CharacterId, ...CharacterId[]]
 export const findCharacter = (id: string): (typeof CHARACTERS)[number] => CHARACTERS.find((c) => c.id === id) ?? CHARACTERS[0]
+
+/** One of the user's own models: 'mine:' and the first 12 hex digits of the file's SHA-256 (see main/model.ts). */
+export const MY_MODEL_ID = /^mine:[0-9a-f]{12}$/
+/** What the character setting holds: a bundled character or one of the user's own models. */
+export type CharacterChoice = CharacterId | `mine:${string}`

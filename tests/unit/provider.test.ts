@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createThinkFilter, listModels, ProviderError, streamChat, type ProviderConfig, type StreamEvent } from '../../src/main/ai/provider'
+import { createThinkFilter, listModels, ProviderError, streamChat, type ChatMessage, type ProviderConfig, type StreamEvent } from '../../src/main/ai/provider'
 
 const cfg: ProviderConfig = { baseUrl: 'http://127.0.0.1:11434/v1/', model: 'qwen3:4b' }
 
@@ -152,6 +152,31 @@ describe('streamChat', () => {
       }
     ])
     expect(JSON.parse(calls[0]!.init.body as string).tools).toEqual(tools)
+  })
+
+  it('keeps Gemini’s thought signature on a tool call and always sends Google one back', async () => {
+    const sig = { google: { thought_signature: 'abc' } }
+    const part = (delta: unknown): string => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`
+    const google: ProviderConfig = { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-3.6-flash' }
+    const reply = sseFetch([part({ tool_calls: [{ index: 0, id: 'c1', function: { name: 'apps_open', arguments: '{}' }, extra_content: sig }] }), 'data: [DONE]\n\n'])
+    const events: StreamEvent[] = []
+    for await (const e of streamChat(google, [], { fetchImpl: reply.impl })) events.push(e)
+    expect(events).toEqual([{ type: 'tool_calls', calls: [{ id: 'c1', name: 'apps_open', arguments: '{}', extra_content: sig }] }])
+
+    // Replayed calls: Gemini's own signature as received; a call it didn't make gets Google's placeholder (first call only).
+    const call = (id: string, extra?: unknown) => ({ id, type: 'function' as const, function: { name: 'apps_open', arguments: '{}' }, ...(extra ? { extra_content: extra } : {}) })
+    const history: ChatMessage[] = [
+      { role: 'assistant', content: '', tool_calls: [call('c1', sig), call('c2')] },
+      { role: 'assistant', content: '', tool_calls: [call('c3'), call('c4')] }
+    ]
+    const sent = async (config: ProviderConfig): Promise<unknown> => {
+      const { impl, calls } = sseFetch(['data: [DONE]\n\n'])
+      await collect(streamChat(config, history, { fetchImpl: impl }))
+      return (JSON.parse(calls[0]!.init.body as string).messages as ChatMessage[]).map((m) => m.tool_calls!.map((c) => c.extra_content ?? null))
+    }
+    const skip = { google: { thought_signature: 'skip_thought_signature_validator' } }
+    expect(await sent(google)).toEqual([[sig, null], [skip, null]])
+    expect(await sent(cfg)).toEqual([[sig, null], [null, null]]) // other services get no placeholder
   })
 
   it('surfaces an error event inside the stream', async () => {

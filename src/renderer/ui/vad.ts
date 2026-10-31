@@ -1,7 +1,7 @@
 // Voice activity detection for hands-free voice mode: loudness against a tracked noise floor. Pure, so it is unit-tested.
 
 export const VAD = {
-  minThreshold: 0.02, // RMS; quieter than this is never speech
+  minThreshold: 0.01, // RMS; quieter than this is never speech (0.02 missed soft voices on laptop mics)
   floorRatio: 3, // speech must be this many times louder than the room
   startMs: 150, // this much loud audio starts an utterance
   endMs: 900, // this much quiet ends it

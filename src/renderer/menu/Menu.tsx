@@ -25,6 +25,7 @@ const ICONS: Record<string, string> = {
   stop: 'M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM7.5 7.5h5v5h-5z',
   quit: 'M10 2.5v7M5.6 5.4a6.5 6.5 0 1 0 8.8 0',
   character: 'M10 9.5a3.25 3.25 0 1 0 0-6.5 3.25 3.25 0 0 0 0 6.5zM3.5 17.5c.6-3.3 3.3-5 6.5-5s5.9 1.7 6.5 5',
+  dance: 'M8 15.5V4.5l8-2v11M8 15.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM16 13.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0z',
   back: 'M12 4l-6 6 6 6'
 }
 const Icon = ({ name }: { name: keyof typeof ICONS }): React.JSX.Element => (
@@ -74,7 +75,7 @@ export function Menu(): React.JSX.Element {
         </button>
         <hr />
         <div className="menu-list">
-          {CHARACTERS.map((c) => (
+          {[...CHARACTERS.map((c) => ({ id: c.id as string, name: c.name, note: c.voice })), ...state.myModels.map((m) => ({ ...m, note: 'yours' }))].map((c) => (
             <button
               key={c.id}
               type="button"
@@ -89,7 +90,7 @@ export function Menu(): React.JSX.Element {
                 {state.model.id === c.id ? '✓' : ''}
               </span>
               {c.name}
-              <small>{c.voice}</small>
+              <small>{c.note}</small>
             </button>
           ))}
         </div>
@@ -123,6 +124,11 @@ export function Menu(): React.JSX.Element {
         <Icon name="pin" /> Keep on top <span className="switch" aria-hidden="true" />
       </button>
       <hr />
+      {state.mate.clips > 0 && (
+        <button type="button" role="menuitemcheckbox" aria-checked={state.dancing} onClick={() => run('dance')}>
+          <Icon name="dance" /> Dance <span className="switch" aria-hidden="true" />
+        </button>
+      )}
       <button type="button" role="menuitem" className="stop" onClick={() => run('stop')}>
         <Icon name="stop" /> Stop everything <kbd>{formatAccelerator(state.shortcuts.stop.accelerator, ' ')}</kbd>
       </button>

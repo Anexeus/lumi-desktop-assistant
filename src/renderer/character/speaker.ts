@@ -15,6 +15,8 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
   onState(state: AppState): void
   /** A quick, cute line like "Yay!" in her voice (higher and quicker), unless she is talking or voice is off. Cached per voice. */
   exclaim(text: string): void
+  /** A short sound effect (an mp3 or wav: Mate Engine's reactions), unless voice is off. */
+  sound(bytes: Uint8Array): void
 } {
   const exclaims = new Map<string, Promise<Uint8Array | null>>()
   let voice: VoiceSettings | undefined
@@ -30,6 +32,7 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
   let source: AudioBufferSourceNode | undefined
   let ctx: AudioContext | undefined
   let warnedFallback = false
+  let utterance: SpeechSynthesisUtterance | null = null // the Windows voice's current sentence
 
   const synth = (text: string): Promise<Uint8Array | null> => {
     if (ttsFailed === ttsKey) return Promise.resolve(null) // e.g. Lumi's built-in engine has no voice: don't wait on it per sentence
@@ -143,10 +146,17 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
       }
       u.onboundary = () => (level = 0.8)
       u.onstart = () => requestAnimationFrame(decay)
-      u.onend = u.onerror = () => {
+      // Chromium sometimes never fires onend (e.g. when it garbage-collects the utterance), which left her stuck in
+      // SPEAKING and voice mode deaf. Keep a reference, and finish anyway once nothing is speaking or queued.
+      utterance = u
+      const watchdog = window.setInterval(() => !speechSynthesis.speaking && !speechSynthesis.pending && finish(), 1000)
+      function finish(): void {
+        clearInterval(watchdog)
+        if (utterance === u) utterance = null
         setMouth(0)
         resolve()
       }
+      u.onend = u.onerror = finish
       speechSynthesis.speak(u)
     })
   }
@@ -191,6 +201,21 @@ export function createSpeaker(setMouth: (level: number | null) => void): {
           return audio ? playWav(audio, gen, 1.15) : speakWithWindows(text, gen, true)
         })
         .catch(() => {})
+    },
+    sound(bytes) {
+      if (!voice || voice.output === 'off') return
+      const audio = (ctx ??= new AudioContext())
+      void audio
+        .decodeAudioData(bytes.slice().buffer as ArrayBuffer)
+        .then((buffer) => {
+          const node = audio.createBufferSource()
+          node.buffer = buffer
+          const gain = audio.createGain()
+          gain.gain.value = 0.8
+          node.connect(gain).connect(audio.destination)
+          node.start()
+        })
+        .catch((error) => console.warn('Could not play a sound', error))
     },
     onState(state) {
       voice = state.voice

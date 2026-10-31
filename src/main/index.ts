@@ -6,7 +6,7 @@ import { homedir } from 'node:os'
 import { basename, extname, join } from 'node:path'
 import { z } from 'zod'
 import { initialSnapshot, transition, TRANSIENT_MS, type CharacterEvent } from '@shared/character'
-import { Events, Invoke, Send, type AppState, type WindowName, type ChatEvent, type ChooseModelResult, type ListModelsResult } from '@shared/ipc'
+import { Events, Invoke, Send, type AppState, type WindowName, type ChatEvent, type ChooseModelResult, type ListModelsResult, type MateImportResult } from '@shared/ipc'
 import { runCommand, saveMemory } from './ai/commands'
 import { Conversation } from './ai/conversation'
 import { downloadModel, LocalServer } from './ai/local'
@@ -27,16 +27,16 @@ import { synthesize, transcribe } from './ai/voice'
 import { handle, on } from './ipc'
 import { startLog } from './log'
 import { appIcon } from './icon'
-import { findCharacter } from '@shared/characters'
+import { CHARACTERS, findCharacter, MY_MODEL_ID } from '@shared/characters'
 import { findLocalModel, LOCAL_MODELS } from '@shared/localModels'
 import { findProvider } from '@shared/providers'
 import { DEFAULT_SHORTCUTS, SHORTCUT_ACTIONS, type ShortcutAction } from '@shared/shortcuts'
-import { importModel, readCustomModel, removeCustomModel } from './model'
+import { importModel, listMyModels, migrateCustomModel, readMyModel, removeMyModel, type MyModel } from './model'
+import { guessMateFolder, importMate, readClip, readLibrary, readSound, removeMate } from './mate/library'
 import { hardenSession, hardenWebContents, registerAppScheme, serveBundle } from './security'
 import { getSecret, hasSecret, isLocalUrl, loadSettings, saveSettings, setSecret } from './settings'
 import { openStore } from './storage/store'
 import { createTray, type TrayActions } from './tray'
-import type { VrmMeta } from './vrm-meta'
 import { loadWindowState, saveWindowState } from './window-state'
 import { glassSupported, WindowManager } from './windows'
 import type { Frame } from './geometry'
@@ -154,12 +154,19 @@ async function start(): Promise<void> {
     }
     return { baseUrl: settings.ai.baseUrl, model: settings.ai.model, apiKey }
   }
-  const custom = await readCustomModel()
-  const modelInfo = (meta: VrmMeta, revision: number): AppState['model'] => ({
-    id: 'custom',
-    name: meta.name,
-    authors: meta.authors,
-    licenseUrl: meta.licenseUrl,
+  // The user's own models. Lumi used to keep just one (models/custom.vrm, shown whenever it existed): it joins the list.
+  const migrated = await migrateCustomModel()
+  if (migrated) {
+    settings.character = migrated as `mine:${string}`
+    saveSettings(store, settings)
+  }
+  let myModels = await listMyModels()
+  const listed = (): AppState['myModels'] => myModels.map(({ id, name, authors }) => ({ id, name, authors }))
+  const modelInfo = (m: MyModel, revision: number): AppState['model'] => ({
+    id: m.id,
+    name: m.name,
+    authors: m.authors,
+    licenseUrl: m.licenseUrl,
     license: null,
     custom: true,
     file: null,
@@ -169,6 +176,20 @@ async function start(): Promise<void> {
     const c = findCharacter(id)
     return { id: c.id, name: c.name, authors: [...c.authors], licenseUrl: c.licenseUrl, license: c.license, custom: false, file: c.file, revision }
   }
+  /** One of the user's models, or a bundled character (the default one when the user's model is gone). */
+  const chosenModel = (id: string, revision: number): AppState['model'] => {
+    const mine = myModels.find((m) => m.id === id)
+    return mine ? modelInfo(mine, revision) : bundledInfo(id, revision)
+  }
+
+  // Mate Engine material, imported from the user's own copy (ADR-075).
+  let mateLibrary = await readLibrary()
+  const mateState = (revision: number): AppState['mate'] => ({
+    clips: mateLibrary ? Object.values(mateLibrary.clips).reduce((n, ids) => n + ids.length, 0) : 0,
+    sounds: mateLibrary ? Object.values(mateLibrary.sounds).reduce((n, ids) => n + ids.length, 0) : 0,
+    revision,
+    progress: null
+  })
 
   let state: AppState = {
     glass: glassSupported,
@@ -177,7 +198,8 @@ async function start(): Promise<void> {
     alwaysOnTop: saved.alwaysOnTop ?? true,
     shortcuts: { character: { accelerator: settings.shortcuts.character, registered: false }, island: { accelerator: settings.shortcuts.island, registered: false }, stop: { accelerator: settings.shortcuts.stop, registered: false } },
     character: initialSnapshot.state,
-    model: custom ? modelInfo(custom.meta, 0) : bundledInfo(settings.character, 0),
+    model: chosenModel(settings.character, 0),
+    myModels: listed(),
     islandVisible: settings.islandVisible,
     islandStyle: settings.islandStyle,
     islandModel: settings.islandModel,
@@ -193,6 +215,8 @@ async function start(): Promise<void> {
     controlling: false,
     panelView: 'chat',
     perch: 'none',
+    mate: mateState(0),
+    dancing: false,
     local: { runtime: false, llm: '', stt: '', installed: [], download: null, downloadError: null, servers: { llm: { state: 'stopped', device: null, message: '' }, stt: { state: 'stopped', device: null, message: '' } } }
   }
   state.local = localState()
@@ -546,7 +570,7 @@ async function start(): Promise<void> {
   handle(Invoke.characterEvent, ({ event }) => fire(event))
   handle(Invoke.getModel, async (_p, e) => {
     if (!fromCharacter(e.sender)) throw new Error('Rejected model:get: not the character window')
-    return state.model.custom ? ((await readCustomModel())?.bytes ?? null) : null
+    return state.model.custom ? await readMyModel(state.model.id).catch(() => null) : null
   })
   handle(Invoke.chooseModel, async (_p, e): Promise<ChooseModelResult> => {
     const parent = BrowserWindow.fromWebContents(e.sender)
@@ -559,8 +583,11 @@ async function start(): Promise<void> {
     const file = picked.filePaths[0]
     if (picked.canceled || !file) return { ok: false, canceled: true }
     try {
-      const meta = await importModel(file)
-      return { ok: true, state: setState({ model: modelInfo(meta, state.model.revision + 1) }) }
+      const model = await importModel(file)
+      myModels = await listMyModels()
+      settings.character = model.id as `mine:${string}`
+      saveSettings(store, settings)
+      return { ok: true, state: setState({ model: modelInfo(model, state.model.revision + 1), myModels: listed() }) }
     } catch (error) {
       return { ok: false, canceled: false, message: error instanceof Error ? error.message : 'Could not load that file.' }
     }
@@ -826,7 +853,9 @@ async function start(): Promise<void> {
           : await withOllama(async () => transcribe({ ...(await voiceConfig()), model: findProvider(settings.ai.provider).stt ?? settings.voice.model }, wav))
       return { ok: true as const, text }
     } catch (error) {
-      return { ok: false as const, message: error instanceof ProviderError ? error.message : 'Could not understand the recording.' }
+      const message = error instanceof ProviderError ? error.message : 'Could not understand the recording.'
+      console.warn(`Transcription failed: ${message}`) // voice problems were invisible in the log
+      return { ok: false as const, message }
     }
   })
   handle(Invoke.voiceSynthesize, async ({ text }, e) => {
@@ -882,17 +911,76 @@ async function start(): Promise<void> {
     return setState({ graphics: quality })
   })
   handle(Invoke.selectCharacter, async ({ id }) => {
-    await removeCustomModel()
-    const c = findCharacter(id)
-    settings.character = c.id
-    settings.voice = { ...settings.voice, voice: c.voice } // a male character gets a male voice, and so on
+    if (MY_MODEL_ID.test(id) && !myModels.some((m) => m.id === id)) throw new Error('That model is no longer installed.')
+    settings.character = id
+    // A bundled character brings its voice (a male character gets a male voice); the user's own models keep the current one.
+    if (!MY_MODEL_ID.test(id)) settings.voice = { ...settings.voice, voice: findCharacter(id).voice }
     saveSettings(store, settings)
-    return setState({ model: bundledInfo(c.id, state.model.revision + 1), voice: settings.voice })
+    return setState({ model: chosenModel(id, state.model.revision + 1), voice: settings.voice })
+  })
+  handle(Invoke.removeModel, async ({ id }, e) => {
+    if (!windows.isPanel(e.sender, 'chat') && !windows.isPanel(e.sender, 'settings')) throw new Error('Rejected model:remove: not the settings window')
+    await removeMyModel(id)
+    myModels = await listMyModels()
+    if (settings.character !== id) return setState({ myModels: listed() })
+    settings.character = CHARACTERS[0].id
+    saveSettings(store, settings)
+    return setState({ myModels: listed(), model: chosenModel(settings.character, state.model.revision + 1) })
+  })
+
+  async function runMateImport(folder: string): Promise<MateImportResult> {
+    if (state.mate.progress) return { ok: false, canceled: false, message: 'An import is already running.' }
+    setState({ mate: { ...state.mate, progress: { done: 0, total: 1 } } })
+    try {
+      const result = await importMate(folder, (done, total) => setState({ mate: { ...state.mate, progress: { done, total } } }))
+      mateLibrary = result.library
+      myModels = await listMyModels()
+      if (result.skipped.length) console.warn(`Mate Engine import skipped: ${result.skipped.join('; ')}`)
+      const next = setState({ mate: mateState(state.mate.revision + 1), myModels: listed() })
+      return { ok: true, state: next, clips: result.clips, sounds: result.sounds, models: result.models.map((m) => m.name), skipped: result.skipped }
+    } catch (error) {
+      setState({ mate: { ...state.mate, progress: null } })
+      return { ok: false, canceled: false, message: error instanceof Error ? error.message : String(error) }
+    }
+  }
+  const fromSettings = (sender: Electron.WebContents): boolean => windows.isPanel(sender, 'chat') || windows.isPanel(sender, 'settings')
+  handle(Invoke.mateImport, async (_p, e) => {
+    if (!fromSettings(e.sender)) throw new Error('Rejected mate:import: not the settings window')
+    const parent = BrowserWindow.fromWebContents(e.sender)
+    const options: Electron.OpenDialogOptions = { title: 'Choose your Mate Engine folder', properties: ['openDirectory'], defaultPath: await guessMateFolder() }
+    const picked = parent ? await dialog.showOpenDialog(parent, options) : await dialog.showOpenDialog(options)
+    const folder = picked.filePaths[0]
+    if (picked.canceled || !folder) return { ok: false, canceled: true }
+    return runMateImport(folder)
+  })
+  handle(Invoke.mateRemove, async (_p, e) => {
+    if (!fromSettings(e.sender)) throw new Error('Rejected mate:remove: not the settings window')
+    await removeMate()
+    mateLibrary = null
+    return setState({ mate: mateState(state.mate.revision + 1) })
+  })
+  // The character window plays the clips; it may ask only for ids the library lists.
+  const mateIds = (kind: 'clips' | 'sounds'): string[] => (mateLibrary ? Object.values(mateLibrary[kind]).flat() : [])
+  handle(Invoke.mateLibrary, (_p, e) => {
+    if (!fromCharacter(e.sender)) throw new Error('Rejected mate:library: not the character window')
+    return mateLibrary
+  })
+  handle(Invoke.mateClip, ({ id }, e) => {
+    if (!fromCharacter(e.sender) || !mateIds('clips').includes(id)) throw new Error('Rejected mate:clip: not the character window or not imported')
+    return readClip(id)
+  })
+  handle(Invoke.mateSound, ({ id }, e) => {
+    if (!fromCharacter(e.sender) || !mateIds('sounds').includes(id)) throw new Error('Rejected mate:sound: not the character window or not imported')
+    return readSound(id)
   })
 
   // Send channels drive the character window and are accepted only from it.
   on(Send.setIgnoreMouse, ({ ignore }, e) => fromCharacter(e.sender) && windows.setIgnoreMouse(ignore))
-  on(Send.dragStart, (p, e) => fromCharacter(e.sender) && windows.dragStart(p.screenX, p.screenY))
+  on(Send.dragStart, (p, e) => {
+    if (!fromCharacter(e.sender)) return
+    windows.dragStart(p.screenX, p.screenY)
+    if (state.dancing) setState({ dancing: false }) // as in Mate Engine: picking her up ends the dance
+  })
   on(Send.dragMove, (p, e) => fromCharacter(e.sender) && windows.dragMove(p.screenX, p.screenY))
   on(Send.dragEnd, (_p, e) => fromCharacter(e.sender) && windows.dragEnd())
   on(Send.resize, (p, e) => fromCharacter(e.sender) && windows.resizeCharacter(p.width, p.height))
@@ -907,6 +995,7 @@ async function start(): Promise<void> {
       settings: actions.openSettings,
       character: actions.toggleCharacter,
       alwaysOnTop: () => actions.setAlwaysOnTop(!state.alwaysOnTop),
+      dance: () => setState({ dancing: !state.dancing }),
       stop: actions.stop,
       quit: actions.quit,
       close: () => {}
@@ -946,8 +1035,14 @@ async function start(): Promise<void> {
     })
   }
 
+  // `Lumi.exe --import-mate=<folder>` imports into the copy of Lumi that is running (and its profile), without the dialog.
+  const mateArg = (argv: string[]): string | undefined => argv.find((a) => a.startsWith('--import-mate='))?.slice('--import-mate='.length)
+  const startMate = mateArg(process.argv)
+  if (startMate) void runMateImport(startMate)
   app.on('second-instance', (_e, argv) => {
     if (argv.includes('--quit')) return app.quit() // `Lumi.exe --quit`: a clean exit for scripts and updates (a kill can damage the database)
+    const folder = mateArg(argv)
+    if (folder) return void runMateImport(folder)
     setState({ characterVisible: true })
     showPanel('chat')
   })

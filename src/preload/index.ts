@@ -100,8 +100,16 @@ const api: AssistantApi = {
     get: () => ipcRenderer.invoke(Invoke.getModel),
     choose: () => ipcRenderer.invoke(Invoke.chooseModel),
     select: (id) => ipcRenderer.invoke(Invoke.selectCharacter, { id }),
+    remove: (id) => ipcRenderer.invoke(Invoke.removeModel, { id }),
     setGraphics: (quality) => ipcRenderer.invoke(Invoke.setGraphics, { quality }),
     openSite: (site) => ipcRenderer.invoke(Invoke.openCharacterSite, { site })
+  },
+  mate: {
+    import: () => ipcRenderer.invoke(Invoke.mateImport),
+    remove: () => ipcRenderer.invoke(Invoke.mateRemove),
+    library: () => ipcRenderer.invoke(Invoke.mateLibrary),
+    clip: (id) => ipcRenderer.invoke(Invoke.mateClip, { id }),
+    sound: (id) => ipcRenderer.invoke(Invoke.mateSound, { id })
   },
   character: {
     onCursor(listener) {

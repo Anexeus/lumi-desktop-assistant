@@ -99,7 +99,7 @@ engine, bundled devDependency) on Lumi's browser. Damaged SQLite indexes ("datab
 self-heal at startup. Forgiving tool arguments. PROJECT_SUMMARY.md and AGENTS.md written. Old installers deleted.
 
 ### 4.7 Icon and install location → 0.3.1
-The violet orb-with-eyes icon everywhere (exe, installer, tray, every window, title bars, notifications; `build/make-icon.py`).
+The violet orb-with-eyes icon everywhere (exe, installer, tray, every window, title bars, notifications; `build/make-icon.py`); in 0.7.1 replaced by the UI orb (`scripts/make-icon.mjs`).
 The installer lets the user choose the install folder. Released as v0.3.1.
 
 ### 4.8 This round → 0.4.0
@@ -197,6 +197,36 @@ app windows. What was done:
   test copy while it runs (it appears on their desktop): trust a capture only if the window stayed where the script
   put it.
 
+### 4.12 Legs in front of the taskbar, the old pick-up, own models, Gemini tools, Mate Engine → 0.8.0
+- The owner called the knees-up taskbar pose and the pendulum pick-up ugly: both reverted (ADR-072). Her legs had hung
+  *behind* the taskbar because Electron's `floating` level is below it; her window now uses `pop-up-menu`.
+- Gemini 400 "missing a thought_signature" after a tool call: Gemini 3 needs its `extra_content` returned with each
+  tool call (ADR-072). The owner did nothing wrong; their key and the OpenAI-compatible endpoint are right.
+- Own models: any number (`models/mine`), also in the right-click menu. The owner asked to bundle models whose
+  licences forbid redistribution (KuroG's, "Miku 2", 止丸式初音ミクNT): they stay personal on the owner's PC.
+- The owner dropped Mate Engine (Unity) into the project folder and asked to copy its animations, voices and models.
+  Its licences forbid that (code: copyleft "MateEngine Pro License"; assets © Shiny): ideas only, own code (head
+  follows the cursor, head pats, naps; ADR-073). The folder is git-ignored. Never commit or copy from it.
+- Island voice "doesn't hear me" while push-to-talk worked: speech detector floor lowered, stuck-speaking watchdog,
+  failures logged, tap stops her (ADR-074). Not reproduced on the owner's mic.
+- **Testing trap:** main sends the real cursor to the character window and any move wakes her from a nap. To test the
+  nap, hold back `character:cursor` sends (see the E2E test) and move the page's `performance.now` ahead.
+- Second request: "use all the Mate Engine animations, voices, models… copy the whole project". Its code still isn't
+  copied (Unity, copyleft), but its assets are now imported at runtime from the owner's own copy (personal use is what
+  its licence allows): `src/main/mate/` converts Unity muscle clips to VRM bone rotations, calibrated against the
+  clips' own hand/foot goals (ADR-075). The character plays them through an AnimationMixer; Lumi's own procedural
+  animation is the fallback. Peeking stays procedural. Never commit or ship anything from that folder.
+- Voice "Got it… then nothing": the name check in the owner's real profile; now a tap or her answer opens a 30 s window
+  without the name (ADR-077). Icon: the UI orb everywhere (ADR-076).
+- **Biggest trap: two profiles.** The Claude desktop app is MSIX-packaged (`Claude_pzs8sxrjxfjjc`), and processes started
+  from its tools inherit its AppData virtualization. A Lumi started from a tool can read and write
+  `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Desktop Assistant` instead of the owner's real
+  `%APPDATA%\Desktop Assistant`. Files already copied there stay there; new files in folders that only exist in the
+  real profile go to the real one. That copy had Gemini and the downloaded models. The owner's real profile, used from
+  the Start menu, had Ollama, the name check on, and their 98 messages. To read or change the real profile, run a
+  script with `explorer.exe <script.cmd>` (outside the package) and have it write its output into the project folder.
+  The installed app is `C:\Users\Admin\Documents\Lumi` (the owner's choice), not `%LOCALAPPDATA%\Programs\Lumi`.
+
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 
 - Main owns all state (`AppState`) and broadcasts it; renderers are sandboxed and only use `window.assistant`.
@@ -207,7 +237,8 @@ app windows. What was done:
 - Auto-approve is opt-in and per user; the emergency stop, red island and plugin switches still apply (ADR-048).
 - No general shell, ever: add specific tools instead (ADR-040, ADR-045). Explained to the owner.
 - Exactly one runtime dependency: `zod`. Renderer/bundled libraries are devDependencies.
-- Bundled characters are CC0 or licensed for redistribution; YUI (PolyForm-NC) and Lala (AGPL): ideas only, never code.
+- Bundled characters are CC0 or licensed for redistribution; YUI (PolyForm-NC) and Lala (AGPL): ideas only, never
+  code. Mate Engine: never its code; its assets only through the runtime import from the user's own copy (ADR-075).
 
 ## 6. How to test (and the traps)
 

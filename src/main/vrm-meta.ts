@@ -13,6 +13,13 @@ export interface VrmMeta {
 
 const text = (v: unknown, max = 200): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null)
 
+export const UNNAMED = 'Unnamed model'
+/** The model's title; without one (some exporters write "null"), "<author>'s model". */
+function named(title: unknown, authors: string[]): string {
+  const t = text(title)
+  return t && t !== 'null' ? t : authors[0] ? `${authors[0]}'s model` : UNNAMED
+}
+
 /** Throws with a user-facing message when the file is not a usable VRM. */
 export function readVrmMeta(buf: Uint8Array): VrmMeta {
   if (buf.byteLength > MAX_MODEL_BYTES) throw new Error('The file is larger than 256 MB.')
@@ -36,13 +43,13 @@ export function readVrmMeta(buf: Uint8Array): VrmMeta {
   const v1 = ext['VRMC_vrm']?.meta
   if (v1) {
     const authors = Array.isArray(v1['authors']) ? v1['authors'].map((a) => text(a)).filter((a): a is string => !!a) : []
-    return { name: text(v1['name']) ?? 'Unnamed model', authors: authors.slice(0, 10), licenseUrl: text(v1['licenseUrl'], 500), specVersion: '1.0' }
+    return { name: named(v1['name'], authors), authors: authors.slice(0, 10), licenseUrl: text(v1['licenseUrl'], 500), specVersion: '1.0' }
   }
   const v0 = ext['VRM']?.meta
   if (v0) {
     const author = text(v0['author'])
     return {
-      name: text(v0['title']) ?? 'Unnamed model',
+      name: named(v0['title'], author ? [author] : []),
       authors: author ? [author] : [],
       licenseUrl: text(v0['otherLicenseUrl'], 500),
       specVersion: '0.x'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, peekPlacement, placeBeside, scaleBounds, seatPlacement, type Frame } from '../../src/main/geometry'
-import { SEAT_LINE } from '../../src/shared/character'
+import { CHARACTER_MAX, CHARACTER_MIN, clampSize, defaultPlacement, fitToDisplays, hangPlacement, peekPlacement, placeBeside, scaleBounds, seatPlacement, type Frame } from '../../src/main/geometry'
+import { HANG_LINE, SEAT_LINE } from '../../src/shared/character'
 
 const primary = { x: 0, y: 0, width: 1920, height: 1040 }
 const secondary = { x: 1920, y: 0, width: 2560, height: 1400 }
@@ -97,6 +97,19 @@ describe('peekPlacement', () => {
     expect(peekPlacement({ x: 500, y: 300, ...size }, display, [])).toBeNull()
     expect(peekPlacement({ x: 1800, y: 300, ...size }, display, [secondary])).toBeNull()
     expect(peekPlacement({ x: -100, y: 300, ...size }, display, [secondary])?.side).toBe('left')
+  })
+})
+
+describe('hangPlacement', () => {
+  const area = { x: 0, y: 0, width: 1920, height: 1032 }
+  it('hangs her hands on the top edge when she is dropped there', () => {
+    const b = { x: 800, y: 10, width: 300, height: 400 }
+    expect(hangPlacement(b, area)).toEqual({ ...b, y: Math.round(-400 * HANG_LINE) })
+    expect(hangPlacement({ ...b, y: -60 }, area)?.y).toBe(Math.round(-400 * HANG_LINE)) // dragged past the top
+  })
+  it('leaves her alone lower down or off the display', () => {
+    expect(hangPlacement({ x: 800, y: 300, width: 300, height: 400 }, area)).toBeNull()
+    expect(hangPlacement({ x: -400, y: 0, width: 300, height: 400 }, area)).toBeNull()
   })
 })
 

@@ -15,7 +15,7 @@ const KEY_RESIZE_STEP = 0.1
 const SLEEP_AFTER_MS = 3 * 60_000 // no cursor movement, clicks or chat for this long and she naps
 // Cute lines for little moments. Windows voices say "Hee hee" more clearly than "Hehe".
 const TAP_LINES = ['Hi hi!', 'Yay!', 'Hee hee!']
-const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!' }
+const PERCH_LINES: Partial<Record<Perch, string>> = { sit: 'Hee hee!', left: 'Peekaboo!', right: 'Peekaboo!', fall: 'Whoa!', hang: 'Wheee!' }
 const pick = (lines: string[]): string => lines[Math.floor(Math.random() * lines.length)]!
 
 let interactive = false
@@ -74,6 +74,9 @@ function mateSound(kind: MateSound): boolean {
 let petted = false
 let pettedAt = -Infinity
 let headSince = -1 // when the cursor started moving over her head; a quick pass on the way elsewhere is not a pat
+let headX = 0
+let headDir = 0
+let headTurns = 0 // direction changes while over her head: stroking goes back and forth
 let petTimer = 0
 function setPetted(next: boolean): void {
   if (next === petted) return
@@ -85,15 +88,23 @@ function setPetted(next: boolean): void {
   if (performance.now() - pettedAt > 10_000 && !mateSound('pat')) speaker.exclaim('Hee hee!')
   pettedAt = performance.now()
 }
-function strokeHead(): void {
+function strokeHead(x: number): void {
   const now = performance.now()
-  if (headSince < 0) headSince = now
+  if (headSince < 0) {
+    headSince = now
+    headTurns = 0
+    headDir = 0
+  }
+  const dir = Math.sign(x - headX)
+  if (dir && headDir && dir !== headDir) headTurns++
+  if (dir) headDir = dir
+  headX = x
   clearTimeout(petTimer)
   petTimer = window.setTimeout(() => {
     headSince = -1
     setPetted(false)
   }, 700)
-  if (now - headSince > 300) setPetted(true)
+  if (now - headSince > 600 && headTurns >= 2) setPetted(true)
 }
 
 // Left alone, she naps; any activity wakes her with a stretch.
@@ -131,7 +142,7 @@ window.addEventListener('mousemove', (e) => {
   if (mode !== 'idle' && e.buttons === 0) endPress() // the button was released somewhere we didn't hear about
   if (mode !== 'idle') return
   setInteractive(scene.hitTest(e.clientX, e.clientY) || performance.now() < wheelUntil)
-  if (scene.overHead(e.clientX, e.clientY)) strokeHead()
+  if (scene.overHead(e.clientX, e.clientY)) strokeHead(e.clientX)
 })
 document.addEventListener('mouseleave', () => mode === 'idle' && setInteractive(false))
 

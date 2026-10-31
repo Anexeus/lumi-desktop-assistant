@@ -56,6 +56,7 @@ const api: AssistantApi = {
   voice: {
     setSettings: (settings) => ipcRenderer.invoke(Invoke.voiceSetSettings, settings),
     transcribe: (wav) => ipcRenderer.invoke(Invoke.voiceTranscribe, { wav }),
+    warm: () => ipcRenderer.invoke(Invoke.voiceWarm),
     synthesize: (text) => ipcRenderer.invoke(Invoke.voiceSynthesize, { text })
   },
   approve: (id, decision) => ipcRenderer.invoke(Invoke.approvalRespond, { id, decision }),

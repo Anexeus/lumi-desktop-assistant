@@ -37,7 +37,9 @@ export async function listMyModels(): Promise<MyModel[]> {
     try {
       const meta = await readMeta(join(dir(), f))
       // A model without a name or author of its own goes by the name of the file it came from (saved at import).
-      const saved = meta.name === UNNAMED ? (await readFile(path(id, 'name'), 'utf8').catch(() => '')).trim().slice(0, 80) : ''
+      // A name saved next to the model wins over its title (one without a title gets its file name; a Japanese title
+      // can be given an English name).
+      const saved = (await readFile(path(id, 'name'), 'utf8').catch(() => '')).trim().slice(0, 80)
       models.push({ ...meta, id, name: saved || meta.name })
     } catch {
       // damaged or replaced: not listed

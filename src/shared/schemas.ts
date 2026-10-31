@@ -170,6 +170,7 @@ export const invokeSchemas = {
   [Invoke.dataDeleteAll]: none,
   [Invoke.voiceSetSettings]: voiceSettingsSchema,
   // ~25 MB is several minutes of 16 kHz mono; recordings stop at 60 s anyway.
+  [Invoke.voiceWarm]: none,
   [Invoke.voiceTranscribe]: z.object({ wav: z.instanceof(Uint8Array).refine((b) => b.byteLength >= 44 && b.byteLength <= 25 * 1024 * 1024) }).strict(),
   [Invoke.voiceSynthesize]: z.object({ text: z.string().trim().min(1).max(1000) }).strict(),
   [Invoke.setAssistantName]: z.object({ name: assistantNameSchema }).strict(),

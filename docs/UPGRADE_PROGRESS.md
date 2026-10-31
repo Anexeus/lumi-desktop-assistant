@@ -268,3 +268,11 @@ Root causes found by testing on this PC, not guessed:
 - Typecheck and lint clean; unit 172 pass (2 skipped; new: the muscle converter, including the local calibration
   check); E2E 66/66 with the installed Lumi closed (new: `mate.spec.ts`, a made-up Mate Engine folder imported at launch,
   clips per situation, Dance, the clip/sound access rules, Settings; the API-surface test lists the new `mate` API).
+
+## 0.8.1: showcase fixes
+- Seamless Mate Engine loops (5 idles jumped up to 7 cm / 15°), a 50° neck+head limit, pats need a stroke, sitting and
+  peeking in Lumi's own modest poses, hanging from the top of the screen, blended switches (ADR-078). Checked on screen
+  with the owner's Miku NT: sitting on the taskbar knees together with hands on the lap; hanging with both hands on the
+  screen's top edge (window at y −28).
+- Voice: Whisper instead of Ollama's speech model, models warmed on tap, 0.7 s end of speech.
+- Own models: saved names win over titles; the owner's are named Aldina, Lazuli, Zome, Hatsune Miku NT and Miku KuroG.

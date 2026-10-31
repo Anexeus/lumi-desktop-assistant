@@ -154,6 +154,22 @@ const dofName = (dof: Dof): string => NAME_OF.get(dof)!
 export const fromUnityPosition = (v: Vec3): Vec3 => [-v[0], v[1], v[2]]
 export const fromUnityRotation = (q: Quat): Quat => [q[0], -q[1], -q[2], q[3]]
 
+/** Spherical blend from a to b (the short way round). */
+export function qslerp(a: Quat, b: Quat, t: number): Quat {
+  let dot = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+  const s = dot < 0 ? -1 : 1
+  dot *= s
+  if (dot > 0.9995) {
+    const q = a.map((v, i) => v + (s * b[i]! - v) * t) as Quat
+    const n = Math.hypot(...q)
+    return q.map((v) => v / n) as Quat
+  }
+  const th = Math.acos(dot)
+  const wa = Math.sin((1 - t) * th) / Math.sin(th)
+  const wb = (s * Math.sin(t * th)) / Math.sin(th)
+  return a.map((v, i) => v * wa + b[i]! * wb) as Quat
+}
+
 /** q to the power a: the same axis, a times the angle. */
 export function qpow(q: Quat, a: number): Quat {
   const half = Math.acos(Math.max(-1, Math.min(1, q[3])))

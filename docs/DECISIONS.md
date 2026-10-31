@@ -490,3 +490,22 @@ Engine's icons were not used: they are its branding.
 The owner's "Got it…" and then nothing was the name check (ADR-074): every sentence without "Lumi" was dropped. Tapping
 the island, or her finishing an answer, now opens a 30-second window in which sentences count without her name. The
 name is needed again only after a quiet half minute, which is what the check is for (a TV in the background).
+
+## ADR-078 Showcase fixes: seamless loops, a 50° head limit, modest sitting, hanging, faster voice (2026-10-31)
+From the owner's screenshots (head turned like an owl, the waist "glitching", underwear showing when she sits):
+- **Loops:** five of Mate Engine's idles end up to 7 cm and 15° away from where they start, so every loop jumped.
+  The converter now eases each looping clip's last half second into its first frame (Unity's "Loop Pose").
+- **Head:** some clips turn the neck and head ~60° on their own, and the cursor-following added up to 34° more. On
+  top of a clip, neck and head together now stay within 50°.
+- **Pats:** a pat needs a stroke, back and forth over her head for 0.6 s; before, the cursor passing by switched her
+  into the laughing clip.
+- **Lumi's own poses:** sitting, peeking and the new hanging stay Lumi's own, and the switch to and from the clips
+  blends over 0.4 s. Mate Engine's sits face sideways or show her underwear in a skirt; Lumi's sit keeps the knees
+  together and the hands on her lap.
+- **Hanging:** dropped with her hands at the top of the screen, she holds the edge (`hang`, HANG_LINE).
+- **Window sitting:** works from a wider band of drop heights.
+- **Voice:** with Ollama, speech goes to Lumi's Whisper once it is downloaded, because Ollama swapped its chat model
+  out for its speech model on every sentence. Tapping the island loads the speech and chat models while you talk, and
+  the end-of-speech pause is 0.7 s.
+- **Own models:** a saved name now wins over the model's title. The owner asked again to ship their own models for
+  everyone; all six are "Redistribution_Prohibited", so they stay personal.

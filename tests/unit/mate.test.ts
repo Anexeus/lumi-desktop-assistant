@@ -95,6 +95,20 @@ AnimationClip:
     expect(sampleCurve(clip.curves.get('RootT.y')!, 5)).toBe(1)
   })
 
+  it('makes a looping clip end where it starts, so the loop never jumps', () => {
+    const curve = (attribute: string, from: number, to: number): string =>
+      `  - serializedVersion: 2\n    curve:\n      m_Curve:\n      - serializedVersion: 3\n        time: 0\n        value: ${from}\n        inSlope: 0\n        outSlope: 0\n      - serializedVersion: 3\n        time: 2\n        value: ${to}\n        inSlope: 0\n        outSlope: 0\n    attribute: ${attribute}\n    path: `
+    const names = ['Left', 'Right'].flatMap((s) => [`${s} Arm Down-Up`, `${s} Arm Front-Back`, `${s} Forearm Stretch`, `${s} Upper Leg Front-Back`, `${s} Lower Leg Stretch`, `${s} Hand Down-Up`])
+    const text = `AnimationClip:\n  m_Name: DRIFT\n  m_FloatCurves:\n${[...names.map((n) => curve(n, 0, 0.4)), curve('RootT.x', 0, 0.2)].join('\n')}\n  m_PPtrCurves: []\n  m_AnimationClipSettings:\n    m_StopTime: 2\n    m_LoopTime: 1\n`
+    const clip = convertClip(parseAnim(text))
+    const last = clip.frames - 1
+    for (const values of [...Object.values(clip.bones), clip.hipsRotation])
+      for (let i = 0; i < 4; i++) expect(Math.abs(values[last * 4 + i]!)).toBeCloseTo(Math.abs(values[i]!), 3)
+    for (let i = 0; i < 3; i++) expect(clip.hips[last * 3 + i]).toBeCloseTo(clip.hips[i]!, 3)
+    // Halfway through it still moves as the clip says.
+    expect(Math.abs(clip.hips[Math.floor(last / 2) * 3]! - clip.hips[0]!)).toBeGreaterThan(0.05)
+  })
+
   it('refuses clips that are not humanoid body animations', () => {
     expect(() => convertClip(parseAnim(yaml))).toThrow(/not a humanoid body animation/)
   })

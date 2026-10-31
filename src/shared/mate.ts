@@ -1,7 +1,7 @@
 // Mate Engine material imported from the user's own copy (personal use, credited; never shipped with Lumi).
 
 /** What each converted clip is for. The "Male" sets play for characters with a male voice. */
-export const MATE_ROLES = ['idle', 'idleMale', 'drag', 'dragMale', 'sit', 'sleep', 'pat', 'react', 'dance', 'danceMale'] as const
+export const MATE_ROLES = ['idle', 'idleMale', 'drag', 'dragMale', 'sleep', 'pat', 'react', 'dance', 'danceMale'] as const
 export type MateRole = (typeof MATE_ROLES)[number]
 export const MATE_SOUNDS = ['grab', 'drop', 'pat', 'laugh'] as const
 export type MateSound = (typeof MATE_SOUNDS)[number]

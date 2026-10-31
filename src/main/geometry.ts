@@ -1,5 +1,5 @@
 // Pure window-geometry helpers (no Electron imports) so they can be unit tested.
-import { SEAT_LINE } from '@shared/character'
+import { HANG_LINE, SEAT_LINE } from '@shared/character'
 
 export interface Rect {
   x: number
@@ -122,6 +122,13 @@ export function canSit(b: Rect, frame: Frame, area: Rect): boolean {
   return !frame.maximized && seatedBounds(b, frame.rect.y).y >= area.y - b.height * 0.1
 }
 
+/** Dropped with her raised hands at (or above) the top of the screen: she hangs from it, hands on the edge. */
+export function hangPlacement(b: Rect, area: Rect): Rect | null {
+  const cx = b.x + b.width / 2
+  if (cx < area.x || cx > area.x + area.width || b.y + b.height * HANG_LINE > area.y + b.height * 0.12) return null
+  return { ...b, y: Math.round(area.y - b.height * HANG_LINE) }
+}
+
 /** The taskbar's top edge as a seat (handle 0): the bottom of the work area. */
 export const taskbarSeat = (area: Rect): Frame => ({ handle: 0, rect: { x: area.x, y: area.y + area.height, width: area.width, height: 0 }, maximized: false })
 
@@ -135,7 +142,7 @@ export function seatPlacement(b: Rect, frames: Frame[], area: Rect): { frame: Fr
   const feet = b.y + b.height * FEET_LINE
   for (const [i, frame] of frames.entries()) {
     const r = frame.rect
-    if (cx < r.x + 24 || cx > r.x + r.width - 24 || r.y < hips - 40 || r.y > feet + 60) continue
+    if (cx < r.x + 24 || cx > r.x + r.width - 24 || r.y < hips - b.height * 0.15 || r.y > feet + 80) continue
     if (frames.slice(0, i).some((above) => contains(above.rect, cx, r.y + 2))) continue
     if (canSit(b, frame, area)) return { frame, bounds: seatedBounds(b, r.y) }
   }

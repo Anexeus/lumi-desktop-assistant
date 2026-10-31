@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import type { Perch } from '@shared/character'
 import type { IslandStyle, WindowName } from '@shared/ipc'
 import { devServerUrl } from './env'
-import { canSit, clampSize, fitToDisplays, peekPlacement, placeBeside, scaleBounds, seatedBounds, seatPlacement, taskbarSeat, type Frame, type Rect } from './geometry'
+import { canSit, clampSize, fitToDisplays, hangPlacement, peekPlacement, placeBeside, scaleBounds, seatedBounds, seatPlacement, taskbarSeat, type Frame, type Rect } from './geometry'
 import { APP_HOST, APP_SCHEME } from './policy'
 
 type Page = 'character' | 'island' | 'menu' | WindowName
@@ -302,7 +302,11 @@ export class WindowManager {
   dragEnd(): void {
     this.drag = undefined
     this.settleCharacter()
-    if (this.perch === 'none') void this.trySit()
+    if (this.perch !== 'none') return
+    const b = this.characterBounds()
+    const hang = hangPlacement(b, screen.getDisplayMatching(b).workArea)
+    if (hang) return this.place(hang, 'hang', true) // dropped at the top of the screen: she holds on to its edge
+    void this.trySit()
   }
 
   private scaleBase: Rect | undefined

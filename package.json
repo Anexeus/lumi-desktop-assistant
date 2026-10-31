@@ -1,7 +1,7 @@
 {
   "name": "desktop-assistant",
   "productName": "Lumi",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Windows desktop AI companion with a 3D character",
   "license": "MIT",

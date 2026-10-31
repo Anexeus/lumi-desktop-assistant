@@ -1,7 +1,7 @@
 // Reads Unity's text .anim files (YAML) far enough to sample their humanoid muscle curves, and converts a clip into
 // per-bone quaternion samples for a VRM's normalized bones. Pure: no Electron.
 import type { MateClip } from '@shared/mate'
-import { centreOfMass, fromUnityPosition, fromUnityRotation, hipsRotation, MUSCLE_NAMES, musclePose, qapply, qmul, qrot, type Quat, type Vec3 } from './muscles'
+import { centreOfMass, fromUnityPosition, fromUnityRotation, hipsRotation, MUSCLE_NAMES, musclePose, qapply, qmul, qrot, qslerp, type Quat, type Vec3 } from './muscles'
 
 interface Key {
   t: number
@@ -104,6 +104,24 @@ export function convertClip(clip: UnityClip, fps = 30): MateClip {
     for (let i = 0; i < 4; i++) out.hipsRotation[f * 4 + i] = round(q[i]!)
     const p = qapply(turn, [hips[f]![0] - mx, hips[f]![1], hips[f]![2] - mz])
     out.hips.push(round(p[0]), round(p[1]), round(p[2]))
+  }
+  // A looping clip ends where it starts: its last half second eases into the first frame (Unity's "Loop Pose"). Five
+  // of Mate Engine's idles otherwise jumped up to 7 cm and 15° at every loop.
+  if (clip.loop && frames > 8) {
+    const n = Math.min(Math.round(fps / 2), Math.floor(frames / 3))
+    const ease = (f: number): number => {
+      const p = (f - (frames - 1 - n)) / n
+      return p * p * (3 - 2 * p)
+    }
+    const quats = [...Object.values(out.bones), out.hipsRotation]
+    for (let f = frames - n; f < frames; f++) {
+      const w = ease(f)
+      for (const values of quats) {
+        const q = qslerp(values.slice(f * 4, f * 4 + 4) as Quat, values.slice(0, 4) as Quat, w)
+        for (let i = 0; i < 4; i++) values[f * 4 + i] = round(q[i]!)
+      }
+      for (let i = 0; i < 3; i++) out.hips[f * 3 + i] = round(out.hips[f * 3 + i]! + (out.hips[i]! - out.hips[f * 3 + i]!) * w)
+    }
   }
   return out
 }

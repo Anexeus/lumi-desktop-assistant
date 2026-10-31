@@ -841,14 +841,28 @@ async function start(): Promise<void> {
     return setState({ voice })
   })
   const voiceConfig = async () => ({ baseUrl: settings.ai.baseUrl, model: settings.voice.model, apiKey: await getSecret(keyFor(settings.ai.provider)) })
+  // Gemini, Anthropic, OpenRouter and Lumi's own engine have no speech-to-text: they always use Lumi's Whisper. So does
+  // Ollama once Whisper is downloaded: Ollama swapped its chat model out for its speech model on every sentence,
+  // which made spoken questions much slower to answer than typed ones.
+  const whisperForVoice = (): boolean =>
+    settings.voice.stt === 'builtin' ||
+    ['builtin', 'gemini', 'anthropic', 'openrouter'].includes(settings.ai.provider) ||
+    (settings.ai.provider === 'ollama' && installedModels().includes(settings.local.stt))
+  handle(Invoke.voiceWarm, async (_p, e) => {
+    if (!settings.voice.input || !(windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)) throw new Error('Rejected voice:warm: not allowed from this window')
+    const loads: Promise<unknown>[] = []
+    if (whisperForVoice() && installedModels().includes(settings.local.stt)) loads.push(localUrl(sttServer, settings.local.stt, 'the speech model'))
+    if (settings.ai.provider === 'builtin') loads.push(localUrl(llmServer, settings.local.llm, 'the chat model'))
+    // An Ollama request without a prompt just loads the model (and keeps it loaded for half an hour).
+    if (settings.ai.provider === 'ollama') loads.push(fetch(`${new URL(settings.ai.baseUrl).origin}/api/generate`, { method: 'POST', body: JSON.stringify({ model: settings.ai.model, keep_alive: '30m' }), signal: AbortSignal.timeout(60_000) }))
+    await Promise.allSettled(loads)
+  })
   handle(Invoke.voiceTranscribe, async ({ wav }, e) => {
     const allowed = settings.voice.input && (windows.isPanel(e.sender, 'chat') || e.sender === windows.island.webContents)
     if (!allowed) throw new Error('Rejected voice:transcribe: voice input is off or not allowed from this window')
     try {
-      // Gemini, Anthropic, OpenRouter and Lumi's own engine have no speech-to-text: they always use Lumi's Whisper.
-      const noStt = ['builtin', 'gemini', 'anthropic', 'openrouter'].includes(settings.ai.provider)
       const text =
-        settings.voice.stt === 'builtin' || noStt
+        whisperForVoice()
           ? await transcribe({ baseUrl: await localUrl(sttServer, settings.local.stt, 'the speech model'), model: 'whisper' }, wav)
           : await withOllama(async () => transcribe({ ...(await voiceConfig()), model: findProvider(settings.ai.provider).stt ?? settings.voice.model }, wav))
       return { ok: true as const, text }

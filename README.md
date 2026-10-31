@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.8.0.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.8.1.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -89,7 +89,7 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
 - **Peek and sit:** drop her at the left or right screen edge and she peeks in; drop her feet on an app window's top
   edge and she sits on it facing you, legs over the edge, and rides along when you move the window (she hops down when
   it closes or minimises). Drag her down onto the taskbar and she sits on its edge the same way, legs hanging in front
-  of it.
+  of it. Drag her up to the top of the screen and she hangs from its edge by her hands.
 - **Menu:** right-click the character or the tray icon (Chat, Settings, Change character, Hide, Keep on top, Dance
   once Mate Engine's animations are imported, Stop, Quit). **Island look** (Settings → General): Pill or Frosted glass; the AI model's name shows on the open island only
   if you turn on "Show the AI model on the island".

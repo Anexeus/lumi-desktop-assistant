@@ -82,7 +82,7 @@ test.beforeAll(async () => {
     writeFileSync(join(mate, path), data)
   }
   const anims = 'Assets/MATE ENGINE - Animations'
-  for (const path of ['PET_IDLE/PET_IDLE', 'PET_MISC/PET_DRAGGING', 'PET_SITTING/ME_02/PET_SIT_01', 'PET_MISC/PET_HAPPY', 'PET_DANCING/PET_DANCING'])
+  for (const path of ['PET_IDLE/PET_IDLE', 'PET_MISC/PET_DRAGGING', 'PET_MISC/PET_HAPPY', 'PET_DANCING/PET_DANCING'])
     put(`${anims}/${path}.anim`, fakeClip(path.split('/').pop()!))
   put('Assets/MATE ENGINE - Sounds/Laugh_1.mp3', wav())
   writeFileSync(join(userData, 'settings.json'), JSON.stringify({ ai: { baseUrl: 'http://127.0.0.1:9/v1', model: 'none' } }))
@@ -102,7 +102,7 @@ test.afterAll(async () => {
 const playing = (): Promise<string | undefined> => character.evaluate(() => document.body.dataset['mate'])
 
 test('a Mate Engine folder given at launch is imported and its clips play her body', async () => {
-  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.mate)), { timeout: 20_000 }).toMatchObject({ clips: 5, sounds: 1, progress: null })
+  await expect.poll(() => character.evaluate(() => window.assistant.getState().then((s) => s.mate)), { timeout: 20_000 }).toMatchObject({ clips: 4, sounds: 1, progress: null })
   await expect.poll(playing, { timeout: 10_000 }).toMatch(/^idle:PET_IDLE$/)
   // Picked up, she plays the dragging clip; put down, she goes back to standing.
   const { width, height } = await character.evaluate(() => ({ width: innerWidth, height: innerHeight }))
@@ -144,7 +144,7 @@ test('Settings shows what is in use and can stop using it', async () => {
   await character.evaluate(() => window.assistant.openWindow('settings'))
   const settings = app.windows().find((w) => w.url().endsWith('/chat.html'))!
   await settings.getByRole('tab', { name: 'Character', exact: true }).click()
-  await expect(settings.getByText(/5 animations and 1 sounds in use/)).toBeVisible()
+  await expect(settings.getByText(/4 animations and 1 sounds in use/)).toBeVisible()
   await settings.getByRole('button', { name: 'Stop using them' }).click()
   await expect(settings.getByRole('button', { name: 'Import from Mate Engine…' })).toBeVisible()
   await expect.poll(playing).toBe('')

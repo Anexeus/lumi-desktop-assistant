@@ -4,7 +4,7 @@ export const VAD = {
   minThreshold: 0.01, // RMS; quieter than this is never speech (0.02 missed soft voices on laptop mics)
   floorRatio: 3, // speech must be this many times louder than the room
   startMs: 150, // this much loud audio starts an utterance
-  endMs: 900, // this much quiet ends it
+  endMs: 700, // this much quiet ends it (0.9 s felt slow to answer)
   maxMs: 30_000 // an utterance never runs longer
 }
 

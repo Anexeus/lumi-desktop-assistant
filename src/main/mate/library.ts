@@ -16,8 +16,6 @@ const CLIPS: Record<MateRole, string[]> = {
   idleMale: range(1, 9, (i) => `PET_IDLE/ME_02/HUSBANDO/HUS_IDLE${pad(i)}`),
   drag: ['PET_MISC/PET_DRAGGING'],
   dragMale: ['PET_IDLE/ME_02/HUSBANDO/HUS_DRAG'],
-  // Sitting on an edge with the legs hanging down (her other sits lie down or pull the legs up).
-  sit: ['PET_SITTING/ME_02/PET_SIT_01', 'PET_SITTING/ME_02/PET_SIT_02'],
   sleep: ['PET_SLEEPING/PET_SLEEPING'],
   pat: ['PET_MISC/PET_LAUGHING'],
   react: ['PET_MISC/PET_HAPPY', 'PET_MISC/PET_SHY_POINT', ...range(1, 4, (i) => `PET_POSE/PET_POSE_${i}`)],

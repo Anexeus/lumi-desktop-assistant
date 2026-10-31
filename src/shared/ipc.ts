@@ -316,6 +316,7 @@ export const Invoke = {
   dataDeleteAll: 'data:delete-all',
   voiceSetSettings: 'voice:set-settings',
   voiceTranscribe: 'voice:transcribe',
+  voiceWarm: 'voice:warm',
   voiceSynthesize: 'voice:synthesize',
   setAssistantName: 'app:set-assistant-name',
   windowControl: 'window:control',
@@ -428,6 +429,8 @@ export interface AssistantApi {
     setSettings(settings: VoiceSettings): Promise<AppState>
     /** A 16 kHz mono WAV recording → text. */
     transcribe(wav: Uint8Array): Promise<TranscribeResult>
+    /** Voice mode opened: loads the speech and chat models now, so the first answer doesn't wait for them. */
+    warm(): Promise<void>
     /** Character and Settings windows only: text → WAV audio. */
     synthesize(text: string): Promise<SpeechResult>
   }

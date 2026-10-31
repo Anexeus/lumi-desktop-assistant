@@ -40,10 +40,12 @@ const table: Record<CharacterState, Partial<Record<CharacterEvent, Target>>> = {
 export const initialSnapshot: CharacterSnapshot = { state: 'IDLE', resume: 'IDLE' }
 
 /** How the character is placed: standing, peeking in from the left or right screen edge, sitting on a window or the taskbar, falling. */
-export type Perch = 'none' | 'left' | 'right' | 'sit' | 'fall'
+export type Perch = 'none' | 'left' | 'right' | 'sit' | 'fall' | 'hang'
 
 /** Where her hips are while she sits on a window's top edge, as a fraction of her window height from the top. */
 export const SEAT_LINE = 0.62
+/** Hanging from the top of the screen: where her hands are, as a fraction of her window's height from its top. */
+export const HANG_LINE = 0.07
 
 /** Returns the next snapshot, or null when the event is not valid in the current state. */
 export function transition(current: CharacterSnapshot, event: CharacterEvent): CharacterSnapshot | null {

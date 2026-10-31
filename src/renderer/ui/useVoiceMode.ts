@@ -146,6 +146,7 @@ export function useVoiceMode(
     session.current = { stream, ctx }
     setPhase('listening')
     engage() // the tap itself means "I'm talking to you"
+    void window.assistant.voice.warm().catch(() => {}) // load the speech and chat models while you speak
   }, [micId, send, engage])
 
   const toggle = useCallback(async () => (session.current ? stop() : start()), [start, stop])

@@ -31,6 +31,7 @@ export interface MateSource {
 const MATE_ONCE: MateRole[] = ['react']
 const MATE_FADE: Partial<Record<MateRole, number>> = { drag: 0.2, dragMale: 0.2, pat: 0.35, react: 0.35, idle: 1.2, idleMale: 1.2, sleep: 1.5, dance: 0.6, danceMale: 0.6 }
 const IDLE_SWITCH_S = 12 // Mate Engine's own idle switch time
+const HEAD_LIMIT = 0.87 // 50°: how far her head turns from her chest to follow the cursor
 
 // Procedural animation for a VRM: one blended pose per state, plus additive blink, breathing,
 // gaze and mouth layers. Every state writes the same parameters, so states crossfade instead
@@ -94,6 +95,8 @@ export interface Avatar {
   setMate(source: MateSource | null): void
   /** Dances (Mate Engine's), one after another, while true. */
   setDancing(dancing: boolean): void
+  /** Where her head faces, in degrees: + to the viewer's right, + up. */
+  headAngles(): { yaw: number; pitch: number }
   update(dt: number, elapsed: number): void
   dispose(): void
 }
@@ -205,6 +208,25 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
   let dancing = false
   const addQ = new Quaternion()
   const addE = new Euler()
+  // Every frame starts from the base pose: the clip's own (as the mixer last left it) or, in Lumi's own poses, the rest
+  // pose. The mixer writes a bone only when the clip's value changed since the last frame, so without this the head
+  // turn, nod and blends added on top piled up during every still moment of a clip and her head spun around.
+  const REST = new Quaternion()
+  const clipPose = new Map<Object3D, Quaternion>()
+  const lookQ = new Quaternion()
+  const turnQ = new Quaternion()
+  const worldQ = new Quaternion()
+  const faceDir = new Vector3()
+  const wantDir = new Vector3()
+  const baseDir = new Vector3()
+  /** Where bone b's face side points, in world space (the model faces +Z, the viewer). */
+  const facing = (b: Object3D, out: Vector3): Vector3 => out.set(0, 0, m).applyQuaternion(b.getWorldQuaternion(worldQ))
+  /** Turns bone b by the world-space rotation w about its own joint: local' = P⁻¹ · w · P · local. */
+  function turnInWorld(b: Object3D, w: Quaternion): void {
+    if (!b.parent) return
+    b.parent.getWorldQuaternion(worldQ)
+    b.quaternion.premultiply(worldQ).premultiply(w).premultiply(worldQ.invert())
+  }
 
   /** A converted clip as a three.js clip for this model's normalized bones. */
   function toThree(clip: MateClip): AnimationClip {
@@ -354,11 +376,8 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       role = null
       loading = null
       reacting = false
-      if (!source) {
-        // Back to Lumi's own poses, from the rest pose.
-        for (const name of Object.keys(vrm.humanoid.humanBones) as VRMHumanBoneName[]) bone(name)?.quaternion.identity()
-        hips?.position.copy(hipsRest)
-      }
+      clipPose.clear()
+      if (!source) hips?.position.copy(hipsRest) // back to Lumi's own poses, from the rest pose
     },
     update(dt, t) {
       elapsedNow = t
@@ -389,7 +408,7 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       if (following && head) {
         head.getWorldPosition(headPos)
         wantYaw = Math.max(-0.6, Math.min(0.6, Math.atan2(gazeTarget.position.x - headPos.x, height)))
-        wantPitch = Math.max(-0.35, Math.min(0.35, Math.atan2(headPos.y - gazeTarget.position.y, height))) // + looks down
+        wantPitch = Math.max(-0.45, Math.min(0.45, Math.atan2(headPos.y - gazeTarget.position.y, height))) // + looks down
       }
       const kl = 1 - Math.exp(-dt * 5)
       look.yaw += (wantYaw * track - look.yaw) * kl
@@ -411,7 +430,11 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
         role = null
         loading = null
         hips?.position.copy(hipsRest)
-        for (const name of Object.keys(vrm.humanoid.humanBones) as VRMHumanBoneName[]) bone(name)?.quaternion.identity()
+        clipPose.clear()
+      }
+      for (const name of boneNames) {
+        const b = bone(name)
+        if (b) b.quaternion.copy(clipPose.get(b) ?? REST)
       }
       if (mate && !ownPose) {
         const want = wantedRole()
@@ -420,6 +443,12 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
           startRole(wantedRole())
         }
         mixer.update(dt)
+        if (action) {
+          for (const name of boneNames) {
+            const b = bone(name)
+            if (b) (clipPose.get(b) ?? clipPose.set(b, new Quaternion()).get(b)!).copy(b.quaternion)
+          }
+        }
       }
       const clips = !!action
       if (!clips) {
@@ -484,15 +513,21 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       const breathe = Math.sin(t * (1.7 - 0.7 * sleep)) * (1 + 2 * sleep)
       const nod = state === 'SPEAKING' ? Math.sin(t * 5) * 0.03 : 0
       if (clips) {
-        // On top of the clip: her head follows the cursor, tips into a pat, and keeps the state's nod and tilt.
-        // Neck and head together never turn more than 50° (some clips turn them ~60° on their own; with the cursor
-        // added on top she looked like an owl): the cursor's share shrinks, or pulls back, to stay inside it.
+        // On top of the clip: her head turns to the cursor in world space, so the clip's own head and body turns don't
+        // throw it off, and never more than 50° from her chest (more looked like an owl). Then the state's nod and
+        // tilt, and she tips into a pat.
+        if (head && track > 0.001) {
+          wantDir.set(Math.sin(look.yaw) * Math.cos(look.pitch), -Math.sin(look.pitch), Math.cos(look.yaw) * Math.cos(look.pitch))
+          const base = (neck ?? head).parent
+          const angle = base ? wantDir.angleTo(facing(base, baseDir)) : 0
+          if (angle > HEAD_LIMIT) wantDir.applyQuaternion(lookQ.slerpQuaternions(REST, turnQ.setFromUnitVectors(wantDir, baseDir), 1 - HEAD_LIMIT / angle))
+          turnQ.setFromUnitVectors(facing(head, faceDir), wantDir)
+          if (neck) turnInWorld(neck, lookQ.slerpQuaternions(REST, turnQ, 0.4 * track))
+          turnInWorld(head, lookQ.slerpQuaternions(REST, turnQ, (neck ? 0.6 : 1) * track))
+        }
         const add = (b: Object3D | null, x: number, y: number, z: number): void => void b?.quaternion.multiply(addQ.setFromEuler(addE.set(x * m, y, z * m)))
-        const turned = (b: Object3D | null): number => (b ? 2 * Math.atan2(b.quaternion.y, b.quaternion.w) : 0)
-        const clipYaw = turned(neck) + turned(head)
-        const yaw = Math.max(-0.87, Math.min(0.87, clipYaw + look.yaw * 0.6)) - clipYaw
-        add(neck, look.pitch * 0.25 + pose.headPitch * 0.3, yaw * 0.4, pose.headRoll * 0.3)
-        add(head, look.pitch * 0.35 + pose.headPitch * 0.4 + nod + 0.1 * pet, yaw * 0.6, pose.headRoll * 0.4 + 0.16 * pet)
+        add(neck, pose.headPitch * 0.3, 0, pose.headRoll * 0.3)
+        add(head, pose.headPitch * 0.4 + nod + 0.1 * pet, 0, pose.headRoll * 0.4 + 0.16 * pet)
       } else {
         turn(hips, -0.45 * heldWeight, 0, lean * 0.2) // held: tipped forward, as if lifted by the back
         turn(spine, 0, peekSide * 0.15 * peek, lean * 0.22)
@@ -547,6 +582,11 @@ export async function loadAvatar(source: ArrayBuffer | string, camera: Perspecti
       })
 
       vrm.update(dt)
+    },
+    headAngles() {
+      if (!head) return { yaw: 0, pitch: 0 }
+      facing(head, faceDir)
+      return { yaw: (Math.atan2(faceDir.x, faceDir.z) * 180) / Math.PI, pitch: (Math.asin(Math.max(-1, Math.min(1, faceDir.y))) * 180) / Math.PI }
     },
     dispose() {
       mixer.stopAllAction()

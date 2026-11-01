@@ -276,3 +276,16 @@ Root causes found by testing on this PC, not guessed:
   screen's top edge (window at y −28).
 - Voice: Whisper instead of Ollama's speech model, models warmed on tap, 0.7 s end of speech.
 - Own models: saved names win over titles; the owner's are named Aldina, Lazuli, Zome, Hatsune Miku NT and Miku KuroG.
+
+## 0.8.2: no permission cards; the head stays put and follows the cursor
+- **Approvals:** profiles from 0.3.0 had saved "Do what I ask without asking first" as off and every later save kept
+  it, so the owner still got Allow/Deny cards ("Open www.youtube.com in your browser?"). It is turned on once for
+  every profile (ADR-079); Settings → Tools can still turn it off.
+- **Head:** three's mixer writes a bone only when the clip's value changed, so whenever a clip held still (or a
+  reaction ended) the cursor-following and nod were added again every frame and her head spun round, face up or
+  down. Every frame now starts from the clip's own pose, and her head turns to the cursor in world space, so the
+  clip's own head and body turns no longer throw it off, at most 50° from her chest. She looks up and down further
+  (26°). After a clip, bones Lumi's own poses don't move go back to rest instead of keeping the clip's last pose.
+- Checked: a new E2E test (head turned toward a parked cursor and steady) fails on 0.8.1's code (21° of drift in
+  2 s) and passes now. With the real Mate Engine clips, her head held 34° toward a cursor at either side, 26° up or
+  down, steady across idle switches; screenshots look natural.

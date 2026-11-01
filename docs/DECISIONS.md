@@ -509,3 +509,15 @@ From the owner's screenshots (head turned like an owl, the waist "glitching", un
   the end-of-speech pause is 0.7 s.
 - **Own models:** a saved name now wins over the model's title. The owner asked again to ship their own models for
   everyone; all six are "Redistribution_Prohibited", so they stay personal.
+
+## ADR-079 No approval cards for old profiles; head turns are added to the clip, never piled up (2026-11-01)
+- **Approvals:** the owner wants Lumi to act at once, never asking. New installs already did (0.6.0), but 0.3.0 saved
+  the setting as off and every later save of the tools settings kept it. Loading the settings now turns it on once
+  (store key `migrated.autoApprove`), so a later deliberate "off" sticks. Every act tool still goes through the
+  `PermissionBroker`, so the emergency stop and the red orb keep working; only the question is skipped.
+- **Head on top of clips:** three's `PropertyMixer` writes a bound value only when it differs from the last frame's,
+  so changes added to mixer-driven bones pile up during any still stretch of a clip. Each frame now restores the
+  clip's last pose before the mixer runs (the rest pose in Lumi's own poses), then adds the head turn. The turn is
+  computed in world space: the shortest rotation from where the clip's head faces to the cursor's direction, kept
+  within 50° of the chest (the neck's parent), 40% at the neck and 60% at the head. `data-head` on the character page
+  reports where she looks, for the E2E test.

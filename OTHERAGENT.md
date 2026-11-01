@@ -227,6 +227,14 @@ app windows. What was done:
   script with `explorer.exe <script.cmd>` (outside the package) and have it write its output into the project folder.
   The installed app is `C:\Users\Admin\Documents\Lumi` (the owner's choice), not `%LOCALAPPDATA%\Programs\Lumi`.
 
+### 4.13 Showcase build → 0.8.1, then 0.8.2
+- 0.8.1: seamless loops, 50° head limit, modest sitting, hanging, faster voice (ADR-078).
+- 0.8.2: the owner still got Allow/Deny cards and wants none: their profile had kept 0.3.0's saved "off"; it is
+  switched on once (ADR-079). Their head "rotating 360°, face down or up": three's mixer skips unchanged values, so
+  additions to clip-driven bones piled up. **Trap:** never add to a mixer-driven bone without restoring the clip's pose
+  first (`clipPose` in `avatar.ts`).
+- **Testing trap:** the installed Lumi holds `Alt+Shift+Space`; quit it before the shortcut E2E test.
+
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 
 - Main owns all state (`AppState`) and broadcasts it; renderers are sandboxed and only use `window.assistant`.

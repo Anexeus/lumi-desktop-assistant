@@ -114,6 +114,24 @@ test('a Mate Engine folder given at launch is imported and its clips play her bo
   await expect.poll(playing).toBe('idle:PET_IDLE')
 })
 
+test('her head turns to the cursor and stays there while the clip holds still', async () => {
+  // These clips hold every value, so the mixer stops rewriting her bones: the head turn added on top used to pile up
+  // every frame and spin her head around. Main normally sends the real cursor; this sends one far down to her right.
+  const { width, height } = await character.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+  await app.evaluate(({ BrowserWindow }, [x, y]) => {
+    for (const w of BrowserWindow.getAllWindows()) if (w.webContents.getURL().endsWith('/character.html')) w.webContents.send('character:cursor', x, y)
+  }, [width * 4, height * 0.6])
+  const head = async (): Promise<number[]> => (await character.evaluate(() => document.body.dataset['head'] ?? '0,0')).split(',').map(Number)
+  await expect.poll(async () => (await head())[0], { timeout: 10_000 }).toBeGreaterThan(25)
+  const [yaw, pitch] = await head()
+  expect(pitch).toBeLessThan(-10) // the cursor is below her head
+  expect(pitch).toBeGreaterThan(-40)
+  await character.waitForTimeout(2000)
+  const [yaw2, pitch2] = await head()
+  expect(Math.abs(yaw2! - yaw!)).toBeLessThan(3)
+  expect(Math.abs(pitch2! - pitch!)).toBeLessThan(3)
+})
+
 test('the menu offers Dance once clips are imported, and picking a dance plays it', async () => {
   await character.evaluate(() => window.assistant.character.showMenu())
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('/menu.html'))).toBe(true)

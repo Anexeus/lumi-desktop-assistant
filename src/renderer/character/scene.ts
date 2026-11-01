@@ -94,6 +94,7 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
   const timer = new Timer()
   timer.connect(document) // pauses elapsed time while the page is hidden
   let last = 0
+  let headAt = 0
   let raf = 0
   const tick = (now: number): void => {
     raf = requestAnimationFrame(tick)
@@ -102,6 +103,11 @@ export function createScene(canvas: HTMLCanvasElement): CharacterScene {
     timer.update(now)
     avatar?.update(Math.min(timer.getDelta(), 0.1), timer.getElapsed())
     renderer.render(scene, camera)
+    if (avatar && now - headAt > 250) {
+      headAt = now
+      const a = avatar.headAngles()
+      document.body.dataset['head'] = `${Math.round(a.yaw)},${Math.round(a.pitch)}` // where she looks, for the E2E tests
+    }
   }
   raf = requestAnimationFrame(tick)
 

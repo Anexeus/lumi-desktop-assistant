@@ -74,7 +74,10 @@ export function loadSettings(store: Store): Settings {
   // Saved before providers existed: keep the service they used (e.g. Ollama) rather than failing validation.
   if (raw?.ai && !raw.ai.provider && typeof raw.ai.baseUrl === 'string') raw.ai.provider = providerForUrl(raw.ai.baseUrl)
   const file = parseSettingsFile(raw)
-  return {
+  // 0.3.0 saved "Do what I ask without asking first" as off and every later save kept it: turn it on once (ADR-079).
+  const migrate = store.getJson('migrated.autoApprove') === undefined
+  if (migrate && file.tools) file.tools.autoApprove = true
+  const settings: Settings = {
     assistantName: file.assistantName ?? DEFAULT_NAME,
     ai: file.ai ?? DEFAULT_AI,
     islandVisible: file.islandVisible ?? true,
@@ -90,6 +93,11 @@ export function loadSettings(store: Store): Settings {
     islandStyle: file.islandStyle ?? 'pill',
     islandModel: file.islandModel ?? false
   }
+  if (migrate) {
+    if (file.tools) saveSettings(store, settings)
+    store.setJson('migrated.autoApprove', true)
+  }
+  return settings
 }
 
 export function saveSettings(store: Store, settings: Settings): void {

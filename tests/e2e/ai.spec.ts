@@ -179,7 +179,9 @@ test('chat streams a reply, hides reasoning and animates the character', async (
   const last = requests.at(-1)!
   expect(last.model).toBe('fake-model')
   expect(last.messages[0]!.role).toBe('system')
-  expect(last.messages.at(-1)).toEqual({ role: 'user', content: 'hi there' })
+  // The time goes with each message (not in the system prompt, so a local model's cache of that lasts all day).
+  expect(last.messages.at(-1)).toEqual({ role: 'user', content: expect.stringMatching(/^hi there\n\n\(\d{1,2}:\d{2}\s[AP]M\)$/) })
+  expect(last.messages[0]!.content).not.toMatch(/\d:\d\d/)
   await expect(chat.locator('.titlebar-orb')).toHaveText('fake-model, on this PC')
 })
 

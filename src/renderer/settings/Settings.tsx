@@ -1,5 +1,5 @@
 import type { AppState, Graphics } from '@shared/ipc'
-import { CHARACTERS } from '@shared/characters'
+import { CHARACTERS, MY_MODEL_ID } from '@shared/characters'
 import { DEFAULT_SHORTCUTS, formatAccelerator, SHORTCUT_ACTIONS, toAccelerator, type ShortcutAction } from '@shared/shortcuts'
 import { useState, type KeyboardEvent } from 'react'
 import { useAppState } from '../ui/useAppState'
@@ -241,12 +241,17 @@ export function Settings(): React.JSX.Element {
             </p>
           )}
           <div className="characters" role="radiogroup" aria-label="Characters">
-            {[...CHARACTERS.map((c) => ({ id: c.id as string, name: c.name, note: `${c.voice} voice` })), ...state.myModels.map((m) => ({ ...m, note: 'your model' }))].map((c) => (
+            {/* The user's own models come first, labelled like the bundled ones; they keep the current voice. */}
+            {[
+              ...state.myModels.map((m) => ({ ...m, note: `${/^(female|male)/.exec(state.voice.voice)?.[1] ?? (state.voice.voice || 'default')} voice` })),
+              ...CHARACTERS.map((c) => ({ id: c.id as string, name: c.name, note: `${c.voice} voice` }))
+            ].map((c) => (
               <button
                 key={c.id}
                 type="button"
                 role="radio"
                 aria-checked={model.id === c.id}
+                data-mine={MY_MODEL_ID.test(c.id) || undefined}
                 className="character-choice"
                 disabled={busy}
                 onClick={() => void window.assistant.model.select(c.id)}

@@ -62,8 +62,9 @@ export function systemPrompt(memories: string[] = [], now = new Date(), name = '
         'For a task with several steps, call the tools for every step until it is done; never just announce the next step. ' +
         'An action is done only when the result you get back shows it; if it does not, try another way or say it did not work.'
       : 'You cannot see the screen, open apps, read files or browse the web right now. If asked, say so instead of pretending.',
-    // Small models otherwise guess the date (or claim they can look it up).
-    `The current local date and time is ${now.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })}.`,
+    // Small models otherwise guess the date (or claim they can look it up). Only the date: with the time here, the
+    // instructions and tool list changed every minute and a local model re-read all ~4,000 tokens (1.8 s instead of 0.4).
+    `Today is ${now.toLocaleDateString('en-US', { dateStyle: 'full' })}. Each user message ends with the local time in brackets; mention it only when asked.`,
     ...(kept.length
       ? ['\nThe user asked you to remember these things (trust them unless the user corrects them):', ...kept.map((m) => `\n- ${m}`)]
       : [])
@@ -108,6 +109,23 @@ export class Conversation {
   restore(messages: { role: 'user' | 'assistant'; text: string }[]): void {
     this.items = messages.map((m) => ({ id: this.nextId++, ...m }))
     this.emit()
+  }
+
+  private system(): ChatMessage {
+    return { role: 'system', content: systemPrompt(this.deps.memories?.() ?? [], new Date(), this.deps.name?.(), this.deps.toolNames?.() ?? [], this.deps.fullAccess?.() ?? false) }
+  }
+
+  /** Has a local model read the instructions and tool list once, so its cache already holds them for the first question. */
+  async warm(): Promise<void> {
+    const controller = new AbortController()
+    const messages: ChatMessage[] = [this.system(), { role: 'user', content: 'Hi' }]
+    try {
+      await this.deps.stream(messages, controller.signal).next() // the first token means the prompt is cached
+    } catch {
+      // only a warm-up: the first real question just takes a little longer
+    } finally {
+      controller.abort()
+    }
   }
 
   /** Adds an exchange answered locally (chat commands), without calling the AI. */
@@ -161,12 +179,9 @@ export class Conversation {
     }
     this.pendingSave = save
     const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: systemPrompt(this.deps.memories?.() ?? [], new Date(), this.deps.name?.(), this.deps.toolNames?.() ?? [], this.deps.fullAccess?.() ?? false)
-      },
+      this.system(),
       ...history,
-      { role: 'user', content: text }
+      { role: 'user', content: `${text}\n\n(${new Date().toLocaleTimeString('en-US', { timeStyle: 'short' })})` }
     ]
     let retried = false
     try {

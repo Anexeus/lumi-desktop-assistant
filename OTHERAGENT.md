@@ -234,6 +234,10 @@ app windows. What was done:
   additions to clip-driven bones piled up. **Trap:** never add to a mixer-driven bone without restoring the clip's pose
   first (`clipPose` in `avatar.ts`).
 - **Testing trap:** the installed Lumi holds `Alt+Shift+Space`; quit it before the shortcut E2E test.
+- 0.8.3 (showcase eve): "reply fast, hear me properly". **Trap:** Ollama's `qwen3:4b` tag is now thinking-only and
+  can't be switched off; the owner's real profile was on it (and on Ollama's lfm3-audio voice). Their profile now uses
+  Lumi's built-in engine, whose models were only in the sandbox copy and are hard-linked into the real profile.
+  Measure with the real request: capture it from a test profile (fake server), then replay it against each engine.
 
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 

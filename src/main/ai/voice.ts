@@ -35,12 +35,22 @@ export function cleanTranscript(text: string): string {
   return /\p{L}/u.test(spoken) ? spoken : ''
 }
 
-/** Speech to text. `audio` is a WAV file. */
-export async function transcribe(cfg: ProviderConfig, audio: Uint8Array, fetchImpl: typeof fetch = fetch): Promise<string> {
+/** Seconds of sound in a PCM WAV like the ones Lumi records, or Infinity when the header can't be read. */
+export function wavSeconds(wav: Uint8Array): number {
+  if (wav.byteLength < 44 || String.fromCharCode(...wav.subarray(0, 4)) !== 'RIFF') return Infinity
+  const byteRate = new DataView(wav.buffer, wav.byteOffset, wav.byteLength).getUint32(28, true)
+  return byteRate ? (wav.byteLength - 44) / byteRate : Infinity
+}
+
+/** Speech to text. `audio` is a WAV file. `ownWhisper`: the server is Lumi's own whisper.cpp. */
+export async function transcribe(cfg: ProviderConfig, audio: Uint8Array, fetchImpl: typeof fetch = fetch, ownWhisper = false): Promise<string> {
   if (audio.byteLength > MAX_AUDIO_BYTES) throw new ProviderError('http', 'The recording is too long.')
   const form = new FormData()
   form.append('model', cfg.model)
   form.append('file', new Blob([audio.slice()], { type: 'audio/wav' }), 'speech.wav')
+  // whisper.cpp reads a 30 s window however short the clip; a 15 s one halved a spoken command (1.7 → 0.9 s on a laptop
+  // CPU). Short clips only: a 29 s one came back garbled with it.
+  if (ownWhisper && wavSeconds(audio) <= 14) form.append('audio_ctx', '768')
   let res: Response
   try {
     res = await fetchImpl(endpoint(cfg, '/audio/transcriptions'), {

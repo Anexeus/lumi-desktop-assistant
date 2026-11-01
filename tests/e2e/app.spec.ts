@@ -475,10 +475,11 @@ test('settings credits the model, switches characters with a matching voice, kee
   await expect(settings.getByRole('alert')).toHaveText(/Not a VRM/)
   expect((await character.evaluate(() => window.assistant.getState())).model.custom).toBe(false)
 
-  // A real VRM is copied into the profile, listed as "your model", and the character reloads it.
+  // A real VRM is copied into the profile, listed first like the bundled ones, and the character reloads it.
   await stubDialog(join(process.cwd(), 'src/renderer/public/models/Seed-san.vrm'))
   await settings.getByRole('button', { name: 'Add my own .vrm file…' }).click()
-  const mine = characters.getByRole('radio', { name: /your model/ })
+  const mine = characters.locator('[data-mine]')
+  await expect(characters.getByRole('radio').first()).toHaveAttribute('data-mine')
   await expect(mine).toHaveAttribute('aria-checked', 'true')
   await expect(character.locator('body')).toHaveAttribute('data-model', 'custom', { timeout: 20_000 })
   const kept = (): string[] => (existsSync(join(userData, 'models', 'mine')) ? readdirSync(join(userData, 'models', 'mine')) : [])

@@ -863,7 +863,7 @@ async function start(): Promise<void> {
     try {
       const text =
         whisperForVoice()
-          ? await transcribe({ baseUrl: await localUrl(sttServer, settings.local.stt, 'the speech model'), model: 'whisper' }, wav)
+          ? await transcribe({ baseUrl: await localUrl(sttServer, settings.local.stt, 'the speech model'), model: 'whisper' }, wav, fetch, true)
           : await withOllama(async () => transcribe({ ...(await voiceConfig()), model: findProvider(settings.ai.provider).stt ?? settings.voice.model }, wav))
       return { ok: true as const, text }
     } catch (error) {
@@ -1032,7 +1032,10 @@ async function start(): Promise<void> {
   setState({ tools: toolsState() })
   void mcp.sync()
   void startOllama() // warm up at launch so the first message doesn't wait for it
-  if (settings.ai.provider === 'builtin' && installedModels().includes(settings.local.llm)) void aiConfig().catch(() => {}) // likewise
+  // Likewise the built-in model, which then reads the instructions and tool list once, so the first question is quick too.
+  if (settings.ai.provider === 'builtin' && installedModels().includes(settings.local.llm)) void aiConfig().then(() => conversation.warm(), () => {})
+  // And Lumi's Whisper, so the first spoken question doesn't wait ~2 s for it to start.
+  if (settings.voice.input && whisperForVoice() && installedModels().includes(settings.local.stt)) void localUrl(sttServer, settings.local.stt, 'the speech model').catch(() => {})
   const hookPort = (testMode && Number(process.env['DESKTOP_ASSISTANT_HOOK_PORT'])) || HOOK_PORT
   void startHookServer(() => settings.claude.hookToken, onHookEvent, hookPort).then((server) => {
     hookServerUp = !!server

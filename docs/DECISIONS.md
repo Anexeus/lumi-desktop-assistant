@@ -521,3 +521,25 @@ From the owner's screenshots (head turned like an owl, the waist "glitching", un
   computed in world space: the shortest rotation from where the clip's head faces to the cursor's direction, kept
   within 50° of the chest (the neck's parent), 40% at the neck and 60% at the head. `data-head` on the character page
   reports where she looks, for the E2E test.
+
+## ADR-080 Showcase speed: a cache-friendly prompt, a warm start, crowd-proof listening (2026-11-02)
+Measured on the owner's PC (RTX 4050 Laptop, 6 GB) with Lumi's real request (35 tools, ~3,900 tokens):
+- **Ollama's `qwen3:4b` is now a thinking-only model** (its template always opens `<think>`): 3.6–5.7 s even for
+  "say hi", ~4 s per tool step, and `reasoning_effort: none` only moved the reasoning into the reply text. Lumi's own
+  engine (Qwen3-VL 4B Instruct, Vulkan on the RTX) answered the same request in 0.4 s per step (1.8 s uncached), a
+  question in 0.2 s. The owner's profile was switched to the built-in engine (models hard-linked from the sandbox copy).
+- **The time left the system prompt.** It changed every minute, and the tool list comes after the system text in
+  Qwen's template, so every new minute re-read ~4,000 tokens. The prompt now has the date; each sent user message ends
+  with the time in brackets (not stored in the history).
+- **Warm start:** after the built-in model loads at launch, `Conversation.warm()` sends the instructions and tools once
+  and stops at the first token, so the first question hits a warm cache.
+- **Crowd noise:** the noise floor only followed the room while nobody talked, so a room that got louder than 3× the old
+  floor counted as one endless sentence (30 s of noise sent to Whisper, again and again). An utterance that stays loud
+  and steady for 4 s (loudest under 3× quietest; a voice swings far more) is now dropped and its level becomes the floor.
+- **Whisper:** whisper.cpp encodes a 30 s window however short the clip (1.7 s per command on the owner's CPU; more
+  threads didn't help). Lumi's own Whisper now gets `audio_ctx=768` (15 s) per request for clips up to 14 s: 0.9 s,
+  same text. Not as a server flag: a 29 s note came back garbled with it. Whisper also starts at launch when voice
+  input is on, instead of on the first tap.
+- **Own models** are listed first, labelled with the voice they use like the bundled ones (not "your model"). Their
+  licences were read again: Aldina, Lazuli, Zome, KuroG and Hatsune Miku NT forbid redistribution. "Miku 2" allows it
+  with credit, but its file names no author, so it stays personal until the creator is known.

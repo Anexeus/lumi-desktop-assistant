@@ -73,7 +73,24 @@ describe('Conversation', () => {
     const last = sent[2]!
     expect(last[0]!.role).toBe('system')
     expect(last[0]!.content).toContain(String(new Date().getFullYear()))
-    expect(last.slice(1).map((m) => m.content)).toEqual(['one', 'ok', 'two', 'three'])
+    // Only the newest message carries the time; the system prompt has just the date, so a local model's cache of it lasts.
+    expect(last.slice(1).map((m) => m.content.replace(/\n\n\(.+\)$/, ''))).toEqual(['one', 'ok', 'two', 'three'])
+    expect(last.at(-1)!.content).toMatch(/^three\n\n\(\d{1,2}:\d{2}\s[AP]M\)$/)
+    expect(last[0]!.content).not.toMatch(/\d:\d\d/)
+  })
+
+  it('warms a local model with the instructions, stopping at the first token, without touching the chat', async () => {
+    let aborted = false
+    const { conv, sent, events, snapshots } = setup(async function* (_m, signal) {
+      signal.addEventListener('abort', () => (aborted = true))
+      yield 'Hello'
+      yield 'never read'
+    })
+    await conv.warm()
+    expect(sent[0]!.map((m) => m.role)).toEqual(['system', 'user'])
+    expect(aborted).toBe(true)
+    expect(events).toEqual([])
+    expect(snapshots).toEqual([])
   })
 
   it('turns provider errors into an error item and an error state', async () => {
@@ -157,7 +174,7 @@ describe('Conversation', () => {
     ])
     expect(conv.snapshot().items.map((i) => i.text)).toEqual(['earlier question', 'earlier answer'])
     await conv.send('next')
-    expect(sent[0]!.slice(1).map((m) => m.content)).toEqual(['earlier question', 'earlier answer', 'next'])
+    expect(sent[0]!.slice(1).map((m) => m.content.replace(/\n\n\(.+\)$/, ''))).toEqual(['earlier question', 'earlier answer', 'next'])
   })
 
   it('adds local exchanges without calling the AI', async () => {

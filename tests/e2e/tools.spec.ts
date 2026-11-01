@@ -52,7 +52,7 @@ test.beforeAll(async () => {
         res.write(sse({ content: `(test) tool said: ${last.content.split('\n').slice(1).join(' | ').slice(0, 300)}` }))
         return res.end('data: [DONE]\n\n')
       }
-      const cue = /^\(tool:(\w+)\) (.+)$/.exec(last.content)
+      const cue = /^\(tool:(\w+)\) (.+)$/m.exec(last.content) // the first line; the time follows
       if (cue && TOOL_FOR[cue[1]!]) {
         const [name, args] = TOOL_FOR[cue[1]!]!(cue[2]!)
         res.write(sse({ tool_calls: [{ index: 0, id: 'call_1', function: { name, arguments: '' } }] }))

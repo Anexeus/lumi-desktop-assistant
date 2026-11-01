@@ -1,6 +1,6 @@
 # Current State
 
-_Last updated: 2026-11-01. Version 0.8.2. Every release since 0.2.0, with what was verified and how, is in [UPGRADE_PROGRESS.md](UPGRADE_PROGRESS.md); this page keeps the earlier milestones below._
+_Last updated: 2026-11-02. Version 0.8.3. Every release since 0.2.0, with what was verified and how, is in [UPGRADE_PROGRESS.md](UPGRADE_PROGRESS.md); this page keeps the earlier milestones below._
 
 
 ## PC actions, physics, graphics (new, after `8343a79`)

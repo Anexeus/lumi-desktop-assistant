@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { synthesize, transcribe } from '../../src/main/ai/voice'
+import { synthesize, transcribe, wavSeconds } from '../../src/main/ai/voice'
 import { mouthLevel, pickVoice, speakable, takeSentences } from '../../src/renderer/character/speech'
 import { downsample, encodeWav, fixWavSizes } from '../../src/renderer/ui/wav'
 
@@ -76,6 +76,18 @@ describe('audio endpoints', () => {
     expect(seen!.url).toBe('http://127.0.0.1:11434/v1/audio/transcriptions')
     expect(seen!.form.get('model')).toBe('lfm3-audio')
     expect((seen!.form.get('file') as File).type).toBe('audio/wav')
+    expect(seen!.form.get('audio_ctx')).toBeNull() // not Lumi's own Whisper
+  })
+
+  it('asks Lumi’s own Whisper for a shorter window only for short clips', async () => {
+    const forms: FormData[] = []
+    const fake = (async (_url: string, init: RequestInit) => (forms.push(init.body as FormData), Response.json({ text: 'hi' }))) as unknown as typeof fetch
+    const clip = (seconds: number): Uint8Array => encodeWav(new Float32Array(16000 * seconds))
+    expect(wavSeconds(clip(5))).toBe(5)
+    expect(wavSeconds(new Uint8Array(100))).toBe(Infinity)
+    await transcribe(cfg, clip(5), fake, true)
+    await transcribe(cfg, clip(20), fake, true)
+    expect(forms.map((f) => f.get('audio_ctx'))).toEqual(['768', null])
   })
 
   it('explains a missing voice model', async () => {

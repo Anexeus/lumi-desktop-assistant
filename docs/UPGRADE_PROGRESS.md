@@ -292,3 +292,17 @@ Root causes found by testing on this PC, not guessed:
 - Typecheck and lint clean; unit 175 pass (2 skipped); E2E 67/67 (the shortcut test with the installed Lumi closed,
   as it holds `Alt+Shift+Space`). Installed on the owner's PC through Explorer: the real profile's startup line went
   from `autoApprove=false` to `autoApprove=true`. Released as v0.8.2 (`Lumi-Setup-0.8.2.exe`, 274,604,765 bytes).
+
+## 0.8.3: fast replies for the showcase, crowd-proof listening, own models first
+- Owner's PC measured: Ollama `qwen3:4b` (thinking-only) 3.6–5.7 s for "hi" and ~4 s per tool step; Lumi's built-in
+  Qwen3-VL 4B on the RTX 4050: 0.2 s for a question, 0.4 + 0.8 s for "open my Downloads" (tool call + reply). The
+  owner's profile now uses the built-in engine and the Windows voice (ADR-080).
+- The time moved from the system prompt to the end of each message, so the local model's cache of the instructions and
+  35 tools lasts all day; the built-in model reads them once at launch.
+- Hands-free listening learns a room that gets loud (steady noise for 4 s is dropped and becomes the floor).
+- Speech to text: 1.7 → 0.9 s for a spoken command (a 15 s Whisper window for short clips); Whisper starts at launch.
+- Own models come first in Settings → Character, labelled with their voice.
+- Typecheck and lint clean; unit 179 pass (2 skipped); E2E 67/67 (with the installed Lumi closed). Installed on the
+  owner's PC through Explorer: the real profile's startup line reads `ai=builtin model=qwen3-vl-4b stt=builtin`, and the
+  chat and speech engines start at launch (4.5 GB of the 6 GB GPU). Released as v0.8.3 (`Lumi-Setup-0.8.3.exe`,
+  274,590,125 bytes).

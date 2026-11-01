@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.8.2.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.8.3.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).

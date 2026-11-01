@@ -5,7 +5,9 @@ export const VAD = {
   floorRatio: 3, // speech must be this many times louder than the room
   startMs: 150, // this much loud audio starts an utterance
   endMs: 700, // this much quiet ends it (0.9 s felt slow to answer)
-  maxMs: 30_000 // an utterance never runs longer
+  maxMs: 30_000, // an utterance never runs longer
+  noiseMs: 4_000, // loud and steady this long is the room getting louder (a crowd, a fan), not a voice
+  steadyRatio: 3 // a voice swings more than this between syllables and the gaps between words; noise doesn't
 }
 
 export interface VadState {
@@ -14,12 +16,17 @@ export interface VadState {
   loudMs: number
   quietMs: number
   spokenMs: number
+  quietest: number // the quietest and loudest frames of this utterance
+  loudest: number
 }
 
-export const vadInit = (): VadState => ({ floor: 0.005, speaking: false, loudMs: 0, quietMs: 0, spokenMs: 0 })
+export const vadInit = (): VadState => ({ floor: 0.005, speaking: false, loudMs: 0, quietMs: 0, spokenMs: 0, quietest: Infinity, loudest: 0 })
 
-/** Feeds one audio frame (its RMS and length). Returns 'start' or 'end' when an utterance begins or finishes. */
-export function vadStep(v: VadState, rms: number, ms: number): 'start' | 'end' | null {
+/**
+ * Feeds one audio frame (its RMS and length). Returns 'start' or 'end' when an utterance begins or finishes, and
+ * 'noise' when it was the room getting louder: that level becomes the new floor and the clip should be dropped.
+ */
+export function vadStep(v: VadState, rms: number, ms: number): 'start' | 'end' | 'noise' | null {
   const threshold = Math.max(VAD.minThreshold, v.floor * VAD.floorRatio)
   const loud = rms > threshold
   if (!v.speaking) {
@@ -30,8 +37,13 @@ export function vadStep(v: VadState, rms: number, ms: number): 'start' | 'end' |
     return 'start'
   }
   v.spokenMs += ms
+  v.quietest = Math.min(v.quietest, rms)
+  v.loudest = Math.max(v.loudest, rms)
   v.quietMs = rms > threshold * 0.6 ? 0 : v.quietMs + ms // a little hysteresis so soft syllables don't end it
-  if (v.quietMs < VAD.endMs && v.spokenMs < VAD.maxMs) return null
-  Object.assign(v, { speaking: false, loudMs: 0, quietMs: 0, spokenMs: 0 })
-  return 'end'
+  // Without this a crowd louder than the old floor counted as one endless sentence, 30 s of noise at a time.
+  const noise = v.spokenMs >= VAD.noiseMs && v.loudest < v.quietest * VAD.steadyRatio
+  if (!noise && v.quietMs < VAD.endMs && v.spokenMs < VAD.maxMs) return null
+  if (noise || v.quietMs < VAD.endMs) v.floor = Math.max(v.floor, v.quietest) // never got quiet: learn the room's level
+  Object.assign(v, { speaking: false, loudMs: 0, quietMs: 0, spokenMs: 0, quietest: Infinity, loudest: 0 })
+  return noise ? 'noise' : 'end'
 }

@@ -139,6 +139,9 @@ export function useVoiceMode(
         frames = []
         setPhase('listening')
         void send(utterance, ctx.sampleRate)
+      } else if (event === 'noise') {
+        frames = [] // the room, not a sentence: drop it and keep listening
+        setPhase('listening')
       } else if (!vad.speaking && frames.length > PRE_ROLL_FRAMES) frames.shift()
     }
     source.connect(processor)

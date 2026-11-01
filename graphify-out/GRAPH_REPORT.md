@@ -1,17 +1,17 @@
 # Graph Report - Desktop Assistant  (2026-11-02)
 
 ## Corpus Check
-- 160 files · ~148,722 words
+- 160 files · ~149,899 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 20 file(s) not represented in the graph (top: .vrm 10, .css 7, (none) 3)
 
 ## Summary
-- 1756 nodes · 3169 edges · 98 communities (82 shown, 16 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 106 edges (avg confidence: 0.87)
+- 1758 nodes · 3173 edges · 93 communities (80 shown, 13 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 107 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e5d60722`
+- Built from commit: `8ac6a8a1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -55,7 +55,7 @@
 - tsconfig.json
 - .claude/CLAUDE.md
 - package.json
-- windows.ts
+- security.ts
 - eslint.config.mjs
 - electron.vite.config.ts
 - Third-party notices
@@ -64,7 +64,7 @@
 - PermissionBroker
 - hooks.ts
 - commands.ts
-- tasks.ts
+- AiSettings.tsx
 - store.ts
 - settings.ts
 - model.ts
@@ -74,60 +74,57 @@
 - AssistantApi
 - muscles.ts
 - useVoiceMode.ts
-- character.ts
+- LocalServer
 - zod
-- library.ts
+- tools.spec.ts
 - fake-claude.mjs
 - local.ts
 - @modelcontextprotocol/sdk
 - main/ipc.ts
-- react
-- Perch
+- scene.ts
+- log.ts
 - schemas.ts
 - desktop.ts
-- security.ts
+- Security
 - desktop.ps1
 - store.ts
 - Upgrade progress (2026-10-30 brief: repair, computer use, voice, local AI, UI, installer)
 - shortcuts.ts
 - ref_node_path
-- .characterBounds
-- schemas.test.ts
+- eslint@10.13.0
+- parseSettingsFile
 - Avatar
-- window-state.ts
-- RichText.tsx
-- .constructor
-- characters.ts
+- three
+- Chat.tsx
+- @types/node@24.19.2
+- AiSettings
 - 4. The story, in order
 - Desktop Assistant: instructions for Claude Code
 - projects.ts
 - Application Plugin Registry (design)
-- TasksPanel.tsx
+- vite@8.3.5
 - scene.ts
 - preload/index.ts
 - MateSource
 - Lumi — project summary and handoff
-- ROADMAP.md
 - Lumi (Desktop Assistant)
-- ToolsSettings.tsx
-- electron-builder@26.18.0
-- @pixiv/three-vrm
 - @ghostery/adblocker
-- @types/react@19.3.0
 
 ## God Nodes (most connected - your core abstractions)
 1. `start()` - 119 edges
-2. `Decisions (ADR log)` - 81 edges
+2. `Decisions (ADR log)` - 82 edges
 3. `WindowManager` - 41 edges
 4. `vitest` - 27 edges
 5. `tool` - 27 edges
-6. `react` - 23 edges
-7. `Current State` - 23 edges
-8. `Upgrade progress (2026-10-30 brief: repair, computer use, voice, local AI, UI, installer)` - 23 edges
+6. `Upgrade progress (2026-10-30 brief: repair, computer use, voice, local AI, UI, installer)` - 24 edges
+7. `react` - 23 edges
+8. `Current State` - 23 edges
 9. `AssistantApi` - 22 edges
-10. `ProviderError` - 20 edges
+10. `Conversation` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `ADR-081 The history the model sees includes its tool calls; restored chats aren't sent (2026-11-02)` --references--> `Conversation`  [INFERRED]
+  docs/DECISIONS.md → src/main/ai/conversation.ts
 - `Phase 14: mouse-wheel resize (done first: smallest, self-contained)` --references--> `scaleBounds()`  [INFERRED]
   docs/UPGRADE_PROGRESS.md → src/main/geometry.ts
 - `Character state machine (pure TS, renderer)` --references--> `notify()`  [INFERRED]
@@ -136,21 +133,19 @@
   CLAUDE.md → src/main/tools/broker.ts
 - `ADR-015 Character state machine lives in main (2026-10-29)` --references--> `AppState`  [INFERRED]
   docs/DECISIONS.md → src/shared/ipc.ts
-- `5. Decisions worth knowing (see docs/DECISIONS.md)` --references--> `AppState`  [INFERRED]
-  OTHERAGENT.md → src/shared/ipc.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (98 total, 16 thin omitted)
+## Communities (93 total, 13 thin omitted)
 
 ### Community 0 - "start"
-Cohesion: 0.12
-Nodes (15): appIcon(), start(), aiConfig(), chatStream(), emergencyStop(), fire(), localUrl(), notify() (+7 more)
+Cohesion: 0.06
+Nodes (49): ADR-054 Peeking from screen edges and sitting on app windows (2026-10-30), canSit(), CHARACTER_DEFAULT, CHARACTER_MAX, CHARACTER_MIN, clampSize(), contains(), defaultPlacement() (+41 more)
 
 ### Community 1 - "devDependencies"
-Cohesion: 0.14
-Nodes (14): devDependencies, electron@45.1.0, react@19.3.1, react-dom@19.3.1, three@0.186.1, @types/node@24.19.2, @types/three@0.186.0, typescript@6.0.3 (+6 more)
+Cohesion: 0.13
+Nodes (15): devDependencies, electron@45.1.0, electron-builder@26.18.0, @pixiv/three-vrm@3.5.5, react@19.3.1, react-dom@19.3.1, @types/react-dom@19.3.0, @types/three@0.186.0 (+7 more)
 
 ### Community 3 - "Code Review and Quality"
 Cohesion: 0.06
@@ -197,8 +192,8 @@ Cohesion: 0.09
 Nodes (21): Build Failure Triage, Common Rationalizations, Debugging and Error Recovery, Error-Specific Patterns, Instrumentation Guidelines, Overview, Red Flags, Runtime Error Triage (+13 more)
 
 ### Community 14 - "ai.spec.ts"
-Cohesion: 0.11
-Nodes (15): characterState(), fakeMicWav(), launch(), openPanel(), page(), pageErrors, pages(), requests (+7 more)
+Cohesion: 0.22
+Nodes (9): characterState(), fakeMicWav(), launch(), openPanel(), page(), pageErrors, pages(), requests (+1 more)
 
 ### Community 15 - "electron-builder.yml"
 Cohesion: 0.08
@@ -225,8 +220,8 @@ Cohesion: 0.12
 Nodes (16): compilerOptions, composite, isolatedModules, jsx, lib, module, moduleResolution, noEmit (+8 more)
 
 ### Community 21 - "Settings.tsx"
-Cohesion: 0.13
-Nodes (13): ClaudeSettings(), IntegrationsSettings(), PRESETS, STATUS, MateSettings(), GRAPHICS, Settings(), SHORTCUT_LABELS (+5 more)
+Cohesion: 0.09
+Nodes (21): react, ClaudeSettings(), IntegrationsSettings(), PRESETS, STATUS, MateSettings(), MemorySettings(), add() (+13 more)
 
 ### Community 22 - "Testing Patterns Reference (JavaScript/TypeScript)"
 Cohesion: 0.14
@@ -234,11 +229,11 @@ Nodes (13): API / Integration Testing, Common Assertions, E2E Testing (Playwrigh
 
 ### Community 23 - "Decisions (ADR log)"
 Cohesion: 0.03
-Nodes (77): ADR-001 Electron over Tauri (2026-10-29), ADR-002 React instead of Vue (2026-10-29), ADR-003 No Python backend (2026-10-29), ADR-004 Privileged work only in main; sandboxed renderers (2026-10-29), ADR-005 OmniRoute not adopted (2026-10-29), ADR-006 Claude Code via hooks + headless CLI (2026-10-29), ADR-007 SQLite driver: `node:sqlite` (decided 2026-10-29), ADR-008 Agent-skills subset instead of full plugin (2026-10-29) (+69 more)
+Nodes (79): ADR-001 Electron over Tauri (2026-10-29), ADR-002 React instead of Vue (2026-10-29), ADR-003 No Python backend (2026-10-29), ADR-004 Privileged work only in main; sandboxed renderers (2026-10-29), ADR-005 OmniRoute not adopted (2026-10-29), ADR-006 Claude Code via hooks + headless CLI (2026-10-29), ADR-007 SQLite driver: `node:sqlite` (decided 2026-10-29), ADR-008 Agent-skills subset instead of full plugin (2026-10-29) (+71 more)
 
 ### Community 24 - "speaker.ts"
-Cohesion: 0.11
-Nodes (27): createSpeaker(), enqueue(), finishIfDone(), playWav(), pump(), speakWithWindows(), Sentence, mouthLevel() (+19 more)
+Cohesion: 0.19
+Nodes (17): createSpeaker(), enqueue(), finishIfDone(), playWav(), pump(), speakWithWindows(), Sentence, mouthLevel() (+9 more)
 
 ### Community 25 - "compilerOptions"
 Cohesion: 0.15
@@ -252,13 +247,17 @@ Nodes (10): Correctness, Definition of Done, Definition of Done vs. Acceptance C
 Cohesion: 0.15
 Nodes (12): A. Ponytail, Additional plugins (official marketplace `claude-plugins-official`), B. OmniRoute, C. Graphify, Configuration backup, Configuration changes, D. Addy Osmani Agent Skills, Development Tools (+4 more)
 
+### Community 28 - "README.md"
+Cohesion: 0.27
+Nodes (3): Instructions for AI coding agents, Milestone 1 plan (implemented 2026-10-29; kept for reference), Roadmap
+
 ### Community 29 - "scripts"
 Cohesion: 0.18
 Nodes (11): scripts, build, dev, lint, package, package:dir, preview, runtimes (+3 more)
 
 ### Community 30 - "react"
-Cohesion: 0.17
-Nodes (14): Island(), tail(), VOICE_LABEL, Icon(), ICONS, Menu(), STATUS, Orb() (+6 more)
+Cohesion: 0.11
+Nodes (18): react-dom, Island(), tail(), VOICE_LABEL, Icon(), ICONS, Menu(), STATUS (+10 more)
 
 ### Community 31 - "Current State"
 Cohesion: 0.08
@@ -270,11 +269,11 @@ Nodes (7): 1. AIRI (moeru-ai/airi): primary reference, 2. Xiaoke AI (liupig/xiao
 
 ### Community 33 - "shared/ipc.ts"
 Cohesion: 0.03
-Nodes (7): ClaudeState, LocalState, MateState, MenuAction, ModelInfo, SpeechResult, TranscribeResult
+Nodes (8): ChooseModelResult, ListModelsResult, LocalState, MateImportResult, MateState, ModelInfo, SpeechResult, TranscribeResult
 
 ### Community 34 - "main/index.ts"
-Cohesion: 0.12
-Nodes (22): electron, findClaude(), DEBUG_SWITCHES, locked, ADR-0075, appsPlugin(), filesPlugin(), findApp() (+14 more)
+Cohesion: 0.22
+Nodes (14): DEBUG_SWITCHES, locked, ADR-0075, appsPlugin(), filesPlugin(), findApp(), InstalledApp, knownFolders() (+6 more)
 
 ### Community 35 - "Installation"
 Cohesion: 0.22
@@ -282,11 +281,11 @@ Nodes (8): Claude Code tooling (reproduce on another machine), Development envir
 
 ### Community 38 - "package.json"
 Cohesion: 0.14
-Nodes (13): description, eslint@10.13.0, @types/react-dom@19.3.0, engines, node, license, main, name (+5 more)
+Nodes (13): dependencies, zod@4.6.7, description, @types/react@19.3.0, engines, node, license, main (+5 more)
 
-### Community 39 - "windows.ts"
-Cohesion: 0.13
-Nodes (29): ADR-054 Peeking from screen edges and sitting on app windows (2026-10-30), 4.8 This round → 0.4.0, canSit(), CHARACTER_DEFAULT, CHARACTER_MAX, CHARACTER_MIN, clampSize(), contains() (+21 more)
+### Community 39 - "security.ts"
+Cohesion: 0.27
+Nodes (11): APP_HOST, APP_SCHEME, devCsp(), isTrustedUrl(), PROD_CSP, resolveBundlePath(), hardenSession(), hardenWebContents() (+3 more)
 
 ### Community 40 - "eslint.config.mjs"
 Cohesion: 0.29
@@ -301,36 +300,36 @@ Cohesion: 0.40
 Nodes (4): Claude Code skills (development only, not shipped), npm packages, Seed-san (default character model), Third-party notices
 
 ### Community 43 - "provider.ts"
-Cohesion: 0.06
-Nodes (43): ADR-080 Showcase speed: a cache-friendly prompt, a warm start, crowd-proof listening (2026-11-02), Conversation, ConversationDeps, parseWrittenToolCall(), systemPrompt(), wrapToolResult(), ChatMessage, createThinkFilter() (+35 more)
+Cohesion: 0.05
+Nodes (53): vitest, Conversation, ConversationDeps, parseWrittenToolCall(), systemPrompt(), wrapToolResult(), ChatMessage, createThinkFilter() (+45 more)
 
 ### Community 44 - "web.ts"
-Cohesion: 0.14
-Nodes (11): blockAds(), browser(), downloadName(), lenientItem(), load(), openArgs, openInput, Site (+3 more)
+Cohesion: 0.11
+Nodes (12): blockAds(), browser(), browserContents, downloadName(), lenientItem(), load(), openArgs, openInput (+4 more)
 
 ### Community 45 - "PermissionBroker"
 Cohesion: 0.15
 Nodes (11): ADR-079 No approval cards for old profiles; head turns are added to the clip, never piled up (2026-11-01), ToolSpec, PermissionBroker, resolve(), createRegistry(), Registry, runToolCall(), ToolOutcome (+3 more)
 
 ### Community 46 - "hooks.ts"
-Cohesion: 0.17
-Nodes (15): ClaudeSettings, EVENTS, eventSchema, HOOK_PORT, hookCommand(), HookEntry, HookEvent, hooksInstalled() (+7 more)
+Cohesion: 0.10
+Nodes (24): Planned built-ins, ClaudeSettings, EVENTS, eventSchema, HOOK_PORT, hookCommand(), HookEntry, HookEvent (+16 more)
 
 ### Community 47 - "commands.ts"
 Cohesion: 0.23
 Nodes (8): HELP, MAX_MEMORY_CHARS, runCommand(), saveMemory(), looksSensitive(), luhn(), PATTERNS, SaveResult
 
-### Community 48 - "tasks.ts"
-Cohesion: 0.20
-Nodes (8): Planned built-ins, ClaudeTasks, describeEvent(), explainFailure(), TaskRunnerDeps, ClaudeMode, ClaudeTask, runner()
+### Community 48 - "AiSettings.tsx"
+Cohesion: 0.26
+Nodes (10): AiSettings(), choose(), saveKey(), test(), gb(), host(), LocalModels(), findProvider() (+2 more)
 
 ### Community 49 - "store.ts"
-Cohesion: 0.13
+Cohesion: 0.18
 Nodes (4): @playwright/test@1.64.1, @playwright/test, expectedConsoleErrors, pageErrors
 
 ### Community 50 - "settings.ts"
-Cohesion: 0.15
-Nodes (21): ADR-0079, DEFAULT_AI, DEFAULT_LOCAL, DEFAULT_NAME, DEFAULT_TOOLS, DEFAULT_VOICE, getSecret(), hasSecret() (+13 more)
+Cohesion: 0.12
+Nodes (24): ADR-0079, DEFAULT_AI, DEFAULT_LOCAL, DEFAULT_NAME, DEFAULT_TOOLS, DEFAULT_VOICE, getSecret(), hasSecret() (+16 more)
 
 ### Community 51 - "model.ts"
 Cohesion: 0.09
@@ -341,100 +340,88 @@ Cohesion: 0.12
 Nodes (21): activeAt, applyMate(), applyState(), canvas, clipCache, endPress(), loadClip(), loadModel() (+13 more)
 
 ### Community 54 - "mcp.ts"
-Cohesion: 0.23
+Cohesion: 0.21
 Nodes (8): Connection, McpManager, McpToolInfo, mcpToolName(), parseCommandLine(), slug(), McpServerConfig, McpServerInfo
 
 ### Community 56 - "muscles.ts"
-Cohesion: 0.10
-Nodes (38): convertClip(), Key, num(), parseAnim(), round(), sampleCurve(), UnityClip, BY_BONE (+30 more)
+Cohesion: 0.06
+Nodes (57): convertClip(), Key, num(), parseAnim(), round(), sampleCurve(), UnityClip, assetsOf() (+49 more)
 
 ### Community 57 - "useVoiceMode.ts"
 Cohesion: 0.23
-Nodes (12): MicButton(), RecorderStatus, useRecorder(), useVoiceMode(), VAD, vadInit(), VadState, vadStep() (+4 more)
+Nodes (12): MicButton(), RecorderStatus, useRecorder(), useVoiceMode(), VoicePhase, VAD, vadInit(), VadState (+4 more)
 
-### Community 58 - "character.ts"
-Cohesion: 0.31
-Nodes (8): CHARACTER_EVENTS, CharacterSnapshot, initialSnapshot, table, Target, TRANSIENT_MS, transition(), run()
+### Community 58 - "LocalServer"
+Cohesion: 0.27
+Nodes (4): freePort(), listDevices(), LocalServer, LocalServerStatus
 
 ### Community 59 - "zod"
-Cohesion: 0.15
-Nodes (10): dependencies, zod@4.6.7, zod, githubPlugin(), repoSchema, Permission, Plugin, tool (+2 more)
+Cohesion: 0.20
+Nodes (6): zod, githubPlugin(), repoSchema, Permission, Plugin, wingetPlugin()
 
-### Community 60 - "library.ts"
-Cohesion: 0.11
-Nodes (20): assetsOf(), CLIPS, guessMateFolder(), importMate(), ImportResult, MATE_CREDIT, mateId(), MODELS (+12 more)
+### Community 60 - "tools.spec.ts"
+Cohesion: 0.20
+Nodes (6): chat(), HOOK_TOKEN, page(), pageErrors, Seen, TOOL_FOR
 
 ### Community 62 - "local.ts"
-Cohesion: 0.10
-Nodes (14): root, RUNTIMES, downloadModel(), freePort(), listDevices(), LocalServer, pickDevice(), sha256File() (+6 more)
+Cohesion: 0.18
+Nodes (9): downloadModel(), pickDevice(), sha256File(), sleep(), findLocalModel(), LOCAL_MODEL_IDS, LOCAL_MODELS, LocalModel (+1 more)
 
 ### Community 63 - "@modelcontextprotocol/sdk"
 Cohesion: 0.50
 Nodes (3): @modelcontextprotocol/sdk@1.32.2, @modelcontextprotocol/sdk, server
 
 ### Community 64 - "main/ipc.ts"
-Cohesion: 0.32
-Nodes (7): handle(), on(), trusted(), InvokeChannel, InvokePayload, SendChannel, SendPayload
+Cohesion: 0.19
+Nodes (10): electron, devOrigin, devServerUrl, handle(), on(), trusted(), InvokeChannel, InvokePayload (+2 more)
 
-### Community 65 - "react"
-Cohesion: 0.23
-Nodes (8): react, react-dom, Approvals(), Chat(), onKeyDown(), send(), TitleBar(), useConversation()
+### Community 65 - "scene.ts"
+Cohesion: 0.25
+Nodes (3): Gesture, QUALITY, CharacterState
 
 ### Community 67 - "schemas.ts"
-Cohesion: 0.10
-Nodes (21): MENU_ACTIONS, acceleratorSchema, aiSettingsSchema, assistantNameSchema, baseUrlSchema, boundsSchema, characterChoiceSchema, coord (+13 more)
+Cohesion: 0.08
+Nodes (25): loadWindowState(), saveWindowState(), MENU_ACTIONS, acceleratorSchema, aiSettingsSchema, assistantNameSchema, baseUrlSchema, boundsSchema (+17 more)
 
 ### Community 68 - "desktop.ts"
 Cohesion: 0.13
 Nodes (12): describeLook(), DesktopHelper, desktopPlugin(), Element, Look, Rect, rectText(), target (+4 more)
 
-### Community 69 - "security.ts"
-Cohesion: 0.08
-Nodes (30): Claude Code, Dependency policy, Desktop control, project scripts, local engines, Development-tool risks (this repo), Electron baseline (enforced from Milestone 1), Mate Engine import (ADR-075), MCP, Microphone and voice (Milestone 4) (+22 more)
+### Community 69 - "Security"
+Cohesion: 0.12
+Nodes (16): Claude Code, Dependency policy, Desktop control, project scripts, local engines, Development-tool risks (this repo), Electron baseline (enforced from Milestone 1), Mate Engine import (ADR-075), MCP, Microphone and voice (Milestone 4) (+8 more)
 
 ### Community 70 - "desktop.ps1"
 Cohesion: 0.31
 Nodes (16): Act(), Await(), Capture(), Click(), Elements(), EnsureTarget(), FindWindow(), Handle() (+8 more)
 
 ### Community 71 - "store.ts"
-Cohesion: 0.23
-Nodes (10): createStore(), MIGRATIONS, openStore(), StoredMessage, MemorySettings(), add(), when(), ConversationSummary (+2 more)
+Cohesion: 0.27
+Nodes (8): createStore(), MIGRATIONS, openStore(), Store, StoredMessage, ConversationSummary, MemoryItem, MemoryKind
 
 ### Community 72 - "Upgrade progress (2026-10-30 brief: repair, computer use, voice, local AI, UI, installer)"
-Cohesion: 0.09
-Nodes (23): 0.2.1: testing the installed app found three bugs (fixed), 0.3.0: "too slow, nothing works, cmd windows" (fixed), 0.3.1: one icon everywhere, install location, settings diagnosis, 0.4.0: taskbar-glass island, Siri orb, rebindable keys, peeking and sitting, cute lines, 0.5.0: pill island, glass menu, guided API keys, 9 characters, side-on sitting, smoother resizing, 0.6.0: the AI does what it's told; one look everywhere; taskbar icon; front-facing sit, 0.7.0: Gemini voice fix, Miku by default, Desktop Mate–style poses, install apps, never asks, 0.8.0 (first part, built as 0.7.1, not released): legs in front of the taskbar, the first pick-up back, own models, Gemini tools, Mate Engine ideas, island fixes (+15 more)
+Cohesion: 0.08
+Nodes (24): 0.2.1: testing the installed app found three bugs (fixed), 0.3.0: "too slow, nothing works, cmd windows" (fixed), 0.3.1: one icon everywhere, install location, settings diagnosis, 0.4.0: taskbar-glass island, Siri orb, rebindable keys, peeking and sitting, cute lines, 0.5.0: pill island, glass menu, guided API keys, 9 characters, side-on sitting, smoother resizing, 0.6.0: the AI does what it's told; one look everywhere; taskbar icon; front-facing sit, 0.7.0: Gemini voice fix, Miku by default, Desktop Mate–style poses, install apps, never asks, 0.8.0 (first part, built as 0.7.1, not released): legs in front of the taskbar, the first pick-up back, own models, Gemini tools, Mate Engine ideas, island fixes (+16 more)
 
 ### Community 73 - "shortcuts.ts"
-Cohesion: 0.24
-Nodes (10): ShortcutRow(), onKeyDown(), save(), DEFAULT_SHORTCUTS, isAccelerator(), KEYS, MODIFIERS, NAMED_KEYS (+2 more)
+Cohesion: 0.16
+Nodes (15): createTray(), ShortcutRow(), onKeyDown(), save(), Send, invokeSchemas, sendSchemas, DEFAULT_SHORTCUTS (+7 more)
 
 ### Community 74 - "ref_node_path"
-Cohesion: 0.19
-Nodes (5): vitest, build, SIZES, redact(), startLog()
+Cohesion: 0.13
+Nodes (8): root, RUNTIMES, build, SIZES, SearchHit, SKIP_DIRS, unsafePath(), within()
 
-### Community 76 - "schemas.test.ts"
-Cohesion: 0.29
-Nodes (5): ADR-055 Settings are validated one by one (2026-10-30), Send, invokeSchemas, parseSettingsFile(), sendSchemas
+### Community 76 - "parseSettingsFile"
+Cohesion: 0.67
+Nodes (3): ADR-055 Settings are validated one by one (2026-10-30), 4.8 This round → 0.4.0, parseSettingsFile()
 
-### Community 77 - "Avatar"
-Cohesion: 0.09
-Nodes (5): three, Avatar, Gesture, QUALITY, CharacterState
+### Community 79 - "Chat.tsx"
+Cohesion: 0.15
+Nodes (15): Approvals(), Chat(), onKeyDown(), send(), MODES, name(), STATUS, TasksPanel() (+7 more)
 
-### Community 78 - "window-state.ts"
-Cohesion: 0.40
-Nodes (4): Store, saveWindowState(), WindowStateFile, windowStateSchema
-
-### Community 79 - "RichText.tsx"
-Cohesion: 0.42
-Nodes (6): Block, dedent(), inline, parseMarkdown(), RichText(), spans()
-
-### Community 80 - ".constructor"
-Cohesion: 0.33
-Nodes (4): loadPage(), workAreas(), IslandStyle, WindowName
-
-### Community 81 - "characters.ts"
-Cohesion: 0.18
-Nodes (9): Settings, CHARACTER_IDS, CharacterChoice, CharacterId, findCharacter(), MY_MODEL_ID, AiSettings, AiStatus (+1 more)
+### Community 81 - "AiSettings"
+Cohesion: 0.67
+Nodes (3): AiSettings, AiStatus, ProviderId
 
 ### Community 82 - "4. The story, in order"
 Cohesion: 0.09
@@ -452,10 +439,6 @@ Nodes (8): Owned, ProjectInfo, projectsPlugin(), resolveProject(), game, outside
 Cohesion: 0.33
 Nodes (5): Application Plugin Registry (design), Enforcement, Lifecycle, Manifest, Scope (v1)
 
-### Community 86 - "TasksPanel.tsx"
-Cohesion: 0.29
-Nodes (6): MODES, name(), STATUS, TasksPanel(), AppState, ShortcutAction
-
 ### Community 87 - "scene.ts"
 Cohesion: 0.29
 Nodes (8): loadAvatar(), holdPose(), startRole(), toThree(), addOffsets(), createScene(), applyGaze(), use()
@@ -463,6 +446,10 @@ Nodes (8): loadAvatar(), holdPose(), startRole(), toThree(), addOffsets(), creat
 ### Community 88 - "preload/index.ts"
 Cohesion: 0.40
 Nodes (4): api, ChatEvent, Events, Invoke
+
+### Community 89 - "MateSource"
+Cohesion: 0.33
+Nodes (3): MateSource, MateClip, MateRole
 
 ### Community 90 - "Lumi — project summary and handoff"
 Cohesion: 0.33
@@ -474,23 +461,23 @@ Nodes (5): Configure, Develop, Docs, Lumi (Desktop Assistant), Use it (installed
 
 ## Knowledge Gaps
 - **5 isolated node(s):** `ADR-0075`, `ADR-0075`, `ADR-0075`, `ADR-0079`, `ADR-0075`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 921 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **16 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 922 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Decisions (ADR log)` connect `Decisions (ADR log)` to `windows.ts`, `provider.ts`, `schemas.test.ts`, `PermissionBroker`, `README.md`?**
-  _High betweenness centrality (0.069) - this node is a cross-community bridge._
+- **Why does `Decisions (ADR log)` connect `Decisions (ADR log)` to `start`, `README.md`, `PermissionBroker`, `parseSettingsFile`?**
+  _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **Are the 41 inferred relationships involving `start()` (e.g. with `main/index.ts` and `.addLocal()`) actually correct?**
   _`start()` has 41 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `ADR-0075`, `ADR-0075`, `ADR-0075` to the rest of the system?**
   _5 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `start` be split into smaller, more focused modules?**
-  _Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected._
-- **Why does `start()` connect `start` to `speaker.ts`, `react`, `main/index.ts`, `provider.ts`, `web.ts`, `PermissionBroker`, `hooks.ts`, `commands.ts`, `tasks.ts`, `settings.ts`, `model.ts`, `mcp.ts`, `character.ts`, `zod`, `library.ts`, `local.ts`, `main/ipc.ts`, `Perch`, `desktop.ts`, `security.ts`, `store.ts`, `ref_node_path`, `.characterBounds`, `window-state.ts`, `characters.ts`, `projects.ts`?**
-  _High betweenness centrality (0.063) - this node is a cross-community bridge._
+  _Cohesion score 0.05613951266125179 - nodes in this community are weakly interconnected._
+- **Why does `start()` connect `start` to `react`, `main/index.ts`, `security.ts`, `provider.ts`, `web.ts`, `PermissionBroker`, `hooks.ts`, `commands.ts`, `AiSettings.tsx`, `settings.ts`, `model.ts`, `mcp.ts`, `muscles.ts`, `LocalServer`, `zod`, `local.ts`, `main/ipc.ts`, `log.ts`, `schemas.ts`, `desktop.ts`, `store.ts`, `shortcuts.ts`, `projects.ts`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
 - **Should `devDependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
-- **Why does `AppState` connect `TasksPanel.tsx` to `shared/ipc.ts`, `main/index.ts`, `store.ts`, `.characterBounds`, `Avatar`, `4. The story, in order`, `main.ts`, `Settings.tsx`, `Decisions (ADR log)`, `preload/index.ts`, `speaker.ts`, `react`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
+- **Why does `vitest` connect `provider.ts` to `start`, `devDependencies`, `avatar.ts`, `speaker.ts`, `package.json`, `security.ts`, `web.ts`, `hooks.ts`, `commands.ts`, `model.ts`, `mcp.ts`, `muscles.ts`, `useVoiceMode.ts`, `zod`, `local.ts`, `log.ts`, `shortcuts.ts`, `ref_node_path`, `Chat.tsx`, `projects.ts`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._

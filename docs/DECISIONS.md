@@ -543,3 +543,17 @@ Measured on the owner's PC (RTX 4050 Laptop, 6 GB) with Lumi's real request (35 
 - **Own models** are listed first, labelled with the voice they use like the bundled ones (not "your model"). Their
   licences were read again: Aldina, Lazuli, Zome, KuroG and Hatsune Miku NT forbid redistribution. "Miku 2" allows it
   with credit, but its file names no author, so it stays personal until the creator is known.
+
+## ADR-081 The history the model sees includes its tool calls; restored chats aren't sent (2026-11-02)
+After 0.8.3 the owner said "the things I ask to open don't work": the reply said "YouTube is open!" and nothing opened.
+The history sent to the model held only the words of each turn, so earlier "open YouTube" → "YouTube is open!" pairs
+taught the model to answer with text. Replayed against the owner's engine with their real last 20 messages: 0 of 9
+tries called a tool, with or without an extra rule in the prompt or a shorter history; 9 of 9 with the tool calls and
+results kept in the history, and 21 of 21 action requests over three simulated 10-turn chats.
+- `Conversation` keeps each turn of this session as the model saw it: the user's words, every finished tool round
+  (the call and its result, shortened to 500 characters) and the reply. A cancelled round is left out (a call without
+  its result breaks the next request).
+- A chat restored after a restart is shown but not sent: its tool calls were never saved. (Shortcut noted in the code.)
+- New `files_open`: opens a document, PDF, picture, song or video from an approved folder in its usual app
+  (`shell.openPath`, documents and media only, never programs, scripts or macro formats). The owner asked for
+  "open rademy.txt from my desktop"; the model chains `files_search` → `files_open`.

@@ -4,7 +4,8 @@ import { ProviderError, type ChatMessage, type StreamEvent, type ToolCall } from
 
 // One conversation shared by every window. Persistence is the caller's job (see onPersist).
 
-const HISTORY_LIMIT = 20 // shortcut: fixed message window; upgrade to token-aware trimming when long chats lose context
+const HISTORY_TURNS = 10 // shortcut: fixed window of turns; upgrade to token-aware trimming when long chats lose context
+const HISTORY_RESULT = 500 // earlier turns' tool results, shortened: the model needs to see that it acted, not every byte
 const MEMORY_CHARS = 2000 // cap so saved memories can't crowd a small model's context
 const MAX_TOOL_ROUNDS = 10 // a model stuck calling tools gets cut off and answers with what it has
 const MAX_TOOL_RESULT = 12_000
@@ -53,7 +54,7 @@ export function systemPrompt(memories: string[] = [], now = new Date(), name = '
           ? 'The user has given you full permission: do what they ask right away, without asking them to confirm. '
           : 'Some actions need the user’s OK first; if they decline, accept it and don’t retry. ') +
         'Never tell the user to do something you can do with your tools, and never answer with a link when they asked you to open or ' +
-        'play something: open it or play it. To play music or a video use play_video; to open any program or folder use apps_open; ' +
+        'play something: open it or play it. To play music or a video use play_video; to open any program or folder use apps_open; to open a file find it with files_search, then files_open; ' +
         'to install an app use app_install; to write a paragraph or letter for the user use notes_write; to message someone use ' +
         'whatsapp_message. In Lumi’s browser the ' +
         'videos are listed first, so "the third video" is item 3. ' +
@@ -98,6 +99,11 @@ export class Conversation {
   private generation = 0 // bumped by clear(): replies from before a clear belong to the old chat
   private controller: AbortController | undefined
   private pendingSave: (() => void) | undefined
+  // What the model saw and did in each turn of this session: the user's words, its tool calls with their results, its
+  // reply. With only the words, small models learned from earlier turns to answer "open YouTube" with "YouTube is open!"
+  // and call nothing (0 of 9 tries with the owner's chat; 9 of 9 with the calls in it).
+  // shortcut: tool calls aren't saved, so a chat restored after a restart is shown but not sent; save them to continue it.
+  private context: { user: string; steps: ChatMessage[] }[] = []
 
   constructor(private readonly deps: ConversationDeps) {}
 
@@ -108,6 +114,7 @@ export class Conversation {
   /** Replaces the conversation with saved messages (e.g. the last chat after a restart). */
   restore(messages: { role: 'user' | 'assistant'; text: string }[]): void {
     this.items = messages.map((m) => ({ id: this.nextId++, ...m }))
+    this.context = []
     this.emit()
   }
 
@@ -144,6 +151,7 @@ export class Conversation {
       this.items.push({ id: this.nextId++, role, text })
       this.deps.onPersist?.({ role, text })
     }
+    this.context.push({ user: userText, steps: [{ role: 'assistant', content: replyText }] })
     this.emit()
   }
 
@@ -156,10 +164,9 @@ export class Conversation {
     const controller = new AbortController()
     this.controller = controller
 
-    const history: ChatMessage[] = this.items
-      .filter((i) => (i.role === 'user' || i.role === 'assistant') && i.text)
-      .slice(-HISTORY_LIMIT)
-      .map((i) => ({ role: i.role as 'user' | 'assistant', content: i.text }))
+    const history = this.context.slice(-HISTORY_TURNS).flatMap((t): ChatMessage[] => [{ role: 'user', content: t.user }, ...t.steps])
+    const done: ChatMessage[] = [] // this turn's finished steps, for later turns
+    this.context.push({ user: text, steps: done })
     this.items.push({ id: this.nextId++, role: 'user', text })
     this.deps.onPersist?.({ role: 'user', text })
     this.status = 'thinking'
@@ -224,11 +231,14 @@ export class Conversation {
           stepText = ''
           this.emit()
         }
-        if (!calls.length || !this.deps.runTool || round >= MAX_TOOL_ROUNDS) break
+        if (!calls.length || !this.deps.runTool || round >= MAX_TOOL_ROUNDS) {
+          if (stepText) done.push({ role: 'assistant', content: stepText })
+          break
+        }
 
         usedTools = true
         reply = undefined // text after the tools starts a new bubble
-        messages.push({
+        const callMessage: ChatMessage = {
           role: 'assistant',
           content: stepText,
           tool_calls: calls.map((c, i) => ({
@@ -237,7 +247,9 @@ export class Conversation {
             function: { name: c.name, arguments: c.arguments },
             ...(c.extra_content ? { extra_content: c.extra_content } : {}) // e.g. Gemini's thought signature, sent back as is
           }))
-        })
+        }
+        messages.push(callMessage)
+        const results: ChatMessage[] = []
         this.status = 'thinking'
         this.deps.onCharacter('work')
         for (const [i, call] of calls.entries()) {
@@ -251,7 +263,9 @@ export class Conversation {
           item.ok = outcome.ok
           this.emit()
           messages.push({ role: 'tool', tool_call_id: call.id || `call_${round}_${i}`, content: wrapToolResult(outcome.result) })
+          results.push({ role: 'tool', tool_call_id: call.id || `call_${round}_${i}`, content: wrapToolResult(outcome.result.slice(0, HISTORY_RESULT)) })
         }
+        done.push(callMessage, ...results) // whole rounds only: a call without its result would break the next request
         this.deps.onCharacter('think')
       }
       save()
@@ -283,6 +297,7 @@ export class Conversation {
     this.controller?.abort()
     const wasBusy = this.status !== 'idle'
     this.items = []
+    this.context = []
     this.status = 'idle'
     if (wasBusy) this.deps.onCharacter('cancel')
     this.emit()

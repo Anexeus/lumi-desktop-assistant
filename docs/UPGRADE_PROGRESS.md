@@ -306,3 +306,12 @@ Root causes found by testing on this PC, not guessed:
   owner's PC through Explorer: the real profile's startup line reads `ai=builtin model=qwen3-vl-4b stt=builtin`, and the
   chat and speech engines start at launch (4.5 GB of the 6 GB GPU). Released as v0.8.3 (`Lumi-Setup-0.8.3.exe`,
   274,590,125 bytes).
+
+## 0.8.4: she really does what you ask
+- "Open YouTube" answered "YouTube is open!" without opening anything: the history sent to the model had only words,
+  so it copied earlier replies. The history now carries each turn's tool calls and results; a restored chat is shown
+  but not sent (ADR-081). Owner's real chat replayed on their engine: 0/9 → 9/9 tool calls; three simulated 10-turn
+  chats: 21/21.
+- New `files_open`: "open rademy.txt from my desktop" searches the approved folders and opens the file in its usual app.
+- Typecheck and lint clean; unit 182 pass (2 skipped); E2E 67/67 (with the installed Lumi closed). Installed on the owner's PC
+  through Explorer (built-in engine and Whisper running). Released as v0.8.4 (`Lumi-Setup-0.8.4.exe`, 274,589,988 bytes).

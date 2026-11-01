@@ -238,6 +238,8 @@ app windows. What was done:
   can't be switched off; the owner's real profile was on it (and on Ollama's lfm3-audio voice). Their profile now uses
   Lumi's built-in engine, whose models were only in the sandbox copy and are hard-linked into the real profile.
   Measure with the real request: capture it from a test profile (fake server), then replay it against each engine.
+- 0.8.4: "it says it opened it but nothing opens". **Trap:** never send a small model a history of words only; it
+  copies earlier "done!" replies instead of calling tools. Keep tool calls and results in the history (ADR-081).
 
 ## 5. Decisions worth knowing (see docs/DECISIONS.md)
 

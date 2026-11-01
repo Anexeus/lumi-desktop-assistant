@@ -39,6 +39,19 @@ describe('scoped files', () => {
     expect((await files.read('docs/notes.md')).text).toContain('Meeting notes') // relative to the root
   })
 
+  it('opens documents inside the folder, but never programs, folders or anything outside', async () => {
+    const files = createScopedFiles(() => [root])
+    writeFileSync(join(root, 'setup.exe'), 'MZ')
+    writeFileSync(join(root, 'run.ps1'), 'x')
+    expect(await files.openable('docs/My Resume 2026.pdf')).toBe(join(root, 'docs', 'My Resume 2026.pdf'))
+    expect(await files.openable(join(root, 'docs', 'notes.md'))).toBe(join(root, 'docs', 'notes.md'))
+    await expect(files.openable('setup.exe')).rejects.toThrow(/not programs/)
+    await expect(files.openable('run.ps1')).rejects.toThrow(/not programs/)
+    await expect(files.openable('docs')).rejects.toThrow(/folder/)
+    await expect(files.openable(join(outside, 'secret.txt'))).rejects.toThrow(/approved/)
+    await expect(createScopedFiles(() => []).openable(join(root, 'docs', 'notes.md'))).rejects.toThrow(/approved/)
+  })
+
   it('refuses paths outside the approved folders, however they are written', async () => {
     const files = createScopedFiles(() => [root])
     for (const p of [join(outside, 'secret.txt'), join(root, '..', 'x'), '../secret.txt', join(root, 'escape', 'secret.txt'), '\\\\server\\share\\x', '\\\\?\\C:\\Windows\\win.ini']) {

@@ -14,8 +14,8 @@ export function filesPlugin(folders: () => string[]): Plugin {
     id: 'core.files',
     name: 'Files',
     version: '1.0.0',
-    description: 'Search and read text files in folders you approve. Read-only.',
-    permissions: ['files.read'],
+    description: 'Search and read text files in folders you approve, and open documents, pictures, music and videos from them.',
+    permissions: ['files.read', 'apps.launch'],
     tools: [
       tool({
         name: 'files_search',
@@ -48,6 +48,21 @@ export function filesPlugin(folders: () => string[]): Plugin {
         async run({ path }) {
           const { path: real, text, truncated } = await files.read(path)
           return `${real}${truncated ? ' (first 200 KB)' : ''}\n\n${text.slice(0, 20_000)}`
+        }
+      }),
+      tool({
+        name: 'files_open',
+        description:
+          'Open a document, PDF, picture, song or video from the user’s approved folders in its usual app (path from files_search, or relative to an approved folder).',
+        parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
+        input: z.object({ path: z.string().trim().min(1).max(1000) }),
+        risk: 'act',
+        describe: ({ path }) => `Open ${basename(path)}`,
+        async run({ path }) {
+          const real = await files.openable(path)
+          const error = await shell.openPath(real) // no shell, no arguments: Windows' usual app for that type
+          if (error) throw new Error(`Windows could not open ${basename(real)}: ${error}`)
+          return `Opened ${basename(real)}.`
         }
       })
     ]

@@ -166,15 +166,15 @@ describe('Conversation', () => {
     expect(saved).toEqual(['user:hi'])
   })
 
-  it('restores saved messages and continues the same history', async () => {
+  it('shows a restored chat but starts the model fresh (its tool calls were not saved)', async () => {
     const { conv, sent } = setup(() => reply('ok'))
     conv.restore([
-      { role: 'user', text: 'earlier question' },
-      { role: 'assistant', text: 'earlier answer' }
+      { role: 'user', text: 'open YouTube' },
+      { role: 'assistant', text: 'YouTube is open!' }
     ])
-    expect(conv.snapshot().items.map((i) => i.text)).toEqual(['earlier question', 'earlier answer'])
+    expect(conv.snapshot().items.map((i) => i.text)).toEqual(['open YouTube', 'YouTube is open!'])
     await conv.send('next')
-    expect(sent[0]!.slice(1).map((m) => m.content.replace(/\n\n\(.+\)$/, ''))).toEqual(['earlier question', 'earlier answer', 'next'])
+    expect(sent[0]!.slice(1).map((m) => m.content.replace(/\n\n\(.+\)$/, ''))).toEqual(['next'])
   })
 
   it('adds local exchanges without calling the AI', async () => {

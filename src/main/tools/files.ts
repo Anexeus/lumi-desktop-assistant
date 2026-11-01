@@ -6,6 +6,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'nod
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.svn', '.hg', '__pycache__', '.venv', 'dist', 'out', 'build', '$RECYCLE.BIN'])
 const TEXT_EXT = /\.(txt|md|markdown|json|jsonc|ya?ml|toml|ini|cfg|conf|csv|tsv|log|xml|html?|css|scss|less|js|jsx|ts|tsx|mjs|cjs|py|rb|go|rs|java|kt|cs|cpp|cc|c|h|hpp|php|sh|ps1|bat|cmd|sql|env\.example|gitignore|vue|svelte|lua|r|swift|dart)$/i
+// Documents, pictures, music and video: opening a program or a script would run it. No .doc/.xls/.ppt (macros).
+const OPENABLE_EXT = /\.(pdf|txt|md|rtf|docx|xlsx|pptx|odt|ods|odp|csv|png|jpe?g|gif|bmp|webp|mp3|wav|m4a|flac|ogg|mp4|mkv|mov|avi|webm)$/i
 const MAX_READ_BYTES = 200 * 1024
 const MAX_WRITE_BYTES = 1024 * 1024
 const MAX_SCAN_FILES = 5000
@@ -106,6 +108,15 @@ export function createScopedFiles(roots: () => string[]) {
       if (bytes.subarray(0, 8000).includes(0)) throw new Error('That looks like a binary file, so I can’t read it as text.')
       const truncated = bytes.byteLength > MAX_READ_BYTES
       return { path: real, text: bytes.subarray(0, MAX_READ_BYTES).toString('utf8'), truncated }
+    },
+
+    /** A document, picture, song or video inside an approved folder, safe to hand to its usual app. */
+    async openable(path: string): Promise<string> {
+      const real = await within(roots(), path)
+      if (!real) throw new Error('That file is not inside a folder you approved (Settings → Tools).')
+      if (!(await stat(real)).isFile()) throw new Error('That is a folder, not a file.')
+      if (!OPENABLE_EXT.test(real)) throw new Error('Lumi only opens documents, pictures, music and videos, not programs or scripts.')
+      return real
     },
 
     /**

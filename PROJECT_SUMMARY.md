@@ -89,7 +89,8 @@ input is zod-validated; there is no general shell — the AI can only use the sp
 | `8d53ba5` 0.8.0 | Mate Engine's animations, sounds and avatars imported from the user's copy (muscle-clip converter), Dance, one orb icon everywhere, voice answers without her name after a tap, Gemini tool calls, legs in front of the taskbar, own models, head follows the cursor, head pats, naps, island tap stops her |
 | `3acc56e` 0.8.1 | Seamless Mate Engine loops, 50° head limit, modest sitting, hanging from the screen top, faster voice |
 | `adb5a3d` 0.8.2 | No permission cards for old profiles; the head no longer spins on still clips and turns to the cursor in world space |
-| (next) 0.8.3 | Cache-friendly prompt and warm start (replies in under a second on the built-in engine), crowd-proof listening, own models first |
+| `8ac6a8a` 0.8.3 | Cache-friendly prompt and warm start (replies in under a second on the built-in engine), crowd-proof listening, own models first |
+| (next) 0.8.4 | The model's history keeps its tool calls (no more "YouTube is open!" without opening it), files_open |
 
 ## 4. How to work on it
 

@@ -150,6 +150,55 @@ describe('conversation with tools', () => {
     expect(rounds).toBe(11) // MAX_TOOL_ROUNDS (10) tool rounds, then one final answer
     expect(conv.snapshot().status).toBe('idle')
   })
+
+  it('sends earlier turns with the tools they called, so the model acts again instead of only saying it did', async () => {
+    const seen: ChatMessage[][] = []
+    let round = 0
+    const conv = new Conversation({
+      async *stream(messages): AsyncGenerator<StreamEvent> {
+        seen.push(structuredClone(messages))
+        if (round++ === 0) yield { type: 'tool_calls', calls: [{ id: 'c1', name: 'look', arguments: '{"q":"yt"}' }] }
+        else yield 'YouTube is open!'
+      },
+      runTool: async () => ({ title: 'Opened YouTube', ok: true, result: 'x'.repeat(2000) }),
+      onSnapshot: () => {},
+      onDelta: () => {},
+      onCharacter: () => {}
+    })
+    await conv.send('open YouTube')
+    expect(seen[1]!.at(-1)!.content.length).toBeGreaterThan(2000) // this turn sees the whole result
+    await conv.send('open YouTube again')
+    const history = seen[2]!.slice(1, -1)
+    expect(history.map((m) => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant'])
+    expect(history[1]!.tool_calls?.[0]?.function).toEqual({ name: 'look', arguments: '{"q":"yt"}' })
+    expect(history[2]!.tool_call_id).toBe('c1')
+    expect(history[2]!.content.length).toBeLessThan(700) // earlier results are shortened
+    expect(history[3]!.content).toBe('YouTube is open!')
+  })
+
+  it('leaves a cancelled tool round out of the history: a call without its result would break the next request', async () => {
+    const seen: ChatMessage[][] = []
+    let first = true
+    const conv: Conversation = new Conversation({
+      async *stream(messages): AsyncGenerator<StreamEvent> {
+        seen.push(structuredClone(messages))
+        if (first) {
+          first = false
+          yield { type: 'tool_calls', calls: [{ id: 'c1', name: 'look', arguments: '{}' }] }
+        } else yield 'ok'
+      },
+      runTool: async () => {
+        conv.cancel()
+        return { title: 't', ok: true, result: 'r' }
+      },
+      onSnapshot: () => {},
+      onDelta: () => {},
+      onCharacter: () => {}
+    })
+    await conv.send('do it')
+    await conv.send('next')
+    expect(seen.at(-1)!.slice(1).map((m) => m.role)).toEqual(['user', 'user'])
+  })
 })
 
 describe('parseWrittenToolCall', () => {

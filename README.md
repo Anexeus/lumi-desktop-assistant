@@ -12,7 +12,7 @@ should also read [OTHERAGENT.md](OTHERAGENT.md) (the whole history and the traps
 
 ## Use it (installed app)
 
-1. Run `release\Lumi Setup 0.8.3.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
+1. Run `release\Lumi Setup 0.8.4.exe` (unsigned: SmartScreen → **More info → Run anyway**). It installs for your user
    only, at `%LOCALAPPDATA%\Programs\Lumi`, with Start-menu and desktop shortcuts.
 2. Start **Lumi** from the Start menu. Settings → AI → **Lumi built-in** → **Download** Qwen3-VL 4B (2.9 GB, once).
    Settings → Voice → turn on voice input, choose **Lumi's Whisper** and download it (190 MB).
@@ -96,7 +96,7 @@ Logs: `%APPDATA%\Desktop Assistant\logs\lumi.log` (keys and tokens are masked).
   if you turn on "Show the AI model on the island".
 - **What the AI can do for you:** open any installed app or your folders ("open Brave", "open my Downloads"), play
   music or videos ("play a song"), click things in its own browser ("open the third video"), write notes and paragraphs
-  (opened in Notepad), type and click in apps, install apps (winget), send WhatsApp messages through WhatsApp Web (give it
+  (opened in Notepad), open documents, PDFs, pictures and videos from folders you approved, type and click in apps, install apps (winget), send WhatsApp messages through WhatsApp Web (give it
   the number with country code; you must be logged in at web.whatsapp.com). It acts without asking (Settings → Tools →
   "Do what I ask without asking first", on by default).
 - **Clicking her:** one click and she waves with a cute line, a double click opens Settings, a right-click opens the

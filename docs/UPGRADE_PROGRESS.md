@@ -289,3 +289,6 @@ Root causes found by testing on this PC, not guessed:
 - Checked: a new E2E test (head turned toward a parked cursor and steady) fails on 0.8.1's code (21° of drift in
   2 s) and passes now. With the real Mate Engine clips, her head held 34° toward a cursor at either side, 26° up or
   down, steady across idle switches; screenshots look natural.
+- Typecheck and lint clean; unit 175 pass (2 skipped); E2E 67/67 (the shortcut test with the installed Lumi closed,
+  as it holds `Alt+Shift+Space`). Installed on the owner's PC through Explorer: the real profile's startup line went
+  from `autoApprove=false` to `autoApprove=true`. Released as v0.8.2 (`Lumi-Setup-0.8.2.exe`, 274,604,765 bytes).
